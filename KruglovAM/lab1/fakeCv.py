@@ -18,9 +18,9 @@ def resize(src_img, new_w, new_h):
     return dst_img
 
 def apply_sepia(src_img):
-    sepia_filter = np.array([[0.393, 0.349, 0.272],
-                             [0.769, 0.686, 0.534],
-                             [0.189, 0.168, 0.131]])
+    sepia_filter = np.array([[0.272, 0.349, 0.393],
+                             [0.534, 0.686, 0.769],
+                             [0.131, 0.168, 0.189]])
     sepia_img = np.dot(src_img[..., :3], sepia_filter)
     sepia_img[sepia_img > 255] = 255  # Обрезаем значения до 255
     return sepia_img.astype(np.uint8)
