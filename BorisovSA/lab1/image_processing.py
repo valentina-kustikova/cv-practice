@@ -4,6 +4,7 @@ import argparse
 import sys
 import cv2 as cv
 import numpy as np
+from argparse import RawTextHelpFormatter
 
 
 def grayscale(image):
@@ -91,24 +92,35 @@ def pixelization(image, min_blocks_num):
     return image
 
 def argument_parser():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
+    
+    filters = ['grayscale', 'resize', 'sepia', 
+                           'vignette', 'pixelization']
+    
+    parameters_help = ['resize: Factor to resize the image',
+                       'vignette: Strength of vignette effect',
+                       'pixelization: Lower limit of the number '
+                        'of pixels per square area length']
+                        
+    for i in range(len(parameters_help)):
+        parameters_help[i] = ('- ' + parameters_help[i])
     
     parser.add_argument('-i', '--image',
                         help='Path to an image',
                         type=str,
                         dest='image_path')
+    parser.add_argument('-o', '--output',
+                        help='Output image name',
+                        type=str,
+                        dest='output_image',
+                        default='output.jpg')
     parser.add_argument('-f', '--filter',
-                        help='Filters: grayscale, resize,\
-                        sepia, vignette, pixelization ',
+                        help='Filters: ' + ', '.join(filters),
                         type=str,
                         dest='filter')
-    
     parser.add_argument('-p', '--parameter',
-                        help='Parameter of the filter\n\
-                        resize: Factor to resize the image\n\
-                        vignette: Strength of vignette effect\n\
-                        pixelization: lower limit of the number of pixels\
-                        per square area length',
+                        help='Parameter of the filter (default 2.0 for all)\n' + 
+                        '\n'.join(parameters_help),
                         type=float,
                         default=2.,
                         dest='parameter')
@@ -138,6 +150,7 @@ def main():
         new_image = pixelization(image, int(args.parameter))
         
     cv.imshow('Original image', cv.imread(args.image_path))
+    cv.imwrite(args.output_image, new_image)
     cv.imshow('New image', new_image)
     cv.waitKey(0)
     cv.destroyAllWindows()
