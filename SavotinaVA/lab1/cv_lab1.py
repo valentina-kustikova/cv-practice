@@ -3,12 +3,6 @@ import cv2 as cv
 import argparse
 import sys
 
-# Создаем изображение с красным цветом 
-#red_image = np.full((1000, 1000, 3), (0, 0, 255), dtype=np.uint8)
-
-#cv.imwrite("test_img.jpeg", red_image) 
-
-
 def arg_parser():
     parser = argparse.ArgumentParser()
     
@@ -75,7 +69,6 @@ def Resize(image, scale):
 
 def Sepia(image):
     height, width, nchannels = image.shape
-    print("channels is", nchannels)
     sepia = np.zeros((height, width, nchannels), dtype = np.uint8)
     
     for i in range(height):
@@ -141,50 +134,9 @@ def Pixelation(image, step):
                     image[x, y] = b, g, r
     
     return image
-    
-    
-    
-'''def Pixelation(image):
-    height, width = image.shape[:2]
-    print(height, width)
-    xstart = int(height / 5)
-    xend = int(height / 2.5)
-    ystart = int(width / 5)
-    yend = int(width / 2.5)
-    
-    print(xstart, xend, ystart, yend)
-    roi_img = image[xstart:xend, ystart:yend]
-    
-    
-    # Массив случайных координат
-    random_indices = np.arange((xend - xstart) * (yend - ystart))
-    np.random.shuffle(random_indices)
-    
-    # Массив для переставленных пикселей
-    shuffled_img = np.zeros_like(roi_img)
-    
-    # Перемешайте пиксели
-    for i in range(xend - xstart):
-      for j in range(yend - ystart):
-        index = i * (yend - ystart) + j
-        new_i, new_j = random_indices[index] // (yend - ystart), random_indices[index] % (yend - ystart)
-        shuffled_img[new_i, new_j] = roi_img[i, j]
-        
-    final_img = image[:height, :width]
-    ii = 0
-    jj = 0
-    for i in range(height):
-        if (i > xstart and i < xend):
-            for j in range(width):
-                 if( j > ystart and j < yend):
-                    final_img[i, j] = shuffled_img[ii, jj]
-                    jj = jj + 1
-            ii = ii + 1
-            jj = 0
-    
-    return final_img'''
 
-    
+
+
 def Gray_img(image_path, output_image):
     image = cv.imread(image_path)
     cv.imshow("Init image", image)
