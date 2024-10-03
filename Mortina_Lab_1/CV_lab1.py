@@ -72,6 +72,7 @@ def image_to_grayscale(image_path, output_image):
         for j in range(width):
             R, G, B = image[i, j]
             grey_value = int(0.2989 * R + 0.5870 * G + 0.1140 * B) 
+            
             grey_image[i, j] = grey_value
     
     #Отображение изображения
@@ -105,7 +106,7 @@ def image_resize(image_path, output_image, value):
         for j in range(new_width):
             new_x = int(j/value)
             new_y = int(i/value)
-            
+
             resize_image[i, j] = image[new_y, new_x]
 
     #Отображение изображения
@@ -165,6 +166,7 @@ def vignette(image_path, output_image):
     
     x = int(width / 2)
     y = int(height / 2)
+    
     for i in range(height):
         for j in range(width):
             x_value = 1 - (abs(j - x) / x)
@@ -194,7 +196,7 @@ def pixelation(image_path, output_image, pixel_size):
 
     pixelation_image = np.zeros((height, width, 3), dtype=np.uint8)
     
-    pixelation_image = image.copy()
+    pixelation_image = np.copy(image)
     
     x1 = width // 4
     x2 = int(width * 0.5)
@@ -206,12 +208,10 @@ def pixelation(image_path, output_image, pixel_size):
             
             region = image[j:j + pixel_size, i:i + pixel_size]
             
-            mean_color_bgr = np.zeros(nchannels, dtype=int)
-            for k in range(nchannels):
-                mean_color_bgr[k] = np.mean(region[:, :, k])
-                   
-            pixelation_image[j:j + pixel_size, i:i + pixel_size] = mean_color_bgr
-    
+            color = [np.mean(region[:, :, 0]), np.mean(region[:, :, 1]), np.mean(region[:, :, 2])]  
+            
+            pixelation_image[j:j + pixel_size, i:i + pixel_size] = color
+            
     #Отображение изображения
     cv.imshow('Init image', image)
     cv.imshow('Output image', pixelation_image)
