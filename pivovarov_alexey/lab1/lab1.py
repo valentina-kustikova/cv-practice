@@ -1,130 +1,190 @@
-import cv2
+import argparse
+import sys
+import cv2 as cv
 import numpy as np
 
-# Функция перевода изображения в оттенки серого
-def to_grayscale(image):
-    gray_image = np.dot(image[..., :3], [0.299, 0.587, 0.114]).astype(np.uint8)
-    return np.stack((gray_image,)*3, axis=-1)
+def cli_argument_parser():
+    parser = argparse.ArgumentParser()
 
-# Функция изменения размера изображения
-def resize_image(image, new_width, new_height):
-    h, w = image.shape[:2]
-    # Создаем новое изображение с белым фоном
-    resized_image = np.ones((new_height, new_width, 3), dtype=np.uint8) * 255
-    # Изменяем размер изображения
-    resized = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
-    resized_image[0:resized.shape[0], 0:resized.shape[1]] = resized
-    return resized_image
+    parser.add_argument('-i', '--image',
+                        help='Path to an image',
+                        type=str,
+                        dest='image_path',
+                        required=True)
+    parser.add_argument('-o', '--output',
+                        help='Output file name',
+                        type=str,
+                        default='output.jpg',
+                        dest='out_image_path')
+    parser.add_argument('-m', '--mode',
+                        help='Mode (image, grey_color, change_resolution, sepia_filter, vignette_filter, pixelated)',
+                        type=str,
+                        default='image',
+                        dest='mode')
+    parser.add_argument('-w', '--width',
+                        help='New width for resizing (only for resize_image mode)',
+                        type=int,
+                        default=200,
+                        dest='width')
+    parser.add_argument('-hg', '--height',
+                        help='New height for resizing (only for resize_image mode)',
+                        type=int,
+                        default=200,
+                        dest='height')
+    parser.add_argument('-px', '--pixel_size',
+                        help='Size of pixels for pixelation (only for pixelated mode)',
+                        type=int,
+                        default=5,
+                        dest='pixel_size')
 
-# Функция изменения разрешения изображения с добавлением белого фона
-def resize_image_with_fill(image):
-    # Получаем исходные размеры
+    args = parser.parse_args()
+    return args
+
+def image_mode(image_path, out_image_path):
+    image = cv.imread(image_path)
+    if image is None:
+        raise ValueError("Image not found or unable to load.")
+    
+    cv.imwrite(out_image_path, image)
+    print(f"Оригинальное изображение сохранено в '{out_image_path}'.")
+
+def grey_color(image_path, out_image_path):
+    image = cv.imread(image_path)
+    if image is None:
+        raise ValueError("Image not found or unable to load.")
+    
+    height, width, channels = image.shape
+    gray_image = np.zeros((height, width), dtype=np.uint8)
+    
+    # Проходим по каждому пикселю и вычисляем значение серого
+    for i in range(height):
+        for j in range(width):
+            # Получаем значения R, G, B для текущего пикселя
+            B, G, R = image[i, j]
+            # Вычисляем значение серого
+            gray_value = int(0.299 * R + 0.587 * G + 0.114 * B)
+            # Устанавливаем значение серого в новом изображении
+            gray_image[i, j] = gray_value
+    
+    # Преобразуем обратно в 3-канальный BGR
+    gray_image_colored = cv.merge([gray_image, gray_image, gray_image])
+    
+    cv.imwrite(out_image_path, gray_image_colored)
+    print(f"Грейскейл изображение сохранено в '{out_image_path}'.")
+
+def change_resolution(image_path, new_width, new_height, out_image_path):
+    image = cv.imread(image_path)
+    if image is None:
+        raise ValueError("Image not found or unable to load.")
+
     original_height, original_width = image.shape[:2]
-    
-    # Вычисляем новые размеры
-    new_width = original_width // 2
-    new_height = original_height // 2
-    
-    # Создаем новое изображение
-    filled_image = np.ones((original_height, original_width, 3), dtype=np.uint8) * 255
-    
-    # Изменяем размер изображения
-    resized = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
-    
-    # Вставляем уменьшенное изображение
-    start_y = (original_height - new_height) // 2
-    start_x = (original_width - new_width) // 2
-    filled_image[start_y:start_y + new_height, start_x:start_x + new_width] = resized
-    
-    return filled_image
+    resized_image = np.zeros((new_height, new_width, 3), dtype=np.uint8)
 
-# Функция применения фотоэффекта сепии
-def apply_sepia(image):
-    sepia_filter = np.array([[0.393, 0.769, 0.189],
-                             [0.349, 0.686, 0.168],
-                             [0.272, 0.534, 0.131]])
-    sepia_image = np.dot(image[..., :3], sepia_filter.T)
-    sepia_image[sepia_image > 255] = 255  # Обрезаем значения до 255
-    return sepia_image.astype(np.uint8)
+    # Коэффициенты масштабирования по ширине и высоте
+    x_ratio = original_width / new_width
+    y_ratio = original_height / new_height
 
-# Функция применения фотоэффекта виньетки
-def apply_vignette(image):
+    for i in range(new_height):
+        for j in range(new_width):
+            # Определяем координаты соответствующего пикселя в исходном изображении
+            orig_x = int(j * x_ratio)
+            orig_y = int(i * y_ratio)
+
+            # Копируем значение пикселя
+            resized_image[i, j] = image[orig_y, orig_x]
+
+    cv.imwrite(out_image_path, resized_image)
+    print(f"Изменённое разрешение изображения сохранено в '{out_image_path}'.")
+
+def sepia_filter(image_path, out_image_path):
+    image = cv.imread(image_path)
+    if image is None:
+        raise ValueError("Image not found or unable to load.")
+    
+    height, width, channels = image.shape
+    sepia_image = np.zeros_like(image)
+
+    for i in range(height):
+        for j in range(width):
+            B, G, R = image[i, j]
+            # Вычисляем новые значения RGB
+            new_R = min(255, int(0.393 * R + 0.769 * G + 0.189 * B))
+            new_G = min(255, int(0.349 * R + 0.686 * G + 0.168 * B))
+            new_B = min(255, int(0.272 * R + 0.534 * G + 0.131 * B))
+            sepia_image[i, j] = [new_B, new_G, new_R]
+    
+    cv.imwrite(out_image_path, sepia_image)
+    print(f"Сепия изображение сохранено в '{out_image_path}'.")
+
+
+def vignette_filter(image_path, out_image_path):
+    image = cv.imread(image_path)
+    if image is None:
+        raise ValueError("Image not found or unable to load.")
+    
     rows, cols = image.shape[:2]
-    X_resultant_matrix = cv2.getGaussianKernel(cols, cols/4)
-    Y_resultant_matrix = cv2.getGaussianKernel(rows, rows/4)
-    resultant_matrix = Y_resultant_matrix * X_resultant_matrix.T
-    mask = 200 * resultant_matrix / np.linalg.norm(resultant_matrix)
     vignette_image = np.copy(image)
-
-    for i in range(3):
-        vignette_image[:, :, i] = vignette_image[:, :, i] * mask
     
-    return vignette_image.astype(np.uint8)
+    # Генерация маски виньетки
+    center_x, center_y = cols // 2, rows // 2
+    for i in range(rows):
+        for j in range(cols):
+            # Расстояние от текущего пикселя до центра
+            distance = np.sqrt((j - center_x) ** 2 + (i - center_y) ** 2)
+            # Вычисляем коэффициент ослабления
+            vignette_strength = max(0, 1 - distance / max(center_x, center_y))
+            # Применяем маску к каждому цветному каналу
+            for c in range(3):
+                vignette_image[i, j, c] = int(vignette_image[i, j, c] * vignette_strength)
+    
+    cv.imwrite(out_image_path, vignette_image)
+    print(f"Виньетированное изображение сохранено в '{out_image_path}'.")
 
-# Функция пикселизации заданной области
-def pixelate_region(image, x, y, w, h, pixel_size):
-    region = image[y:y+h, x:x+w]
-    temp = cv2.resize(region, (pixel_size, pixel_size), interpolation=cv2.INTER_LINEAR)
-    pixelated_region = cv2.resize(temp, (w, h), interpolation=cv2.INTER_NEAREST)
-    image[y:y+h, x:x+w] = pixelated_region
-    return image
-
-# Функция добавления подписи на изображение
-def add_text(image, text, x, y):
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 1
-    color = (0, 0, 0)
-    thickness = 2
-    cv2.putText(image, text, (x, y), font, font_scale, color, thickness, cv2.LINE_AA)
-
-# Функция разделения изображения на зоны и применения фильтров
-def apply_filters_by_zones(image):
+def pixelate_image(image_path, pixel_size, out_image_path):
+    image = cv.imread(image_path)
+    if image is None:
+        raise ValueError("Image not found or unable to load.")
+    
     height, width = image.shape[:2]
-    zones = 5
-    zone_height = height // zones
-
-    filtered_image = np.copy(image)
-
-    # Оттенки серого
-    filtered_image[0:zone_height] = to_grayscale(image[0:zone_height])
-    add_text(filtered_image, "Grayscale", 10, zone_height - 10)
-
-    # Изменение разрешения
-    resized_zone = resize_image_with_fill(image[zone_height:2*zone_height])
-    filtered_image[zone_height:2*zone_height] = resized_zone
-    add_text(filtered_image, "Resized", 10, 2*zone_height - 10)
-
-    # Сепия
-    filtered_image[2*zone_height:3*zone_height] = apply_sepia(image[2*zone_height:3*zone_height])
-    add_text(filtered_image, "Sepia", 10, 3*zone_height - 10)
-
-    # Виньетка
-    filtered_image[3*zone_height:4*zone_height] = apply_vignette(image[3*zone_height:4*zone_height])
-    add_text(filtered_image, "Vignette", 10, 4*zone_height - 10)
+    pixelated_image = np.zeros_like(image)
 
     # Пикселизация
-    filtered_image[4*zone_height:] = pixelate_region(image[4*zone_height:], 0, 0, width, zone_height, 10)
-    add_text(filtered_image, "Pixelated", 10, height - 10)
+    for i in range(0, height, pixel_size):
+        for j in range(0, width, pixel_size):
+            # Находим размеры блока
+            block = image[i:i + pixel_size, j:j + pixel_size]
+            # Вычисляем средний цвет блока
+            avg_color = block.mean(axis=(0, 1))
+            # Применяем средний цвет ко всем пикселям блока
+            pixelated_image[i:i + pixel_size, j:j + pixel_size] = avg_color
+    
+    cv.imwrite(out_image_path, pixelated_image)
+    print(f"Пикселизированное изображение сохранено в '{out_image_path}'.")
 
-    return filtered_image
 
+# Главная функция
 def main():
-    # Загрузка изображения
-    image = cv2.imread('input.jpg')
-    new_width = 400
-    new_height = image.shape[0] * new_width // image.shape[1]
-    image = resize_image(image, new_width, new_height)
-    tmp = image.copy()
+    #python lab1.py -i input.jpg -o output.jpg -m vignette_filter
+    args = cli_argument_parser()
 
-    # Применение фильтров к зонам
-    filtered_image = apply_filters_by_zones(tmp)
+    if args.mode == 'image':
+        image_mode(args.image_path, args.out_image_path)
+    elif args.mode == 'grey_color':
+        grey_color(args.image_path, args.out_image_path)
+    elif args.mode == 'change_resolution':
+        change_resolution(args.image_path, int(args.width), int(args.height), args.out_image_path)
+    elif args.mode == 'sepia_filter':
+        sepia_filter(args.image_path, args.out_image_path)
+    elif args.mode == 'vignette_filter':
+        vignette_filter(args.image_path, args.out_image_path)
+    elif args.mode == 'pixelated':
+        pixelate_image(args.image_path, int(args.pixel_size), args.out_image_path)
+    else:
+        raise ValueError('Unsupported mode')
 
-    cv2.imshow('Original Image', image)
-    cv2.imshow('Filtered Image', filtered_image)
-
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    print(f"Фильтр '{args.mode}' успешно применён. Изображение сохранено в '{args.out_image_path}'.")
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main() or 0)
+
 
