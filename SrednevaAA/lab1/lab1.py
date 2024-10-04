@@ -38,8 +38,8 @@ def gray_img(image_path):
     for y in range(height):
         for x in range(width):
             r, g, b = src_image[y, x]
-            gray_value = 0,299 * r + 0,587 * g + 0,114 * b
-            gray_image[y, x] = gray_value
+            gray_value = 0.299 * r + 0.587 * g + 0.114 * b
+            gray_image[y, x] = gray_value 
 
     cv.imshow('Image', src_image)
     cv.imshow('Gray image', gray_image)
@@ -80,7 +80,7 @@ def sepia_img(image_path):
     for y in range(height):
         for x in range(width):
             r, g, b = src_image[y, x]
-            gray = 0,299 * r + 0,587 * g + 0,114 * b
+            gray = 0.299 * r + 0.587 * g + 0.114 * b 
             sepia_image[y, x, 0] = np.clip(int(gray) - 30, 0, 255)
             sepia_image[y, x, 1] = np.clip(int(gray) + 15, 0, 255)
             sepia_image[y, x, 2] = np.clip(int(gray) + 40, 0, 255)
