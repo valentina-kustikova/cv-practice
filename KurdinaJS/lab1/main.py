@@ -75,7 +75,6 @@ def sepiaImage(image_path):
     image = cv.imread(image_path)
     sepia_image = np.zeros_like(image, dtype=np.float32)
 
-    # Вычисляем значения для каждого канала (с учетом BGR)
     sepia_image[:, :, 0] = 0.393 * image[:, :, 2] + 0.769 * image[:, :, 1] + 0.189 * image[:, :, 0]
     sepia_image[:, :, 1] = 0.349 * image[:, :, 2] + 0.686 * image[:, :, 1] + 0.168 * image[:, :, 0]
     sepia_image[:, :, 2] = 0.272 * image[:, :, 2] + 0.534 * image[:, :, 1] + 0.131 * image[:, :, 0]
