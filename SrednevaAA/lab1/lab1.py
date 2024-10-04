@@ -26,16 +26,6 @@ def cli_argument_parser():
 
     return args
 
-
-def highgui_samples(in_filename, out_filename):
-    img = cv.imread(in_filename)
-    cv.imwrite(out_filename, img)
-    
-    cv.imshow('Init image', img)
-    cv.waitKey()
-    
-    cv.destroyAllWindows()
-
 def gray_img(image_path):
     if image_path is None:
         raise ValueError('Empty path to the image')
@@ -206,9 +196,7 @@ def pixel2_img(image_path):
 def main():
     args = cli_argument_parser()
     
-    if args.mode == 'image':
-        highgui_samples(args.image_path, args.out_image_path)
-    elif args.mode == 'gray':
+    if args.mode == 'gray':
         gray_img(args.image_path)
     elif args.mode == 'res':
         resolution_img(args.image_path)
