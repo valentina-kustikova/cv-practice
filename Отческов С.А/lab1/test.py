@@ -80,28 +80,6 @@ def effect_sepia(img):
     output = transform(output, kernel)
     return output
 
-    # method: main_color + gray_scale
-    # r, g, b = cv2.split(img)
-    # gray = (0.2126 * r + 0.587 * g + 0.144 * b)
-    # gray_scale = np.array(gray, np.float32) / 255
-    # sepia = np.ones(img.shape)
-    # sepia[:,:,0] *= 153 #B
-    # sepia[:,:,1] *= 204 #G
-    # sepia[:,:,2] *= 255 #R
-    # #hadamard
-    # for i in range(3):
-    #     sepia[:,:,i] *= gray_scale
-    
-    # cv2.imshow('Sepia', np.array(sepia.astype(np.uint8)))
-
-
-    # 2 method
-    # kernel = np.array([[0.131, 0.534, 0.272],[0.168, 0.686, 0.349],[0.189, 0.769, 0.393]])
-    # sepiaCV = np.copy(img)
-    # sepiaCV = np.dot(sepiaCV, kernel.T)
-    # sepiaCV = np.clip(sepiaCV, 0, 255).astype(np.uint8)
-    # cv2.imshow('SepiaCV', sepiaCV)
-
 def pixelate(img, block_size):
     r = cv2.selectROI('select the area', input_image, showCrosshair=False)
     cv2.destroyWindow('select the area')
