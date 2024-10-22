@@ -12,20 +12,21 @@ def argumentParse():
          required = True
      )
      parser.add_argument(
+         "-s", "--store",
+         help = "Path to store results",
+         required = True
+     )
+     parser.add_argument(
          "-m", "--mode",
          type = int,
          help = "mode process image (0, 1, 2, 3, 4)",
          required = True
      )
      parser.add_argument(
-         "-kx",
+         "-k",
          type = float,
-         help = "coeficent x for resize image"
-     ) 
-     parser.add_argument(
-         "-ky",
-         type = float,
-         help = "coeficent y for resize image"
+         nargs = 2,
+         help = "coeficents x, y for resize image"
      )
      parser.add_argument(
          "-r", "--radius",
@@ -52,23 +53,29 @@ def main():
     
     args = argumentParse()
     img = cv.imread(args.path, -1)
+    imgRes = 0
 
     if (args.mode == 0):
-        cv.imshow("conversionToGray", filterscv.conversionToGray(img))
+        imgRes = filterscv.conversionToGray(img)
+        cv.imshow("conversionToGray", imgRes)
         
     elif (args.mode == 1):
-        
-        cv.imshow("resizeImage", filterscv.resizeImage(img, args.kx, args.ky))
+        imgRes = filterscv.resizeImage(img, args.k)
+        cv.imshow("resizeImage", imgRes)
         
     elif (args.mode == 2):
-        cv.imshow("sepiaPhotoEffect", filterscv.sepiaPhotoEffect(img))
+        imgRes = filterscv.sepiaPhotoEffect(img)
+        cv.imshow("sepiaPhotoEffect", imgRes)
         
     elif (args.mode == 3):
-        cv.imshow("vignettePhotoEffect", filterscv.vignettePhotoEffect(img, args.radius))
+        imgRes = filterscv.vignettePhotoEffect(img, args.radius)
+        cv.imshow("vignettePhotoEffect", imgRes)
         
     elif (args.mode == 4):
-        cv.imshow("pixelation", filterscv.pixelation(img, args.coordinates[0], args.coordinates[1], args.coordinates[2], args.coordinates[3], args.px))
-        
+        imgRes = filterscv.pixelation(img, args.coordinates, args.px)
+        cv.imshow("pixelation", imgRes)
+    
+    cv.imwrite(args.store, imgRes)
     cv.waitKey(0)
     cv.destroyAllWindows()
         

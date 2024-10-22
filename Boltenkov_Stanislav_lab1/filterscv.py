@@ -6,10 +6,10 @@ def conversionToGray(img):
     blue, green, red, = np.split(img, 3, axis = 2)
     return (0.114 * red +  0.587 * green + 0.299 * blue).astype("uint8")
 
-def resizeImage(img, kheight, kwidth):
+def resizeImage(img, coeficents):
     
-     nheight = int(img.shape[0] * kheight)
-     nwidth = int(img.shape[1] * kwidth)
+     nheight = int(img.shape[0] * coeficents[0])
+     nwidth = int(img.shape[1] * coeficents[1])
      
      newIm = np.zeros((nheight, nwidth, img.shape[2]), np.uint8)   
        
@@ -32,21 +32,18 @@ def sepiaPhotoEffect(img):
    
 
 def vignettePhotoEffect(img, r):
-
-    newIm = img
-    r = r * r
     
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-            dist = (img.shape[0] // 2 - i) ** 2 + (img.shape[1] // 2 - j) ** 2
-            if (dist > r):
-                newIm[i][j] = pow(r / dist, 3) *  newIm[i][j]
-    return newIm
+    Y, X = np.ogrid[:img.shape[0], :img.shape[1]]
+    dist = (X - (img.shape[1] // 2)) ** 2 + (Y - (img.shape[0] // 2)) ** 2
+    mask = np.full((img.shape[0], img.shape[1]), r * r, np.float64)
+    mask = np.clip((mask / (dist + 1)) ** 3, 0, 1)
+    
+    return (img * mask[::,::, np.newaxis]).astype(np.uint8)
 
-def pixelation(img, x0, y0, x1, y1, pix):
+def pixelation(img, coordinates, pix):
 
     newIm = img
-   
+    x0, y0, x1, y1 = coordinates
     countAreaX = (x1 - x0 + pix - 1) // pix
     countAreaY = (y1 - y0 + pix - 1) // pix
     
