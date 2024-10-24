@@ -24,34 +24,46 @@ def cli_argument_parser():
                         help='Path to a video file',
                         type=str,
                         dest='video_path')
+    parser.add_argument('-p', '--param',
+                        help='Parametres',
+                        type=str,
+                        dest='param')
+
 
     args = parser.parse_args()
     return args
 
-def grayImage(image_path):
+
+def parsParam(args):
+    str = args.param.split(",")
+    param = [float(number) for number in str]
+    numParam = len(param)
+    return param, numParam
+
+
+def readImage(image_path):
     if image_path is None:
         raise ValueError('Empty path to the image')
-
     image = cv.imread(image_path)
-    gray_image = np.zeros_like(image, dtype=np.float32)
-
-    gray_image[:, :, 0] = 0.299 * image[:, :, 0] + 0.587 * image[:, :, 1] + 0.114 * image[:, :, 2]
-    gray_image[:, :, 1] = gray_image[:, :, 0]
-    gray_image[:, :, 2] = gray_image[:, :, 0]
-
-    gray_image = gray_image.astype(np.uint8)
-
-    cv.imshow('Base image', image)
-    cv.imshow('Gray image', gray_image)
+    return image
+def outputImage(text, new_text, image, new_image):
+    cv.imshow(text, image)
+    cv.imshow(new_text, new_image)
     cv.waitKey(0)
     cv.destroyAllWindows()
 
 
-def resolutionImage(image_path, new_width, new_height):
-    if image_path is None:
-        raise ValueError('Empty path to the image')
+def grayImage(image_path):
+    image = readImage(image_path)
+    gray_image = np.zeros((image.shape[0], image.shape[1]), dtype=np.float32)
 
-    image = cv.imread(image_path)
+    gray_image[:, :] = 0.299 * image[:, :, 0] + 0.587 * image[:, :, 1] + 0.114 * image[:, :, 2]
+    gray_image = gray_image.astype(np.uint8)
+    outputImage('BaseImage', 'GrayImage', image, gray_image)
+
+
+def resolutionImage(image_path, new_width, new_height):
+    image = readImage(image_path)
 
     x = np.arange(new_width) / (new_width - 1) * (image.shape[1] - 1)
     y = np.arange(new_height) / (new_height - 1) * (image.shape[0] - 1)
@@ -62,17 +74,10 @@ def resolutionImage(image_path, new_width, new_height):
 
     resolution_image = image[y_coords, x_coords]
 
-    cv.imshow('Base image', image)
-    cv.imshow('Gray image', resolution_image)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
-
+    outputImage('BaseImage', 'ResolutionImage', image, resolution_image)
 
 def sepiaImage(image_path):
-    if image_path is None:
-        raise ValueError('Empty path to the image')
-
-    image = cv.imread(image_path)
+    image = readImage(image_path)
     sepia_image = np.zeros_like(image, dtype=np.float32)
 
     sepia_image[:, :, 0] = 0.393 * image[:, :, 2] + 0.769 * image[:, :, 1] + 0.189 * image[:, :, 0]
@@ -83,16 +88,11 @@ def sepiaImage(image_path):
     sepia_image = sepia_image.astype(np.uint8)
     sepia_image = cv.cvtColor(sepia_image, cv.COLOR_BGR2RGB)
 
-    cv.imshow('Base image', image)
-    cv.imshow('Sepia image', sepia_image)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    outputImage('BaseImage', 'SepiaImage', image, sepia_image)
+
 
 def vignetteImage(image_path, radius, intensity):
-    if image_path is None:
-        raise ValueError('Empty path to the image')
-
-    image = cv.imread(image_path)
+    image = readImage(image_path)
 
     height = image.shape[0]
     width = image.shape[1]
@@ -108,22 +108,38 @@ def vignetteImage(image_path, radius, intensity):
     vignette = image * (1 - intensity * norm[..., np.newaxis])
     vignette = vignette.astype(np.uint8)
 
-    cv.imshow('Base image', image)
-    cv.imshow('Vignette', vignette)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    outputImage('BaseImage', 'VignetteImage', image, vignette)
 
-def pixelImage(image_path, x, y, width, height, block_size):
-    if image_path is None:
-        raise ValueError('Empty path to the image')
 
+x1, y1, x2, y2 = -1, -1, -1, -1
+
+
+def mouse_callback(event, x, y, flags, param):
+    global x1, y1, x2, y2
+
+    if event == cv.EVENT_LBUTTONDOWN:
+        x1, y1 = x, y
+    elif event == cv.EVENT_MOUSEMOVE:
+        if flags == cv.EVENT_FLAG_LBUTTON:
+            x2, y2 = x, y
+            image_copy = param.copy()
+            cv.rectangle(image_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv.imshow("BaseImage", image_copy)
+
+def pixelImage(image_path, block_size):
     image = cv.imread(image_path)
+    cv.namedWindow("BaseImage")
+    global x1, y1, x2, y2
+
+    cv.setMouseCallback("BaseImage", mouse_callback, param=image)
+    cv.imshow("BaseImage", image)
+    cv.waitKey(0)
+
     pixel_image = image.copy()
+    epsilon = pixel_image[y1:y2, x1:x2]
 
-    epsilon = pixel_image[y:y + height, x:x + width]
-
-    blocks_x = width // block_size
-    blocks_y = height // block_size
+    blocks_x = (x2 - x1) // block_size
+    blocks_y = (y2 - y1) // block_size
     for i in range(blocks_y):
         for j in range(blocks_x):
             block = epsilon[i * block_size:(i + 1) * block_size, j * block_size:(j + 1) * block_size]
@@ -132,12 +148,12 @@ def pixelImage(image_path, x, y, width, height, block_size):
 
             epsilon[i * block_size:(i + 1) * block_size, j * block_size:(j + 1) * block_size] = avg_color.astype(np.uint8)
 
-    pixel_image[y:y + height, x:x + width] = epsilon
+    pixel_image[y1:y2, x1:x2] = epsilon
 
-    cv.imshow('Base image', image)
-    cv.imshow('Region', pixel_image)
+    cv.imshow("PixelImage", pixel_image)
     cv.waitKey(0)
     cv.destroyAllWindows()
+
 
 def main():
     args = cli_argument_parser()
@@ -145,13 +161,22 @@ def main():
     if args.mode == 'grayImage':
         grayImage(args.image_path)
     elif args.mode == 'resolImage':
-        resolutionImage(args.image_path, 360, 240)
+        param, numParam = parsParam(args)
+        if numParam != 2:
+            raise ValueError('Add parameters')
+        resolutionImage(args.image_path, int(param[0]), int(param[1]))
     elif args.mode == 'sepiaImage':
         sepiaImage(args.image_path)
     elif args.mode == 'vignetteImage':
-        vignetteImage(args.image_path, 0.75, 1)
+        param, numParam = parsParam(args)
+        if numParam != 2:
+            raise ValueError('Add parameters')
+        vignetteImage(args.image_path, param[0], param[1])
     elif args.mode == 'pixelImage':
-        pixelImage(args.image_path, 100, 100, 200, 200, 20)
+        param, numParam = parsParam(args)
+        if numParam != 1:
+            raise ValueError('Add parameters')
+        pixelImage(args.image_path, int(param[0]))
     else:
         raise 'Unsupported \'mode\' value'
 
