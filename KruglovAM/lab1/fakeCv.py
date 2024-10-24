@@ -1,5 +1,5 @@
 import numpy as np
-import cv2
+import cv2 as cv
 
 def bgr2grey(src_img):
     gray_img = np.dot(src_img[..., :3], [0.299, 0.587, 0.114]).astype(np.uint8)
@@ -25,19 +25,38 @@ def apply_sepia(src_img):
     sepia_img[sepia_img > 255] = 255  # Обрезаем значения до 255
     return sepia_img.astype(np.uint8)
 
-def apply_vignette(src_img):
+def apply_vignette(src_img, radius):
     rows, cols = src_img.shape[:2]
-    X_resultantMatrix = cv2.getGaussianKernel(cols, cols/4)
-    Y_resultantMatrix = cv2.getGaussianKernel(rows, rows/4)
-    resultantMatrix = Y_resultantMatrix * X_resultantMatrix.T
-    uBound = np.full((rows, cols), 255)
-    mask = 200 * resultantMatrix / np.linalg.norm(resultantMatrix)
     vignette_img = np.copy(src_img)
 
-    for i in range(3):
-        vignette_img[:, :, i] = np.minimum(vignette_img[:, :, i] * mask, uBound)
+    height = src_img.shape[0]
+    width = src_img.shape[1]
+    center_x = width // 2
+    center_y = height // 2
+    radius = min(radius, max(width, height))
+
+    x, y = np.meshgrid(np.arange(width), np.arange(height))
+    dist_from_center = np.max(np.sqrt(((x - center_x)**2 + (y - center_y)**2)) - radius, 0)
+
+    norm = dist_from_center / (max(center_x, center_y))
+    norm = np.clip(norm, 0, 1)
+
+    vignette_img = src_img * (1 - norm[..., np.newaxis])
     
     return vignette_img.astype(np.uint8)
+
+def select_region(event, x, y, flags, param):
+    src_img, region, pixel_size = param
+    if event == cv.EVENT_LBUTTONDOWN or event == cv.EVENT_LBUTTONUP:
+        region.append((x, y))
+    if len(region) == 2:
+        if  region[0] != region[1]:
+            x1 = min(region[0][0],  region[1][0])
+            y1 = min(region[0][1],  region[1][1])
+            w = abs(region[0][0] - region[1][0])
+            h = abs(region[0][1] - region[1][1])
+            src_img = pixelate_region(src_img, x1, y1, w, h, pixel_size)
+        region.clear()
 
 def pixelate_region(src_img, x, y, w, h, numOfPixels):
     region = src_img[y:y+h, x:x+w]

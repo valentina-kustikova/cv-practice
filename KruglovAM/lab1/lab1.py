@@ -10,92 +10,98 @@ def cli_argument_parser():
     parser.add_argument('-i', '--image',
                         help='Path to an image',
                         type=str,
-                        dest='image_path')
+                        dest='image_path',
+                        required=True)
     parser.add_argument('-o', '--output',
                         help='Output file name',
                         type=str,
-                        default='test_out.jpg',
+                        default='output.jpg',
                         dest='out_image_path')
-    parser.add_argument('-g', '--greyscale',
-                    help='Convert image to greyscale',
-                    type=bool,
-                    default=False,
-                    dest='gsc')
-    parser.add_argument('-r', '--resize',
-                    help='Resizes image',
-                    type=bool,
-                    default=False,
-                    dest='rs')
-    parser.add_argument('-s', '--sepia',
-                    help='Apply sepia filter',
-                    type=bool,
-                    default=False,
-                    dest='sep')
-    parser.add_argument('-v', '--vignette',
-                    help='Apply vignette filter',
-                    type=bool,
-                    default=False,
-                    dest='vig')
-    parser.add_argument('-p', '--pixelize',
-                    help='Pixelize image',
-                    type=bool,
-                    default=False,
-                    dest='pix')
-    args = parser.parse_args()
+    parser.add_argument('-m', '--mode',
+                        help='Mode (image, grey_color, resize, sepia_filter, vignette_filter, pixelate_region)',
+                        type=str,
+                        default='image',
+                        dest='mode')
+    parser.add_argument('-w', '--width',
+                        help='New width for resizing',
+                        type=int,
+                        default=200,
+                        dest='width')
+    parser.add_argument('-hg', '--height',
+                        help='New height for resizing',
+                        type=int,
+                        default=200,
+                        dest='height')
+    parser.add_argument('-pxsz', '--pixel_size',
+                        help='Size of pixels for pixelation',
+                        type=int,
+                        default=15,
+                        dest='pixel_size')
+    parser.add_argument('-r', '--radius',
+                        help='Radius for vignette filter',
+                        type=int,
+                        default=1,
+                        dest='radius')
 
+    args = parser.parse_args()
     return args
 
-def imgproc_samples(image_path, args):
-    if image_path is None:
+def imgproc_samples(args):
+    if args.image_path is None:
         raise ValueError('Empty path to the image')
     # Загрузка изображения
-    src_image = cv.imread(image_path)
+    src_image = cv.imread(args.image_path)
+    image_placeholder = src_image.copy()
 
-    if(args.gsc):
+    if(args.mode=="grey_color"):
         # Преобразование изображения в серое
-        my_gray_dst_image = fakeCv.bgr2grey(src_image)
-        cv.imshow('My Gray image', my_gray_dst_image)
+        image_placeholder = fakeCv.bgr2grey(src_image)
+        cv.imshow('My Gray image', image_placeholder)
         cv.waitKey(0)
 
-    # gray_dst_image = cv.cvtColor(src_image, cv.COLOR_BGR2GRAY)
-    # cv.imshow('Gray image', gray_dst_image)
-    # cv.waitKey(0)
-
-    if(args.rs):
+    elif(args.mode=="resize"):
         # Изменение разрешения изображения
-        my_resized_image = fakeCv.resize(src_image, 100, 1000)
-        cv.imshow('My resized image', my_resized_image)
+        image_placeholder = fakeCv.resize(src_image, args.width, args.height)
+        cv.imshow('My resized image', image_placeholder)
         cv.waitKey(0)
 
-    # resized_image = cv.resize(src_image, (100, 1000), interpolation=cv.INTER_AREA)
-    # cv.imshow('Resized image', resized_image)
-    # cv.waitKey(0)
+    elif(args.mode=="sepia_filter"):
+        # Функция применения сепии к изображению
+        image_placeholder = fakeCv.apply_sepia(src_image)
+        cv.imshow('My sepia image', image_placeholder)
+        cv.waitKey(0)
 
-    if(args.sep):
+    elif(args.mode=="vignette_filter"):
         # Функция применения фотоэффекта виньетки к изображению
-        my_sepia_image = fakeCv.apply_sepia(src_image)
-        cv.imshow('My sepia image', my_sepia_image)
+        image_placeholder = fakeCv.apply_vignette(src_image, args.radius)
+        cv.imshow('My vignette image', image_placeholder)
         cv.waitKey(0)
 
-    if(args.vig):
-        # Функция применения фотоэффекта виньетки к изображению
-        my_vignette_image = fakeCv.apply_vignette(src_image)
-        cv.imshow('My vignette image', my_vignette_image)
-        cv.waitKey(0)
+    elif(args.mode=="pixelate_region"):
+        # Функция пикселизации региона изображения
+        region = []
+        cv.namedWindow("Choose the region to pixelate")
+        cv.setMouseCallback("Choose the region to pixelate", fakeCv.select_region, [image_placeholder, region, args.pixel_size])
+        while True:
+            cv.imshow("Choose the region to pixelate", image_placeholder)
+            key = cv.waitKey(1) & 0xFF
 
-    if(args.pix):
-        # Функция применения фотоэффекта виньетки к изображению
-        my_pixelate_image = fakeCv.pixelate_region(src_image, 0, 0, 275, 183, 20)
-        cv.imshow('My pixelate image', my_pixelate_image)
-        cv.waitKey(0)
+            if key == ord("r"):
+                image_placeholder = src_image.copy()
+                cv.setMouseCallback("Choose the region to pixelate", fakeCv.select_region, [image_placeholder, region, args.pixel_size])
+
+            elif key == 13:  # Код клавиши Enter
+                break
+        cv.destroyWindow("Choose the region to pixelate")
 
     # Освобождение ресурсов для последующей работы
     cv.destroyAllWindows()
+    cv.imwrite(args.out_image_path, image_placeholder)
 
 def main():
     args = cli_argument_parser()
     
-    imgproc_samples(args.image_path, args)
+    imgproc_samples(args)
 
 
 if __name__ == '__main__':
