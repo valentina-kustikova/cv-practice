@@ -40,7 +40,7 @@ def cli_argument_parser():
     parser.add_argument('-r', '--radius',
                         help='Radius for vignette filter',
                         type=int,
-                        default=1,
+                        default=200,
                         dest='radius')
 
     args = parser.parse_args()
