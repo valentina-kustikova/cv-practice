@@ -33,17 +33,18 @@ def cli_argument_parser():
                         help='circle radius for vignette',
                         type=int,
                         dest='radius')
+    parser.add_argument('-p', '--pixelate_size',
+                        help='pixelate size',
+                        type=int,
+                        dest='pixelate_size')
+    
     
     
     args = parser.parse_args()
     return args
 
-def ImageToGrayscale(image_path):
-    if image_path is None:
-        raise ValueError('Empty path to the image')
-        
-        
-    image     = cv.imread(image_path)
+def ImageToGrayscale(image):
+               
     grayImage = np.zeros(image.shape)
     
     grayImage[:, :, 0] = 0.299 * image[:, :, 0] + 0.587 * image[:, :, 1] + 0.114 * image[:, :, 2]
@@ -53,18 +54,11 @@ def ImageToGrayscale(image_path):
     grayImage = grayImage.astype(np.uint8)
 
 
-    cv.imshow('Original image', image)
-    cv.imshow('Gray image', grayImage)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    return grayImage
     
     
+def changingImageResolution(image, width, height):
     
-def changingImageResolution(image_path, width, height):
-    if image_path is None:
-        raise ValueError('Empty path to the image')
-
-    image = cv.imread(image_path)
 
     x = np.linspace(0, image.shape[1] - 1, width)
     y = np.linspace(0, image.shape[0] - 1, height)
@@ -75,44 +69,28 @@ def changingImageResolution(image_path, width, height):
 
     result = image[y_coords, x_coords]
 
-    cv.imshow('Original image', image)
-    cv.imshow('Resolution image', result)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    return result
     
     
    
 
-def SepiaImage(image_path):
+def SepiaImage(image):
        
-    if image_path is None:
-        raise ValueError('Empty path to the image')
-
-    image = cv.imread(image_path)
+   
     sepiaImage = np.zeros(image.shape)
 
     
-    sepiaImage[:, :, 0] = 0.393 * image[:, :, 2] + 0.769 * image[:, :, 1] + 0.189 * image[:, :, 0]
+    sepiaImage[:, :, 2] = 0.393 * image[:, :, 2] + 0.769 * image[:, :, 1] + 0.189 * image[:, :, 0]
     sepiaImage[:, :, 1] = 0.349 * image[:, :, 2] + 0.686 * image[:, :, 1] + 0.168 * image[:, :, 0]
-    sepiaImage[:, :, 2] = 0.272 * image[:, :, 2] + 0.534 * image[:, :, 1] + 0.131 * image[:, :, 0]
+    sepiaImage[:, :, 0] = 0.272 * image[:, :, 2] + 0.534 * image[:, :, 1] + 0.131 * image[:, :, 0]
    
     sepiaImage = np.clip(sepiaImage, 0, 255).astype(np.uint8)
     
-    sepiaImage = cv.cvtColor(sepiaImage, cv.COLOR_BGR2RGB)
-
-    cv.imshow('Original image', image)
-    cv.imshow('Sepia image', sepiaImage)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    return sepiaImage
     
-    
-def VignetteImage(image_path, radius):
+def VignetteImage(image, radius):
 
-    if image_path is None:
-        raise ValueError('Empty path to the image')
-
-    image = cv.imread(image_path)
-
+   
     height = image.shape[0]
     width  = image.shape[1]
 
@@ -141,15 +119,11 @@ def VignetteImage(image_path, radius):
     vignette[:, :, 1] = vignette[:, :, 1] * mask
     vignette[:, :, 2] = vignette[:, :, 2] * mask
 
-    cv.imshow('Original image', image)
-    cv.imshow('Vignette image', vignette)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    return vignette
 
 
 def pixelate_region(image, x1, y1, x2, y2, pixel_size):
     
-    # pixel_image = image.copy()
 
     x1, y1 = max(0, x1), max(0, y1)
     x2, y2 = min(image.shape[1], x2), min(image.shape[0], y2)
@@ -186,7 +160,6 @@ def pixelate_region(image, x1, y1, x2, y2, pixel_size):
 
 
     
-    
 def draw_rectangle(event, x, y, flags, param):
     global rect, drawing, img, pixel_image, pixelate_size
 
@@ -202,22 +175,20 @@ def draw_rectangle(event, x, y, flags, param):
     
     elif event == cv.EVENT_LBUTTONUP:
         drawing = False
+        img[:] = pixel_image.copy()  
         pixelate_region(img, rect[0], rect[1], x, y, pixelate_size)
         pixel_image[:] = img.copy()  # Обновляем копию
         
-def PixelatingRectImage(image_path):
+def PixelatingRectImage(image, size):
     global img, pixel_image, rect, drawing, pixelate_size
 
-    pixelate_size = 10
+    pixelate_size = size
     rect = (0, 0, 1, 1)
     drawing = False
     
-    if image_path is None:
-        raise ValueError('Empty path to the image')
-
-    
-    img = cv.imread(image_path)
-    pixel_image = img.copy()
+   
+    pixel_image = image.copy()
+    img = image.copy()
 
     
     cv.namedWindow('Image')
@@ -228,25 +199,37 @@ def PixelatingRectImage(image_path):
         if cv.waitKey(1) & 0xFF == 27:  # Нажмите ESC для выхода
             break
 
-    cv.destroyAllWindows()
     
     
     
 def main():
+    
     args = cli_argument_parser()
     
+    image_path = args.image_path
+    if image_path is None:
+        raise ValueError('Empty path to the image')
+
+    image = cv.imread(image_path)
+    
+    
     if args.mode == 'ImageToGrayscale':
-        ImageToGrayscale(args.image_path)
+        result = ImageToGrayscale(image)
     elif args.mode == 'changingImageResolution':
-        changingImageResolution(args.image_path, args.width, args.height)
+        result = changingImageResolution(image, args.width, args.height)
     elif args.mode == 'SepiaImage':
-        SepiaImage(args.image_path)
+        result = SepiaImage(image)
     elif args.mode == 'VignetteImage':
-        VignetteImage(args.image_path, args.radius)
+        result = VignetteImage(image, args.radius)
     elif args.mode == 'PixelatingRectImage':
-        PixelatingRectImage(args.image_path)
+        PixelatingRectImage(image, args.pixelate_size)
     else:
         raise 'Unsupported \'mode\' value'
+        
+    cv.imshow('Original image', image)
+    cv.imshow('Output image', result)
+    cv.waitKey(0)
+    cv.destroyAllWindows()
 
 
 if __name__ == '__main__':
