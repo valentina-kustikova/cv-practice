@@ -57,24 +57,20 @@ def show_img(text, image, image2):
     cv.waitKey(0)
     cv.destroyAllWindows()
 
-def gray_img(image_path):
-    image = read_img(image_path)
+def gray_img(src_image):
     
-    height, width = image.shape[:2]
+    height, width = src_image.shape[:2]
     gray_image = np.zeros((height, width), np.uint8)
     
-    gray_image = 0.299 * image[:, :, 0] + 0.587 * image[:, :, 1] + 0.114 * image[:, :, 2]
+    gray_image = 0.299 * src_image[:, :, 0] + 0.587 * src_image[:, :, 1] + 0.114 * src_image[:, :, 2]
     gray_image = gray_image.astype(np.uint8)
+    return gray_image
     
-    text = 'Gray image'
-    show_img(text, image, gray_image)
-    
-def resolution_img(image_path, coef, op):
-    src_image = read_img(image_path)
+def resolution_img(src_image, coef, op):
    
     height, width = src_image.shape[:2] 
     
-    if op == 'm':
+    if op == 's':
         new_height = int(height/coef)
         new_width = int(width/coef)
     if op == 'b':
@@ -90,11 +86,9 @@ def resolution_img(image_path, coef, op):
             resolution_image[y, x] = src_image[src_y, src_x]
                 
 
-    text = 'Resolution image'
-    show_img(text, src_image, resolution_image)
+    return resolution_image
 
-def sepia_img(image_path): 
-    src_image = read_img(image_path)
+def sepia_img(src_image): 
     
     height, width = src_image.shape[:2]
     sepia_image = np.zeros((height, width, 3), np.uint8)
@@ -104,11 +98,9 @@ def sepia_img(image_path):
     sepia_image[:, :, 1] = np.clip(gray + 15, 0, 255)
     sepia_image[:, :, 2] = np.clip(gray + 40, 0, 255)
               
-    text = 'Sepia image'
-    show_img(text, src_image, sepia_image)
+    return sepia_image
     
-def vignette_img(image_path, radius): 
-    src_image = read_img(image_path)
+def vignette_img(src_image, radius): 
     
     #radius=0.75
 
@@ -126,8 +118,7 @@ def vignette_img(image_path, radius):
     for i in range(3):
         vig_img[:, :, i] = vig_img[:, :, i] * mask
     
-    text = 'Vignette image'
-    show_img(text, src_image, vig_img)
+    return vig_img
     
     
 def area(image):
@@ -153,9 +144,7 @@ def area(image):
 
     return (new_x, new_y, new_width, new_height)
     
-def pixel_img(image_path, block_size): 
-    src_image = read_img(image_path)
-    
+def pixel_img(src_image, block_size): 
     x, y, width, height = area(src_image)
     
     pixel_img = np.zeros((src_image.shape[0], src_image.shape[1], 3), np.uint8)
@@ -171,12 +160,10 @@ def pixel_img(image_path, block_size):
 
     pixel_img[y:y+height, x:x+width] = roi
     
-    text = 'Pixel image'
-    show_img(text, src_image, pixel_img)
+    return pixel_img
     
     
-def pixel2_img(image_path, block_size): 
-    src_image = read_img(image_path)
+def pixel2_img(src_image, block_size): 
     
     x, y, width, height = area(src_image)
     
@@ -207,31 +194,39 @@ def pixel2_img(image_path, block_size):
 
     pixel_img2[y:y+height, x:x+width] = roi
     
-    text = 'Pixel2 image'
-    show_img(text, src_image, pixel_img2)
+    return pixel2_img
     
 
 
 def main():
     args = cli_argument_parser()
     
+    src_image = read_img(args.image_path)
+    
+    
     if args.mode == 'gray':
-        gray_img(args.image_path)
+        new_image = gray_img(src_image)
+        text = 'Gray image'
     elif args.mode == 'res':
-        resolution_img(args.image_path, args.coef, args.op)
+        new_image = resolution_img(src_image, args.coef, args.op)
+        text = 'Resolution image'
     elif args.mode == 'sepia':
-        sepia_img(args.image_path)
+        new_image = sepia_img(src_image)
+        text = 'Sepia image'
     elif args.mode == 'vig':
-        vignette_img(args.image_path, args.radius)
+        new_image = vignette_img(src_image, args.radius)
+        text = 'Vignette image'
     elif args.mode == 'pixel':
-        pixel_img(args.image_path, args.block)
+        new_image = pixel_img(src_image, args.block)
+        text = 'Pixel image'
     elif args.mode == 'pixel2':
-        pixel2_img(args.image_path, args.block)
+        new_image = pixel2_img(src_image, args.block)
+        text = 'Pixel2 image'
     else:
         raise ValueError('Unsupported mode')
+    
+    show_img(text, src_image, new_image)
 
 
 if __name__ == '__main__':
     sys.exit(main() or 0)
-
-
