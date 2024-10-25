@@ -56,10 +56,9 @@ def cli_argument_parser():
     args = parser.parse_args()
     return args
 
-def highgui_image_samples(image_path, output_image):
-    image = readImage(image_path)
-    cv.waitKey(0)   
-    cv.destroyAllWindows()
+# def highgui_image_samples(image):
+#     cv.waitKey(0)   
+#     cv.destroyAllWindows()
 
 def readImage(image_path):
     if image_path is None:
@@ -142,23 +141,18 @@ def apply_pixel(image, pixel_size):
 
             result_image[y:end_y, x:end_x] = mean_color_bgr
     return result_image
-
-
         
-def convert_gray_color_filter(image_path, output_image):
-    image = readImage(image_path)
+def convert_gray_color_filter(image):
     result_image = gray_filter(image)
-    writeImage(output_image, result_image)
+    return result_image
 
-def resolution_change_filter(image_path, output_image, value):
-    image = readImage(image_path)
+def resolution_change_filter(image, value):
     result_image = resize_filter(image,value)
-    writeImage(output_image, result_image) 
+    return result_image
 
-def sepia_filter(image_path, output_image):
-    image = readImage(image_path)
+def sepia_filter(image):
     result_image = apply_sepia(image)
-    writeImage(output_image, result_image)
+    return result_image
 
 def display_image_with_rectangle(image):
     global x1, y1, x2, y2
@@ -194,38 +188,38 @@ def draw_rectangle(event, x, y, flags, param):
         x2, y2 = x, y  
 
 
-def pixelization_filter(image_path, output_image, pixel_size):
+def pixelization_filter(image, pixel_size):
     global x1, y1, x2, y2
-    image = readImage(image_path)
     result_image = apply_pixel(image, pixel_size)
-    writeImage(output_image, result_image)
+    return result_image
  
-def vignette_filter(image_path, output_image, radius):
-    image = readImage(image_path)
+def vignette_filter(image, radius):
     result_image = apply_vignette(image, radius)
-    writeImage(output_image, result_image)
+    return result_image
 
 def main():
     args = cli_argument_parser()
+    image = readImage(args.image_path)
     
-    if args.mode == 'image':
-        highgui_image_samples(args.image_path, args.output_image)
-    elif args.mode == 'convert_gray_color_filter':
-        convert_gray_color_filter(args.image_path, args.output_image)
+    # if args.mode == 'image':
+    #     highgui_image_samples(image)
+    if args.mode == 'convert_gray_color_filter':
+        result_image = convert_gray_color_filter(image)
     elif args.mode == 'resolution_change_filter':
         if args.value is None:
             raise ValueError('The value parameter must be provided for average_resize mode')
-        resolution_change_filter(args.image_path, args.output_image, args.value)
+        result_image = resolution_change_filter(image, args.value)
     elif args.mode == 'sepia_filter':
-        sepia_filter(args.image_path, args.output_image)
+        result_image = sepia_filter(image)
     elif args.mode == 'pixelization_filter':
         if args.pixel_size is None:
             raise ValueError('The pixel_size parameter must be provided for pixelate mode')
-        pixelization_filter(args.image_path, args.output_image, args.pixel_size)
+        result_image = pixelization_filter(image, args.pixel_size)
     elif args.mode == 'vignette_filter':
-        vignette_filter(args.image_path, args.output_image, args.radius)
+        result_image = vignette_filter(image, args.radius)
     else:
         raise ValueError('Unsupported \'mode\' value')
+    writeImage(args.output_image, result_image)
 
 
 if __name__ == '__main__':
