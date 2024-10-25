@@ -53,17 +53,18 @@ def outputImage(text, new_text, image, new_image):
     cv.destroyAllWindows()
 
 
-def grayImage(image_path):
-    image = readImage(image_path)
+def grayImage(image):
+
     gray_image = np.zeros((image.shape[0], image.shape[1]), dtype=np.float32)
 
     gray_image[:, :] = 0.299 * image[:, :, 0] + 0.587 * image[:, :, 1] + 0.114 * image[:, :, 2]
     gray_image = gray_image.astype(np.uint8)
-    outputImage('BaseImage', 'GrayImage', image, gray_image)
+
+    return gray_image
 
 
-def resolutionImage(image_path, new_width, new_height):
-    image = readImage(image_path)
+def resolutionImage(image, new_width, new_height):
+
 
     x = np.arange(new_width) / (new_width - 1) * (image.shape[1] - 1)
     y = np.arange(new_height) / (new_height - 1) * (image.shape[0] - 1)
@@ -74,10 +75,10 @@ def resolutionImage(image_path, new_width, new_height):
 
     resolution_image = image[y_coords, x_coords]
 
-    outputImage('BaseImage', 'ResolutionImage', image, resolution_image)
+    return resolution_image
 
-def sepiaImage(image_path):
-    image = readImage(image_path)
+def sepiaImage(image):
+
     sepia_image = np.zeros_like(image, dtype=np.float32)
 
     sepia_image[:, :, 0] = 0.393 * image[:, :, 2] + 0.769 * image[:, :, 1] + 0.189 * image[:, :, 0]
@@ -88,11 +89,10 @@ def sepiaImage(image_path):
     sepia_image = sepia_image.astype(np.uint8)
     sepia_image = cv.cvtColor(sepia_image, cv.COLOR_BGR2RGB)
 
-    outputImage('BaseImage', 'SepiaImage', image, sepia_image)
+    return sepia_image
 
 
-def vignetteImage(image_path, radius, intensity):
-    image = readImage(image_path)
+def vignetteImage(image, radius, intensity):
 
     height = image.shape[0]
     width = image.shape[1]
@@ -108,7 +108,7 @@ def vignetteImage(image_path, radius, intensity):
     vignette = image * (1 - intensity * norm[..., np.newaxis])
     vignette = vignette.astype(np.uint8)
 
-    outputImage('BaseImage', 'VignetteImage', image, vignette)
+    return vignette
 
 
 x1, y1, x2, y2 = -1, -1, -1, -1
@@ -126,8 +126,8 @@ def mouse_callback(event, x, y, flags, param):
             cv.rectangle(image_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv.imshow("BaseImage", image_copy)
 
-def pixelImage(image_path, block_size):
-    image = cv.imread(image_path)
+def pixelImage(image, block_size):
+
     cv.namedWindow("BaseImage")
     global x1, y1, x2, y2
 
@@ -150,35 +150,37 @@ def pixelImage(image_path, block_size):
 
     pixel_image[y1:y2, x1:x2] = epsilon
 
-    cv.imshow("PixelImage", pixel_image)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    return pixel_image
 
 
 def main():
     args = cli_argument_parser()
 
+    image = readImage(args.image_path)
+
     if args.mode == 'grayImage':
-        grayImage(args.image_path)
+        filtImage = grayImage(image)
     elif args.mode == 'resolImage':
         param, numParam = parsParam(args)
         if numParam != 2:
             raise ValueError('Add parameters')
-        resolutionImage(args.image_path, int(param[0]), int(param[1]))
+        filtImage = resolutionImage(image, int(param[0]), int(param[1]))
     elif args.mode == 'sepiaImage':
-        sepiaImage(args.image_path)
+        filtImage = sepiaImage(image)
     elif args.mode == 'vignetteImage':
         param, numParam = parsParam(args)
         if numParam != 2:
             raise ValueError('Add parameters')
-        vignetteImage(args.image_path, param[0], param[1])
+        filtImage = vignetteImage(image, param[0], param[1])
     elif args.mode == 'pixelImage':
         param, numParam = parsParam(args)
         if numParam != 1:
             raise ValueError('Add parameters')
-        pixelImage(args.image_path, int(param[0]))
+        filtImage = pixelImage(image, int(param[0]))
     else:
         raise 'Unsupported \'mode\' value'
+
+    outputImage('BaseImage', 'FilteredImage', image, filtImage)
 
 
 if __name__ == '__main__':
