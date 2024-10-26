@@ -10,9 +10,10 @@ def load_and_show_image(image_path):
         raise ValueError("Image not found or unable to load.")
     
     cv.imshow("Loaded Image", image)
+    out = image.copy()
     cv.waitKey(0)  # Ожидание нажатия клавиши
     cv.destroyAllWindows()
-    return image
+    return out
 
 # Отображение отфильтрованного изображения
 def show_filtered_image(image_path):
@@ -67,8 +68,8 @@ def cli_argument_parser():
     return args
 
 # Изменение разрешения с использованием блоков
-def change_resolution(image_path, new_width, new_height, out_image_path):
-    image = load_and_show_image(image_path)
+def change_resolution(image, new_width, new_height, out_image_path):
+    #image = load_and_show_image(image_path)
     original_height, original_width = image.shape[:2]
     resized_image = np.zeros((new_height, new_width, 3), dtype=np.uint8)
 
@@ -81,138 +82,138 @@ def change_resolution(image_path, new_width, new_height, out_image_path):
             avg_color = block.mean(axis=(0, 1))  # Средний цвет блока
             resized_image[i, j] = avg_color
 
-    cv.imwrite(out_image_path, resized_image)
     print(f"Изображение с изменённым разрешением сохранено в '{out_image_path}'.")
-    show_filtered_image(out_image_path)
+    return out_image_path, resized_image
 
 # Виньетка
-def vignette_filter(image_path, out_image_path, radius):
-    image = load_and_show_image(image_path)
+def vignette_filter(image, out_image_path, radius):
     rows, cols = image.shape[:2]
-    vignette_image = np.copy(image)
-    
+
+    # Создаем маску виньетки на основе расстояний от центра
     center_x, center_y = cols // 2, rows // 2
-    for i in range(rows):
-        for j in range(cols):
-            distance = np.sqrt((j - center_x) ** 2 + (i - center_y) ** 2)
-            vignette_strength = max(0, 1 - distance / radius)
-            for c in range(3):
-                vignette_image[i, j, c] = int(vignette_image[i, j, c] * vignette_strength)
+    y_indices, x_indices = np.indices((rows, cols))
+    distances = np.sqrt((x_indices - center_x) ** 2 + (y_indices - center_y) ** 2)
+    vignette_mask = np.clip(1 - distances / radius, 0, 1)
+
+    B, G, R = cv.split(image)
+    B = (B * vignette_mask).astype(np.uint8)
+    G = (G * vignette_mask).astype(np.uint8)
+    R = (R * vignette_mask).astype(np.uint8)
     
-    cv.imwrite(out_image_path, vignette_image)
+    vignette_image = cv.merge([B, G, R])
     print(f"Виньетированное изображение сохранено в '{out_image_path}'.")
-    show_filtered_image(out_image_path)
+    return out_image_path, vignette_image
 
 # Пикселизация с выбором области
-def select_region(event, x, y, flags, param):
+def select_region(image):
     global ref_point, cropping
-    if event == cv.EVENT_LBUTTONDOWN:
-        ref_point = [(x, y)]
-        cropping = True
-    elif event == cv.EVENT_LBUTTONUP:
-        ref_point.append((x, y))
-        cropping = False
-        cv.rectangle(image, ref_point[0], ref_point[1], (0, 255, 0), 2)
-        cv.imshow("image", image)
-
-def pixelate_image(image_path, pixel_size, out_image_path):
-    global image, ref_point, cropping
     ref_point = []
     cropping = False
-
-    image = load_and_show_image(image_path)
     clone = image.copy()
     cv.namedWindow("image")
-    cv.setMouseCallback("image", select_region)
+    
+    def mouse_callback(event, x, y, flags, param):
+        global ref_point, cropping
+        if event == cv.EVENT_LBUTTONDOWN:
+            ref_point = [(x, y)]
+            cropping = True
+        elif event == cv.EVENT_LBUTTONUP:
+            ref_point.append((x, y))
+            cropping = False
+            cv.rectangle(image, ref_point[0], ref_point[1], (0, 255, 0), 2)
+            cv.imshow("image", image)
+    
+    cv.setMouseCallback("image", mouse_callback)
     
     while True:
         cv.imshow("image", image)
         key = cv.waitKey(1) & 0xFF
-        
         if key == ord("r"):
             image = clone.copy()
-        
-        elif key == 13:  # Код клавиши Enter
+        elif key == 13:
             break
-
+    
+    cv.destroyAllWindows()
     if len(ref_point) == 2 and ref_point[0] != ref_point[1]:
-        roi = image[ref_point[0][1]:ref_point[1][1], ref_point[0][0]:ref_point[1][0]]
-        height, width = roi.shape[:2]
-        temp_image = cv.resize(roi, (width // pixel_size, height // pixel_size), interpolation=cv.INTER_LINEAR)
-        pixelated_roi = cv.resize(temp_image, (width, height), interpolation=cv.INTER_NEAREST)
-        
-        image[ref_point[0][1]:ref_point[1][1], ref_point[0][0]:ref_point[1][0]] = pixelated_roi
-
-        cv.imwrite(out_image_path, image)
-        cv.destroyAllWindows()
-        print(f"Пикселизированное изображение сохранено в '{out_image_path}'.")
-        show_filtered_image(out_image_path)
-
+        return ref_point
     else:
         print("Область для пикселизации не выбрана или выбрана некорректно.")
-        cv.destroyAllWindows()
+        return None
+
+#Применение пикселизации к выбранной области
+def apply_pixelation(image, region, pixel_size, out_image_path):
+    x_start, y_start = region[0]
+    x_end, y_end = region[1]
+    
+    # Извлечение выбранной области
+    roi = image[y_start:y_end, x_start:x_end]
+    height, width = roi.shape[:2]
+    
+    temp_image = cv.resize(roi, (width // pixel_size, height // pixel_size), interpolation=cv.INTER_LINEAR)
+    pixelated_roi = cv.resize(temp_image, (width, height), interpolation=cv.INTER_NEAREST)
+    
+    # Вставка пикселизированной области обратно в изображение
+    image[y_start:y_end, x_start:x_end] = pixelated_roi
+    cv.imwrite(out_image_path, image)
+    
+    print(f"Пикселизированное изображение сохранено в '{out_image_path}'.")
+    return out_image_path, image
+
+# Функция пикселизации
+def pixelate_image(image_in, pixel_size, out_image_path):
+    region = select_region(image_in)
+    if region:
+        return apply_pixelation(image_in, region, pixel_size, out_image_path)
+    else:
+        return None, image_in
 
 # Оригинальные фильтры
-def image_mode(image_path, out_image_path):
-    image = load_and_show_image(image_path)
-    cv.imwrite(out_image_path, image)
+def image_mode(image, out_image_path):
     print(f"Оригинальное изображение сохранено в '{out_image_path}'.")
-    show_filtered_image(out_image_path)
+    return out_image_path, image
 
 # Оттенки серого
-def grey_color(image_path, out_image_path):
-    image = load_and_show_image(image_path)
-    height, width, channels = image.shape
-    gray_image = np.zeros((height, width), dtype=np.uint8)
-    
-    for i in range(height):
-        for j in range(width):
-            B, G, R = image[i, j]
-            gray_value = int(0.299 * R + 0.587 * G + 0.114 * B)
-            gray_image[i, j] = gray_value
-
-    gray_image_colored = cv.merge([gray_image, gray_image, gray_image])
+def grey_color(image, out_image_path):
+    B, G, R = cv.split(image)  # Разделение изображения на каналы
+    gray_image = (0.299 * R + 0.587 * G + 0.114 * B).astype(np.uint8)  # Расчет серого оттенка
+    gray_image_colored = cv.merge([gray_image, gray_image, gray_image])  # Объединение в 3-канальное изображение
     cv.imwrite(out_image_path, gray_image_colored)
     print(f"Грейскейл изображение сохранено в '{out_image_path}'.")
-    show_filtered_image(out_image_path)
+    return out_image_path, gray_image_colored
     
 # Фильтр сепии
-def sepia_filter(image_path, out_image_path):
-    image = load_and_show_image(image_path)
-    height, width, channels = image.shape
-    sepia_image = np.zeros_like(image)
-
-    for i in range(height):
-        for j in range(width):
-            B, G, R = image[i, j]
-            new_R = min(255, int(0.393 * R + 0.769 * G + 0.189 * B))
-            new_G = min(255, int(0.349 * R + 0.686 * G + 0.168 * B))
-            new_B = min(255, int(0.272 * R + 0.534 * G + 0.131 * B))
-            sepia_image[i, j] = [new_B, new_G, new_R]
-    
-    cv.imwrite(out_image_path, sepia_image)
+def sepia_filter(image, out_image_path):
+    B, G, R = cv.split(image)
+    sepia_R = (0.393 * R + 0.769 * G + 0.189 * B).clip(0, 255).astype(np.uint8)
+    sepia_G = (0.349 * R + 0.686 * G + 0.168 * B).clip(0, 255).astype(np.uint8)
+    sepia_B = (0.272 * R + 0.534 * G + 0.131 * B).clip(0, 255).astype(np.uint8)
+    sepia_image = cv.merge([sepia_B, sepia_G, sepia_R])
     print(f"Сепия изображение сохранено в '{out_image_path}'.")
-    show_filtered_image(out_image_path)
+    return out_image_path, sepia_image
+
 
 # Главная функция
 def main():
     args = cli_argument_parser()
-
+    image_path = load_and_show_image(args.image_path)
     if args.mode == 'image':
-        image_mode(args.image_path, args.out_image_path)
+        out_image_path, image_out = image_mode(image_path, args.out_image_path)
     elif args.mode == 'grey_color':
-        grey_color(args.image_path, args.out_image_path)
+        #grey_color(args.image_path, args.out_image_path)
+        out_image_path, image_out = grey_color(image_path, args.out_image_path)
     elif args.mode == 'change_resolution':
-        change_resolution(args.image_path, args.width, args.height, args.out_image_path)
+        out_image_path, image_out = change_resolution(image_path, args.width, args.height, args.out_image_path)
     elif args.mode == 'sepia_filter':
-        sepia_filter(args.image_path, args.out_image_path)
+        out_image_path, image_out = sepia_filter(image_path, args.out_image_path)
     elif args.mode == 'vignette_filter':
-        vignette_filter(args.image_path, args.out_image_path, args.radius)
+        out_image_path, image_out = vignette_filter(image_path, args.out_image_path, args.radius)
     elif args.mode == 'pixelated':
-        pixelate_image(args.image_path, args.pixel_size, args.out_image_path)
+        out_image_path, image_out = pixelate_image(image_path, args.pixel_size, args.out_image_path)
     else:
         raise ValueError('Unsupported mode')
-
+    
+    cv.imwrite(out_image_path, image_out)
+    show_filtered_image(out_image_path)
     print(f"Фильтр '{args.mode}' успешно применён. Изображение сохранено в '{args.out_image_path}'.")
 
 if __name__ == '__main__':
