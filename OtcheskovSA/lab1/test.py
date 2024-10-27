@@ -1,7 +1,28 @@
 import numpy as np
-import cv2  
+import cv2 
+import argparse
+
 WIDTH = 1200
 HEIGHT = 800
+
+def cli_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--image', '-i',
+                        help='Image path',
+                        type=str,
+                        dest='image_path',
+                        required=False,
+                        default='Miku.jpg')
+    
+    parser.add_argument('--filter', '-f',
+                        help='filter type (gray, resize, sepia, vignette, pixelate)',
+                        type=str,
+                        dest='filter_type',
+                        required=False,
+                        default='gray', choices=['gray', 'resize', 'sepia', 'vignette', 'pixelate'])
+    parser.add_argument('--data', '-d')
+    return parser.parse_args()
 
 def rgb_2_gray(img):
     """
@@ -113,7 +134,7 @@ def effect_vignette(img, rad, strength):
     return output
 
 
-def pixelate(img, block_size):
+def pixelate(img, block_size, ):
     """
     Пикселизация выделенной области входного изображения.
     Изображение разбвается на блок размера block_size
@@ -141,31 +162,24 @@ def pixelate(img, block_size):
     output[int(r[1]):int(r[1]+r[3]),  int(r[0]):int(r[0]+r[2])] = crop_img
     return output
 
+if __name__ == '__main__':
 
-input_image = cv2.imread('Miku.png')
-cv2.imshow('Original', input_image) 
-
-input_image = re_size(input_image, 1200, 800)
-cv2.imshow('Resized', input_image)
-cv2.waitKey(0)
-cv2.destroyWindow('Resized')
-
-gray_img = rgb_2_gray(input_image)
-cv2.imshow('Gray scale', gray_img)
-cv2.waitKey(0)
-cv2.destroyWindow('Gray scale')
-
-vign_img = effect_vignette(input_image, 100, 2.0)
-cv2.imshow('Vignetta', vign_img)
-cv2.waitKey(0)
-cv2.destroyWindow('Vignetta')
-
-sepia_img = effect_sepia(input_image)
-cv2.imshow('Sepia', sepia_img)
-cv2.waitKey(0)
-cv2.destroyWindow('Sepia')
-
-pixel_img = pixelate(input_image, 16)
-cv2.imshow('Pixelated', pixel_img)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+    args = cli_arguments()
+    image_path = args.image_path
+    input_image = cv2.imread(image_path)
+    cv2.imshow('Original', input_image) 
+    filter_type = args.filter_type
+    match filter_type:
+        case "gray":
+            output_img = rgb_2_gray(input_image)
+        case "resize":
+            output_img = re_size(input_image, 1200, 800)
+        case "sepia":
+            output_img = effect_sepia(input_image)
+        case "vignetta":
+            output_img = effect_vignette(input_image, 100, 2.0)
+        case "pixelate":
+            output_img = pixelate(input_image, 16)
+    cv2.imshow('Output', output_img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
