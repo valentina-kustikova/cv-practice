@@ -13,7 +13,7 @@ def cli_arguments():
                         type=str,
                         dest='image_path',
                         required=False,
-                        default='Miku.jpg')
+                        default='Miku.png')
     
     parser.add_argument('--filter', '-f',
                         help='filter type (gray, resize, sepia, vignette, pixelate)',
@@ -21,7 +21,13 @@ def cli_arguments():
                         dest='filter_type',
                         required=False,
                         default='gray', choices=['gray', 'resize', 'sepia', 'vignette', 'pixelate'])
-    parser.add_argument('--data', '-d')
+
+    parser.add_argument('-p', '--param',
+                        help='Parametres',
+                        type=str,
+                        dest='param')
+    
+    
     return parser.parse_args()
 
 def rgb_2_gray(img):
@@ -38,7 +44,7 @@ def rgb_2_gray(img):
 
 # при попытке уменьшенное изображение увеличить возникают артефакты
 # Используется билинейная интерполяция
-def re_size(img, new_w, new_h):
+def re_size(img, size):
     """
     Изменениие размеров входного изображения
     с использование билинейной интерполяции
@@ -49,6 +55,7 @@ def re_size(img, new_w, new_h):
     retval:
         output = выходное изображение
     """
+    new_w, new_h = size
     h, w = img.shape[:2]
     output = np.zeros((new_h, new_w, 3), dtype=img.dtype)
     x_rat = w / new_w
@@ -107,7 +114,7 @@ def effect_sepia(img):
     output = transform(output, kernel)
     return output
     
-def effect_vignette(img, rad, strength):
+def effect_vignette(img, data):
     """
     Накладывает фотоэффект Виньетки на входное изображение
     Args:
@@ -117,6 +124,7 @@ def effect_vignette(img, rad, strength):
     retval:
         output = выходное изображение
     """
+    rad, strength = data
     rows, cols = img.shape[:2]
     if (rad > cols or rad > rows or rad < 0): rad = 0.3 * min(cols, rows) # если радиус содержит недопустимые значения, то используется значение равное 30% от мин. стороны
     cent_x, cent_y = cols // 2, rows // 2
@@ -134,7 +142,7 @@ def effect_vignette(img, rad, strength):
     return output
 
 
-def pixelate(img, block_size, ):
+def pixelate(img, block_size, coords):
     """
     Пикселизация выделенной области входного изображения.
     Изображение разбвается на блок размера block_size
@@ -142,14 +150,14 @@ def pixelate(img, block_size, ):
     Args:
         img = редактируемое изображение
         block_size (pixels) = размер блока, на которых будет разбивать выделенную область
+        coords = (x1, y1, x2, y2) - координаты выделенной области
     retval:
         output = выходное изображение
     """
-    r = cv2.selectROI('select the area', input_image, showCrosshair=False)
-    cv2.destroyWindow('select the area')
-    crop_img = input_image[int(r[1]):int(r[1]+r[3]),  int(r[0]):int(r[0]+r[2])] 
-    h, w = crop_img.shape[:2]
     output = img.copy()
+    crop_img = output[int(coords[1]):int(coords[1]+coords[3]),  int(coords[0]):int(coords[0]+coords[2])] 
+    h, w = crop_img.shape[:2]
+    
     #cv2.GaussianBlur(crop_img, (7,7), 0)
 
     # Перемещение пикселей по блокам
@@ -159,27 +167,43 @@ def pixelate(img, block_size, ):
             mean_color = np.mean(block, axis=(0, 1)).astype(np.uint8)               # Находим средний цвет
             crop_img[i:min(i + block_size, h), j:min(j + block_size, w)] = mean_color   # Заполняем блок средним цветом
 
-    output[int(r[1]):int(r[1]+r[3]),  int(r[0]):int(r[0]+r[2])] = crop_img
+    output[int(coords[1]):int(coords[1]+coords[3]),  int(coords[0]):int(coords[0]+coords[2])] = crop_img
     return output
 
+def Parametr(args):
+    str = args.param.split(",")
+    param = [int(number) for number in str]
+    paramlen = len(param)
+    return param, paramlen
 if __name__ == '__main__':
 
     args = cli_arguments()
     image_path = args.image_path
     input_image = cv2.imread(image_path)
-    cv2.imshow('Original', input_image) 
     filter_type = args.filter_type
+    
     match filter_type:
         case "gray":
             output_img = rgb_2_gray(input_image)
         case "resize":
-            output_img = re_size(input_image, 1200, 800)
+            param, paramLen = Parametr(args)
+            if paramLen!=2: raise ValueError('Add parameters')
+            output_img = re_size(input_image, param)
         case "sepia":
             output_img = effect_sepia(input_image)
-        case "vignetta":
-            output_img = effect_vignette(input_image, 100, 2.0)
+        case "vignette":
+            param, paramLen = Parametr(args)
+            if paramLen!=2: raise ValueError('Add parameters')
+            output_img = effect_vignette(input_image, param)
         case "pixelate":
-            output_img = pixelate(input_image, 16)
+            param, paramLen = Parametr(args)
+            if paramLen!=1: raise ValueError('Add parameters')
+            coords = cv2.selectROI('select the area', input_image, showCrosshair=False)
+            cv2.destroyWindow('select the area')
+            output_img = pixelate(input_image, param[0], coords)
+        case _:
+            raise 'Unsuppored \'mode\' value'
+    cv2.imshow('Original', input_image) 
     cv2.imshow('Output', output_img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
