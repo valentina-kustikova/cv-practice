@@ -39,7 +39,7 @@ def rgb_2_gray(img):
         output = выходное изображение
     """
     r, g, b = cv2.split(img)
-    output = ((0.2126 * r + 0.587 * g + 0.144 * b) / 255)
+    output = (0.2126 * r + 0.587 * g + 0.144 * b) / 255
     return output
 
 # при попытке уменьшенное изображение увеличить возникают артефакты
@@ -61,7 +61,7 @@ def re_size(img, size):
     x_rat = w / new_w
     y_rat = h / new_h
     
-    # целочисленны координаты
+    # целочисленные координаты
     x_ind = (np.arange(new_w) * x_rat).astype(np.float32)
     y_ind = (np.arange(new_h) * y_rat).astype(np.float32)
 
@@ -90,13 +90,12 @@ def re_size(img, size):
     return output
     
 def transform(img, kernel):
-    b, g, r = img[:,:,0], img[:,:,1], img[:, :, 2] # поделили на каналы
+    b, g, r = cv2.split(img) # поделили на каналы
 
     # перемножаем вектор-канал с коэффициентами
     newB = np.clip(b * kernel[0][0] + g * kernel[0][1] + r * kernel[0][2], 0, 255)
     newG = np.clip(b * kernel[1][0] + g * kernel[1][1] + r * kernel[1][2], 0, 255)
     newR = np.clip(b * kernel[2][0] + g * kernel[2][1] + r * kernel[2][2], 0, 255)
-
     #присваиваем новые каналы
     img[:,:,0], img[:,:,1], img[:, :, 2] = newB, newG, newR
     return img
@@ -110,8 +109,7 @@ def effect_sepia(img):
     """
     # 1 method
     kernel = np.array([[0.131, 0.534, 0.272],[0.168, 0.686, 0.349],[0.189, 0.769, 0.393]]) #сетка коэффициентов для фотоэффекта
-    output = np.copy(img)
-    output = transform(output, kernel)
+    output = transform(np.copy(img), kernel)
     return output
     
 def effect_vignette(img, data):
