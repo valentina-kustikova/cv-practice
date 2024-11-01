@@ -18,13 +18,14 @@ def changeSize(dst, desired_height, desired_width):
     # desired_height, desired_width - новые размеры
     # Вывод функции - измененное исходное изображение
     
-    resized = np.zeros((desired_height,desired_width,3),np.uint8)
-    stepx=dst.shape[1]/desired_width
-    stepy=dst.shape[0]/desired_height
-    for i in range (0, desired_width):
-        for j in range (0, desired_height):
-            resized[j,i]=dst[int(j*stepy),int(i*stepx)]
-    return resized
+    height, width, channels = dst.shape
+    X = np.linspace(0,width-1,desired_width)
+    Y = np.linspace(0,height-1,desired_height)
+    newX, newY=np.meshgrid(X,Y)
+    newX=newX.astype(int)
+    newY=newY.astype(int)
+    resized=dst[newY,newX]
+    return resized.astype(np.uint8)
 
 def toSepia(dst):
     
@@ -39,22 +40,21 @@ def toSepia(dst):
     sepia[sepia>255]=255
     return sepia.astype(np.uint8)
 
-def vignette(dst,r): # Возведение в степень 1.5 вышло методом научного тыка...
+def vignette(dst,r):
 
     # dst - исходное изображение
     # r - радиус незатемненной области
     # Вывод функции - фильтр виньетки на исходном изображении
 
     height, width, channels = dst.shape
-    rq=r*r
     vign = np.zeros((height,width,3))
     X,Y=np.meshgrid(np.arange(width),np.arange(height))
-    distances=(Y-height//2)*(Y-height//2)+(X-width//2)*(X-width//2)
-    norm_distances=distances/np.max(distances)
-    norm_rq=rq/np.max(distances)
-    vign[:,:,0]=dst[:,:,0]*(1-(norm_distances/norm_rq))**(1.5)
-    vign[:,:,1]=dst[:,:,1]*(1-(norm_distances/norm_rq))**(1.5)
-    vign[:,:,2]=dst[:,:,2]*(1-(norm_distances/norm_rq))**(1.5)
+    distances=np.sqrt((Y-height//2)*(Y-height//2)+(X-width//2)*(X-width//2))
+    norm_distances = distances/np.max(distances);
+    norm_r=r/np.max(distances)
+    vign[:,:,0]=dst[:,:,0]*np.exp(-(norm_distances/norm_r)**4)
+    vign[:,:,1]=dst[:,:,1]*np.exp(-(norm_distances/norm_r)**4)
+    vign[:,:,2]=dst[:,:,2]*np.exp(-(norm_distances/norm_r)**4)
     return vign.astype(np.uint8)
 
 def pixelization(dst,pix_size,x1,y1,x2,y2): 
