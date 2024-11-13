@@ -1,6 +1,6 @@
 import cv2 as cv
 import numpy as np
-import argparse  # Импортируем argparse для парсинга командной строки
+import argparse
 
 # Загрузка модели YOLO
 net = cv.dnn.readNet('yolov3.weights', 'yolov3.cfg')
@@ -116,6 +116,6 @@ def main():
     
     process_input(input_path, conf_threshold, nms_threshold, input_size)
 
-# Запуск программы
+
 if __name__ == '__main__':
     main()
