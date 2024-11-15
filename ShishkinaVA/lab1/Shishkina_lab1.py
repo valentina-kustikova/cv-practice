@@ -123,9 +123,8 @@ def apply_vignette(image, radius):
 
     return result_image
 
-def apply_pixel(image, pixel_size):
+def apply_pixel(image, pixel_size, x1, x2, y1, y2):
     nchannels = image.shape[2]
-    display_image_with_rectangle(image)
 
     result_image = image.copy()
     for x in range(x1, x2, pixel_size):
@@ -188,9 +187,8 @@ def draw_rectangle(event, x, y, flags, param):
         x2, y2 = x, y  
 
 
-def pixelization_filter(image, pixel_size):
-    global x1, y1, x2, y2
-    result_image = apply_pixel(image, pixel_size)
+def pixelization_filter(image, pixel_size, x1, x2, y1, y2):
+    result_image = apply_pixel(image, pixel_size, x1, x2, y1, y2)
     return result_image
  
 def vignette_filter(image, radius):
@@ -200,9 +198,7 @@ def vignette_filter(image, radius):
 def main():
     args = cli_argument_parser()
     image = readImage(args.image_path)
-    
-    # if args.mode == 'image':
-    #     highgui_image_samples(image)
+
     if args.mode == 'convert_gray_color_filter':
         result_image = convert_gray_color_filter(image)
     elif args.mode == 'resolution_change_filter':
@@ -214,7 +210,8 @@ def main():
     elif args.mode == 'pixelization_filter':
         if args.pixel_size is None:
             raise ValueError('The pixel_size parameter must be provided for pixelate mode')
-        result_image = pixelization_filter(image, args.pixel_size)
+        display_image_with_rectangle(image)
+        result_image = pixelization_filter(image, args.pixel_size, x1, x2, y1, y2)
     elif args.mode == 'vignette_filter':
         result_image = vignette_filter(image, args.radius)
     else:
