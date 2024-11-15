@@ -154,7 +154,7 @@ def apply_pixelation(image, region, pixel_size, out_image_path):
     
     # Вставка пикселизированной области обратно в изображение
     image[y_start:y_end, x_start:x_end] = pixelated_roi
-    cv.imwrite(out_image_path, image)
+    #cv.imwrite(out_image_path, image)
     
     print(f"Пикселизированное изображение сохранено в '{out_image_path}'.")
     return out_image_path, image
