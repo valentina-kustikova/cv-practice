@@ -43,15 +43,21 @@
 - **`--confidence_threshold` (-c)**: Порог уверенности для детекции объектов (значение от 0 до 1). Объекты с уверенностью ниже порога не будут отображаться.
 - **`--nms_threshold` (-n)**: Порог для алгоритма не максимальной подавления (NMS). Определяет, насколько сильно рамки могут перекрывать друг друга.
 - **`--input_size` (-s)**: Размер входного изображения, который будет подаваться в модель. Стандартный размер для YOLO — 416x416 пикселей.
+- **`--weights` (-w)**: Путь к файлу весов YOLO.
+- **`--config` (-cf)**: Путь к файлу конфигурации YOLO.
+- **`--names` (-nms)**: Путь к файлу имен классов.
 
 ## Пример использования
 
 1. Для обработки изображения:
    ```bash
-   python lab2.py -i test.jpg -c 0.5 -n 0.4 -s 416
+   python lab2.py -i test.jpg -w yolov3.weights -cf yolov3.cfg -nms coco.names -c 0.5 -n 0.4 -s 416 416
 2. Для обработки видео:
    ```bash
-   python lab2.py -i test_video.mp4 -c 0.5 -n 0.4 -s 416
-3. Для просмотра доступных параметров:
+   python lab2.py -i test.mp4 -w yolov3.weights -cf yolov3.cfg -nms coco.names -c 0.5 -n 0.4 -s 416 416
+3. Для обработки файла со стандартными параметрами:
+   ```bash
+   python lab2.py -i test.gif -w yolov3.weights -cf yolov3.cfg -nms coco.names
+4. Для просмотра доступных параметров:
    ```bash
    python lab2.py --help

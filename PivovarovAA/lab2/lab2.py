@@ -3,119 +3,112 @@ import numpy as np
 import argparse
 
 # Загрузка модели YOLO
-net = cv.dnn.readNet('yolov3.weights', 'yolov3.cfg')
+def load_model(weights_path, config_path, names_path):
+    net = cv.dnn.readNet(weights_path, config_path)
+    with open(names_path, 'r') as f:
+        classes = [line.strip() for line in f.readlines()]
+    colors = np.random.uniform(0, 255, size=(len(classes), 3))
+    return net, classes, colors
 
-# Загрузим имена классов
-with open('coco.names', 'r') as f:
-    CLASSES = [line.strip() for line in f.readlines()]
+def preprocess_frame(frame, input_size):
+    (h, w) = frame.shape[:2]
+    blob = cv.dnn.blobFromImage(frame, 0.00392, input_size, (0, 0, 0), True, crop=False)
+    return blob, h, w
 
-COLORS = np.random.uniform(0, 255, size=(len(CLASSES), 3))
-
-# Получение имен выходных слоев модели
-layer_names = net.getLayerNames()
-output_layers = [layer_names[i-1] for i in net.getUnconnectedOutLayers()]
-
-# Функция для детектирования объектов
-def detect_objects(image, net, conf_threshold=0.5, nms_threshold=0.4, input_size=(416, 416)):
-    (h, w) = image.shape[:2]
-    blob = cv.dnn.blobFromImage(image, 0.00392, input_size, (0, 0, 0), True, crop=False)
+def process_with_model(net, blob):
     net.setInput(blob)
-    outs = net.forward(output_layers)
-    
-    boxes = []
-    confidences = []
-    class_ids = []
+    outputs = net.forward([net.getLayerNames()[i - 1] for i in net.getUnconnectedOutLayers()])
+    return outputs
+
+def postprocess_frame(frame, outputs, classes, colors, h, w, conf_threshold, nms_threshold):
+    boxes, confidences, class_ids = [], [], []
     detected_objects = {}
 
-    for out in outs:
+    for out in outputs:
         for detection in out:
             scores = detection[5:]
             class_id = np.argmax(scores)
             confidence = scores[class_id]
-            
             if confidence > conf_threshold:
-                center_x = int(detection[0] * w)
-                center_y = int(detection[1] * h)
-                width = int(detection[2] * w)
-                height = int(detection[3] * h)
-                
-                x = int(center_x - width / 2)
-                y = int(center_y - height / 2)
-                
+                center_x, center_y = int(detection[0] * w), int(detection[1] * h)
+                width, height = int(detection[2] * w), int(detection[3] * h)
+                x, y = int(center_x - width / 2), int(center_y - height / 2)
                 boxes.append([x, y, width, height])
                 confidences.append(float(confidence))
                 class_ids.append(class_id)
 
-                if CLASSES[class_id] in detected_objects:
-                    detected_objects[CLASSES[class_id]] += 1
-                else:
-                    detected_objects[CLASSES[class_id]] = 1
-
-    # Применение NMS с порогом
     indices = cv.dnn.NMSBoxes(boxes, confidences, conf_threshold, nms_threshold)
 
     for i in indices.flatten():
         x, y, width, height = boxes[i]
-        label = f"{CLASSES[class_ids[i]]}: {confidences[i]:.3f}"
-        color = COLORS[class_ids[i]]
-        
-        cv.rectangle(image, (x, y), (x + width, y + height), color, 2)
-        cv.putText(image, label, (x, y - 10), cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        label = f"{classes[class_ids[i]]}: {confidences[i]:.3f}"
+        color = colors[class_ids[i]]
+        cv.rectangle(frame, (x, y), (x + width, y + height), color, 2)
+        cv.putText(frame, label, (x, y - 10), cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        detected_objects[classes[class_ids[i]]] = detected_objects.get(classes[class_ids[i]], 0) + 1
 
-    return image, detected_objects
+    return frame, detected_objects
 
-# Функция для обработки видео или изображения
-def process_input(input_path, conf_threshold, nms_threshold, input_size):
-    if input_path.endswith(".mp4") or input_path.endswith(".avi"):
-        cap = cv.VideoCapture(input_path)
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            
-            output_frame, detected_objects = detect_objects(frame, net, conf_threshold, nms_threshold, input_size)
-            
-            for obj, count in detected_objects.items():
-                print(f"{obj}: {count}")
-            
-            cv.imshow("Object Detection", output_frame)
-            
-            if cv.waitKey(1) & 0xFF == ord("q"):
-                break
-        cap.release()
-        cv.destroyAllWindows()
-    else:
-        image = cv.imread(input_path)
-        if image is None:
-            print("Не удалось загрузить изображение")
-            return
-        
-        output_image, detected_objects = detect_objects(image, net, conf_threshold, nms_threshold, input_size)
-        
+# Обработка кадра
+def process_frame(frame, net, classes, colors, conf_threshold, nms_threshold, input_size):
+    blob, h, w = preprocess_frame(frame, input_size)
+    outputs = process_with_model(net, blob)
+    return postprocess_frame(frame, outputs, classes, colors, h, w, conf_threshold, nms_threshold)
+
+# Обработка видео
+def process_video(video_path, net, classes, colors, conf_threshold, nms_threshold, input_size):
+    cap = cv.VideoCapture(video_path)
+    print("Нажмите 'q', чтобы завершить просмотр.")
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        output_frame, detected_objects = process_frame(frame, net, classes, colors, conf_threshold, nms_threshold, input_size)
         for obj, count in detected_objects.items():
             print(f"{obj}: {count}")
-        
-        cv.imshow("Object Detection", output_image)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
+        if not display_frame("Object Detection", output_frame):
+            break
+    cap.release()
+    cv.destroyAllWindows()
 
-# Основная функция для парсинга командной строки
+# Функция для отображения изображения
+def display_frame(window_name, frame, wait_time=1):
+    cv.imshow(window_name, frame)
+    key = cv.waitKey(wait_time) & 0xFF
+    if key == ord('q'):
+        return False
+    return True
+
+
+# Обработка изображения
+def process_image(image_path, net, classes, colors, conf_threshold, nms_threshold, input_size):
+    image = cv.imread(image_path)
+    if image is None:
+        print("Не удалось загрузить изображение")
+        return
+    output_image, detected_objects = process_frame(image, net, classes, colors, conf_threshold, nms_threshold, input_size)
+    for obj, count in detected_objects.items():
+        print(f"{obj}: {count}")
+    display_frame("Object Detection", output_image, wait_time=0)
+
+# Главная функция
 def main():
     parser = argparse.ArgumentParser(description="Object Detection with YOLO")
     parser.add_argument('-i', '--input', required=True, help="Path to the input image or video")
-    parser.add_argument('-c', '--confidence_threshold', type=float, default=0.5, help="Confidence threshold for object detection (default: 0.5)")
-    parser.add_argument('-n', '--nms_threshold', type=float, default=0.4, help="NMS threshold for suppressing overlapping boxes (default: 0.4)")
-    parser.add_argument('-s', '--input_size', type=int, nargs=2, default=[416, 416], help="Input size for the YOLO model (width height, default: 416 416)")
-
-
+    parser.add_argument('-c', '--confidence_threshold', type=float, default=0.5, help="Confidence threshold (default: 0.5)")
+    parser.add_argument('-n', '--nms_threshold', type=float, default=0.4, help="NMS threshold (default: 0.4)")
+    parser.add_argument('-s', '--input_size', type=int, nargs=2, default=[416, 416], help="YOLO input size (width height, default: 416 416)")
+    parser.add_argument('-w', '--weights', required=True, help="Path to YOLO weights file")
+    parser.add_argument('-cf', '--config', required=True, help="Path to YOLO config file")
+    parser.add_argument('-nms', '--names', required=True, help="Path to class names file")
     args = parser.parse_args()
-    input_path = args.input
-    conf_threshold = args.confidence_threshold
-    nms_threshold = args.nms_threshold
-    input_size = tuple(args.input_size)
-    
-    process_input(input_path, conf_threshold, nms_threshold, input_size)
 
+    net, classes, colors = load_model(args.weights, args.config, args.names)
+
+    if args.input.endswith((".mp4", ".avi", ".gif")):
+        process_video(args.input, net, classes, colors, args.confidence_threshold, args.nms_threshold, tuple(args.input_size))
+    else:
+        process_image(args.input, net, classes, colors, args.confidence_threshold, args.nms_threshold, tuple(args.input_size))
 
 if __name__ == '__main__':
     main()
