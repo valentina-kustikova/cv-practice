@@ -35,7 +35,11 @@ def GetParams(param_string: str):
     return [float(item) for item in param_string.split(',')]
 
 def ReadImage(path):
-    return cv.imread(path)
+    img = cv.imread(path)
+    if not img.any():
+        raise ValueError("Unable to read image")
+    else:
+        return cv.imread(path)
     
 def WriteImage(img, path):
     return cv.imwrite(path, img)
@@ -79,16 +83,45 @@ def Vignette(image, _radius, _intensity):
     x, y = np.meshgrid(np.arange(size_x), np.arange(size_y))
     center_dist = np.sqrt((x - center_x)**2 + (y - center_y)**2)
 
-    mask = np.ones((size_x, size_y), dtype=np.float32)
+    mask = np.ones((size_y, size_x), dtype=np.float32)
     mask[center_dist > _radius] = np.exp(-((center_dist[center_dist > _radius] - _radius)**2) * _intensity)
 
-    _image = np.zeros((size_x, size_y, 3), dtype=np.uint8)
+    _image = np.zeros((size_y, size_x, 3), dtype=np.uint8)
   
     _image[:, :, 0] = np.uint8(image[:, :, 0] * mask)
     _image[:, :, 1] = np.uint8(image[:, :, 1] * mask)
     _image[:, :, 2] = np.uint8(image[:, :, 2] * mask)
 
     return _image
+
+def Pixelization(image, box, _block_size, _shuffle):
+    _x1, _y1, _x2, _y2 = box
+    block_size = int(_block_size)
+
+    _image = image.copy()
+    pixelized = _image[_y1:_y2, _x1:_x2]
+
+    blocks_x = (_x2 - _x1) // block_size
+    blocks_y = (_y2 - _y1) // block_size
+    
+    avg_color_list = np.zeros((blocks_y * blocks_x, 3), dtype=np.uint8)
+
+    for i in range(blocks_y):
+        for j in range(blocks_x):
+            avg_color = np.mean(pixelized[i * block_size : (i + 1) * block_size, j * block_size : (j + 1) * block_size], axis=(0, 1)).astype(np.uint8)
+            avg_color_list[i * blocks_x + j] = avg_color
+
+    if (bool(_shuffle)):
+        np.random.shuffle(avg_color_list)
+
+    for i in range(blocks_y):
+        for j in range(blocks_x):
+            pixelized[i * block_size : (i + 1) * block_size, j * block_size : (j + 1) * block_size] = avg_color_list[i * blocks_x + j]
+
+    _image[_y1:_y2, _x1:_x2] = pixelized
+
+    return _image
+
 
 def Mouse_Callback(event, x, y, flags, param):
     global x1, y1, x2, y2
@@ -101,30 +134,6 @@ def Mouse_Callback(event, x, y, flags, param):
             _image = param.copy()
             cv.rectangle(_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv.imshow("Input image", _image)
-
-def Pixelization(image, _block_size):
-    block_size = int(_block_size)
-
-    cv.namedWindow("Input image")
-    global x1, y1, x2, y2
-    cv.setMouseCallback("Input image", Mouse_Callback, param=image)
-    cv.imshow("Input image", image)
-    cv.waitKey(0)
-
-    _image = image.copy()
-    pixelized = _image[y1:y2, x1:x2]
-
-    blocks_x = (x2 - x1) // block_size
-    blocks_y = (y2 - y1) // block_size
-    for i in range(blocks_y):
-        for j in range(blocks_x):
-            avg_color = np.mean(pixelized[i * block_size : (i + 1) * block_size, j * block_size : (j + 1) * block_size], axis=(0, 1)).astype(np.uint8)
-
-            pixelized[i * block_size : (i + 1) * block_size, j * block_size : (j + 1) * block_size] = avg_color
-
-    _image[y1:y2, x1:x2] = pixelized
-
-    return _image
 
 
 def main():
@@ -152,9 +161,16 @@ def main():
             raise ValueError('Incorrect vignette parameters')
         output_img = Vignette(input_img, params_list[0], params_list[1])
     else:
-        if not params_list:
+        if (not params_list) or (len(params_list) < 2):
             raise ValueError('Incorrect pixelization parameters')
-        output_img = Pixelization(input_img, params_list[0])
+
+        cv.namedWindow("Input image")
+        global x1, y1, x2, y2
+        cv.setMouseCallback("Input image", Mouse_Callback, param=input_img)
+        cv.imshow("Input image", input_img)
+        cv.waitKey(0)
+
+        output_img = Pixelization(input_img, [min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)], params_list[0], params_list[1])
 
     cv.imshow('Input image', input_img)
     cv.imshow('Output image', output_img)
