@@ -40,74 +40,36 @@ def cli_argument_parser():
 
     return args
 
-
-def highgui_samples(in_filename, out_filename):
-    img = cv2.imread(in_filename)
-    cv2.imwrite(out_filename, img)
-    
-    cv2.imshow('Init image', img)
-    cv2.waitKey()
-    
-    cv2.destroyAllWindows()
-
-def mode_grayscale(in_filename, out_filename):
-    img = cv2.imread(in_filename)
-
+def mode_grayscale(img):
     grayscale_filter = np.array([[0.299, 0.587, 0.114]])
     processed_img = cv2.transform(img, grayscale_filter)
     processed_img = np.clip(processed_img, 0, 255)
 
-    cv2.imwrite(out_filename, processed_img)
+    return processed_img
 
-    cv2.imshow('Original image', img)
-    cv2.imshow('Grayscale image', processed_img)
-    cv2.waitKey()
-    
-    cv2.destroyAllWindows()
-
-def mode_sepia(in_filename, out_filename):
-    img = cv2.imread(in_filename)
-
+def mode_sepia(img):
     sepia_filter = np.array([[0.272, 0.534, 0.131],
                               [0.349, 0.686, 0.168],
                               [0.393, 0.769, 0.189]])
     processed_img = cv2.transform(img, sepia_filter)
     processed_img = np.clip(processed_img, 0, 255)
 
-    cv2.imwrite(out_filename, processed_img)
+    return processed_img
 
-    cv2.imshow('Original image', img)
-    cv2.imshow('Sepia image', processed_img)
-    cv2.waitKey()
-    
-    cv2.destroyAllWindows()
-
-def mode_resize(in_filename, out_filename, new_width, new_height):
-    img = cv2.imread(in_filename)
-
+def mode_resize(img, new_width, new_height):
      # Calculate the scaling factors
     scale_x = new_width / img.shape[1]
     scale_y = new_height / img.shape[0]
     
-    # Create the transformation matrix
-    transformation_matrix = np.array([[scale_x, 0, 0],
-                                       [0, scale_y, 0]])
-    
-    # Apply the transformation
-    processed_img = cv2.warpAffine(img, transformation_matrix, (new_width, new_height))
+    x_ind = np.floor(np.arange(new_width) / scale_x).astype(int)
+    y_ind = np.floor(np.arange(new_height) / scale_y).astype(int)
 
-    cv2.imwrite(out_filename, processed_img)
+    processed_img = img[y_ind[:, None], x_ind]
 
-    cv2.imshow('Original image', img)
-    cv2.imshow('Resized image', processed_img)
-    cv2.waitKey()
-    
-    cv2.destroyAllWindows()
+    return processed_img
 
 
-def mode_vignette(in_filename, out_filename, radius):
-    img = cv2.imread(in_filename)
-
+def mode_vignette(img, out_filename, radius):
     rows, cols = img.shape[:2]
     X_resultant_kernel = cv2.getGaussianKernel(cols, radius)
     Y_resultant_kernel = cv2.getGaussianKernel(rows, radius)
@@ -119,13 +81,7 @@ def mode_vignette(in_filename, out_filename, radius):
     for i in range(3):  # Apply to each channel
         processed_img[:,:,i] = processed_img[:,:,i] * mask
 
-    cv2.imwrite(out_filename, processed_img)
-
-    cv2.imshow('Original image', img)
-    cv2.imshow('Resized image', processed_img)
-    cv2.waitKey()
-    
-    cv2.destroyAllWindows()
+    return processed_img
 
 rect_start = None
 rect_end = None
@@ -133,6 +89,7 @@ drawing = False
 
 def draw_rectangle(event, x, y, flags, param):
     global rect_start, rect_end, drawing
+    processed_image = param
     if event == cv2.EVENT_LBUTTONDOWN:
         if drawing == False:
             rect_start = (x, y)
@@ -140,7 +97,6 @@ def draw_rectangle(event, x, y, flags, param):
         else:
             drawing = False
             rect_end = (x, y)
-            processed_image = param.copy()
             pixelate_area(processed_image, rect_start, rect_end)
             cv2.imshow('processed_image', processed_image)
 
@@ -185,21 +141,24 @@ def pixelate_area(image, start, end):
     image[y1:y2, x1:x2] = roi
 
 
-def mode_pixelate(in_filename, out_filename):
-    img = cv2.imread(in_filename)
-    
+def mode_pixelate(img):
+    processed = img.copy()
     global rect_start, rect_end, drawing
     cv2.namedWindow("original_image")
-    cv2.setMouseCallback("original_image", draw_rectangle, param=img)
+    cv2.setMouseCallback("original_image", draw_rectangle, param=processed)
     cv2.imshow('original_image', img)
-    cv2.waitKey()
+    cv2.waitKey(0)
     
     cv2.destroyAllWindows() 
+    return processed
 
+def load_image(image_path):
+    img = cv2.imread(image_path)
+    if img is None:
+        raise FileNotFoundError(f"Image not found at the path: {image_path}")
+    return img
 
-def main():
-    args = cli_argument_parser()
-    
+def process_image(img, args):  
     if(args.mode != 'resize' and args.width != -1):
         raise ValueError('Unknown argument \'width\'')
     if(args.mode != 'resize' and args.height != -1):
@@ -207,24 +166,46 @@ def main():
     if(args.mode != 'vignette' and args.radius != -1):
         raise ValueError('Unknown argument \'radius\'')
 
-    if args.mode == 'image':
-        highgui_samples(args.image_path, args.out_image_path)
-    elif args.mode == 'grayscale':
-        mode_grayscale(args.image_path, args.out_image_path)
+
+    if args.mode == 'grayscale':
+        return mode_grayscale(img)
     elif args.mode == 'sepia':
-        mode_sepia(args.image_path, args.out_image_path)
+        return mode_sepia(img)
     elif args.mode == 'resize':
         if(args.width < 0 or args.height < 0):
             raise ValueError('Unspecified or invalid target width and height')
-        mode_resize(args.image_path, args.out_image_path, args.width, args.height)
+        return mode_resize(img, args.width, args.height)
     elif args.mode == 'vignette':
         if(args.radius < 0):
             raise ValueError('Unspecified or invalid radius')
-        mode_vignette(args.image_path, args.out_image_path, args.radius)
+        return mode_vignette(img, args.out_image_path, args.radius)
     elif args.mode == 'pixelate':
-        mode_pixelate(args.image_path, args.out_image_path)
+        return mode_pixelate(img)
     else:
         raise ValueError('Unsupported mode')
+
+def save_image(img, output_path):
+    cv2.imwrite(output_path, img)
+
+
+def display(img, processed):
+    cv2.imshow('Original image', img)
+    cv2.imshow('Processed image', processed)
+    cv2.waitKey()
+    
+    cv2.destroyAllWindows()
+
+def main():
+    args = cli_argument_parser()
+    try:
+        img = load_image(args.image_path)    
+        processed = process_image(img, args)
+        save_image(img, args.out_image_path)
+        if(args.mode != 'pixelate'):
+            display(img, processed)
+
+    except Exception as e:
+        print(e)     
 
 
 if __name__ == '__main__':
