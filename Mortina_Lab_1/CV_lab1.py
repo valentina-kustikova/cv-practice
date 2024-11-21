@@ -4,6 +4,7 @@ import numpy as np
 import argparse
 import sys
 
+x1, y1, x2, y2 = -1, -1, -1, -1
 #Пишем функцию, которая создаёт объект argparse.ArgumentParser для разбора аргументов командной строки
 def cli_argument_parser():
     parser = argparse.ArgumentParser()
@@ -19,7 +20,7 @@ def cli_argument_parser():
                         dest='output_image',
                         default='output.jpg')
     parser.add_argument('-m', '--mode',
-                        help='Mode (\'image\', \'gray_image\', \'resize_image\', \'sepia_image\', \'vignette_image\', \'pixel_mage\')',
+                        help='Mode (\'image\', \'gray_image\', \'resize_image\', \'sepia_image\', \'vignette_image\', \'pixel_image\')',
                         type=str,
                         dest='mode',
                         default='image')
@@ -119,7 +120,7 @@ def vignette(image, radius):
 #Функция пикселизации заданной прямоугольной области изображения
 
 #Функция для пексилизации области изображения
-def image_pixel(image, x1, y1, x2, y2, pixel_size):
+def pixel_filter(image, x1, y1, x2, y2, pixel_size):
     x1, y1 = max(0, x1), max(0, y1)
     x2, y2 = min(image.shape[1], x2), min(image.shape[0], y2)
     
@@ -147,42 +148,40 @@ def image_pixel(image, x1, y1, x2, y2, pixel_size):
 
 #Функция, отвечающая за обработку события мыши для рисования прямоугольника и пикселизации выбранной области
 def draw(event, x, y, flags, param):
-    global rect, drawing, img, pixel_image, pixelate_size
+    global rect, drawing, img, pixel_image, pixelate_size, x1, y1, x2, y2
 
     if event == cv.EVENT_LBUTTONDOWN:
         drawing = True
-        rect = (x, y, x, y)
-    
+        x1, y1 = x, y  
+
     elif event == cv.EVENT_MOUSEMOVE:
         if drawing:
-            img[:] = pixel_image.copy()  
-            cv.rectangle(img, (rect[0], rect[1]), (x, y), (0, 255, 0), 2)
-            rect = (rect[0], rect[1], x, y)
-    
+            x2, y2 = x, y  
+
     elif event == cv.EVENT_LBUTTONUP:
         drawing = False
-        img[:] = pixel_image.copy()  
-        image_pixel(img, rect[0], rect[1], x, y, pixelate_size)
-        pixel_image[:] = img.copy() 
+        x2, y2 = x, y 
+        
         
 #Сама функция пикселизации        
 def pixel_image(image, size):
     global img, pixel_image, rect, drawing, pixelate_size
 
-    pixelate_size = size
-    rect = (0, 0, 1, 1)
-    drawing = False
-    
-    pixel_image = image.copy()
-    img = image.copy()
-    
     cv.namedWindow('Image')
     cv.setMouseCallback('Image', draw)
 
     while True:
-        cv.imshow('Image', img)
-        if cv.waitKey(1) & 0xFF ==ord('0'):
+        img_copy = image.copy()
+        if x1 != -1 and y1 != -1 and x2 != -1 and y2 != -1:
+            cv.rectangle(img_copy, (x1, y1), (x2, y2), (0, 255, 0), 2) 
+        cv.imshow('Image', img_copy)
+
+        key = cv.waitKey(1)
+        if key == ord('q'): 
             break
+
+    cv.destroyWindow('Image')
+
 
     
 #Пишем функцию, которая запускает необходимый сценарий, исходя из аргументов командной строки, а также вызов чтения и вывода изображений
@@ -206,7 +205,8 @@ def main():
     elif args.mode == 'vignette_image':
         filtr_image = vignette(image, args.radius)
     elif args.mode == 'pixel_image':
-        filtr_image = pixel_image(image, args.pixelate_size)
+        pixel_image(image, args.pixelate_size)
+        filtr_image = pixel_filter(image, x1, y1, x2, y2, args.pixelate_size)
     else:
         raise 'Unsupported \'mode\' value'
         
