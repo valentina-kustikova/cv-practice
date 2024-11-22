@@ -101,23 +101,19 @@ def sepia_img(src_image):
     return sepia_image
 
 
-def vignette_img(src_image, radius):
-    """Применение виньетки к изображению"""
-    vig_img = np.zeros((src_image.shape[0], src_image.shape[1], 3), np.uint8)
-    np.copyto(vig_img, src_image)
+def vignette_img(img, radius):
+    rows, cols = img.shape[:2]
+    X_resultant_kernel = cv2.getGaussianKernel(cols, radius)
+    Y_resultant_kernel = cv2.getGaussianKernel(rows, radius)
+    kernel = Y_resultant_kernel * X_resultant_kernel.T
+    mask = kernel / kernel.max()
 
-    height, width = vig_img.shape[:2]
-    x, y = np.meshgrid(np.arange(width), np.arange(height))
+    processed_img = img.copy()
 
-    center_x, center_y = width // 2, height // 2
-    distance_from_center = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
-    normalized_distance = distance_from_center / np.max(distance_from_center)
-    mask = np.clip(1 - (normalized_distance / radius) ** 2, 0, 1)
+    for i in range(3):  # Apply to each channel
+        processed_img[:,:,i] = processed_img[:,:,i] * mask
 
-    for i in range(3):  # Для каждого цветового канала
-        vig_img[:, :, i] =  vig_img[:, :, i] * mask
-
-    return vig_img
+    return processed_img
 
 
 def area(image):
