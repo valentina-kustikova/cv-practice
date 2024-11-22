@@ -21,7 +21,6 @@ def apply_vignette(image, radius=500, intensity=1.0):
             distance = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
             mask[y, x] = 1 - min(distance / radius, 1)
 
-    # Normalize the mask and apply intensity
     mask = mask / mask.max()
     mask = mask ** intensity
 
@@ -48,25 +47,46 @@ def apply_pixelation(image, rect, pixel_size):
     return pixelated_image
 
 
-def resize_image(image, width, height):
+def resize_image(image, new_width, new_height):
     """Изменяет размер изображения."""
-    resized_image = np.zeros((height, width, 3), dtype=image.dtype)
-    scale_x, scale_y = image.shape[1] / width, image.shape[0] / height
-    for i in range(height):
-        for j in range(width):
-            src_x, src_y = int(j * scale_x), int(i * scale_y)
-            resized_image[i, j] = image[src_y, src_x]
-    return resized_image
+    if new_width <= 0 or new_height <= 0:
+        raise ValueError('Width and height must be greater than zero')
+
+    height, width, nchannels = image.shape
+
+    x_scale = width / new_width
+    y_scale = height / new_height
+
+    x_ind = np.floor(np.arange(new_width) * x_scale).astype(int)
+    y_ind = np.floor(np.arange(new_height) * y_scale).astype(int)
+
+    x_ind = np.clip(x_ind, 0, width - 1)
+    y_ind = np.clip(y_ind, 0, height - 1)
+
+    result_image = image[y_ind[:, None], x_ind]
+
+    return result_image
+
+
 
 
 def apply_sepia(image):
     """Применяет сепию к изображению."""
-    sepia_image = np.zeros_like(image, dtype=np.float32)
-    for i in range(image.shape[0]):
-        for j in range(image.shape[1]):
-            r, g, b = image[i, j]
-            tr = 0.272 * r + 0.534 * g + 0.131 * b
-            tg = 0.349 * r + 0.686 * g + 0.168 * b
-            tb = 0.393 * r + 0.769 * g + 0.189 * b
-            sepia_image[i, j] = [min(tr, 255), min(tg, 255), min(tb, 255)]
+    # Коэффициенты для преобразования в сепию
+    sepia_matrix = np.array([
+        [0.272, 0.534, 0.131],
+        [0.349, 0.686, 0.168],
+        [0.393, 0.769, 0.189]
+    ])
+
+    # Преобразование изображения в массив с плавающей точкой
+    image_float = image.astype(np.float32)
+
+    # Применение матрицы сепии к изображению
+    sepia_image = np.dot(image_float, sepia_matrix.T)
+
+    # Ограничение значений в диапазоне [0, 255]
+    sepia_image = np.clip(sepia_image, 0, 255)
+
+    # Преобразование обратно в целочисленный тип
     return sepia_image.astype(np.uint8)
