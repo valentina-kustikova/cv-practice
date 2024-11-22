@@ -57,8 +57,13 @@ class YOLOv4Detector:
 
         return rectangles, valid_confidences, valid_classIds, indexes, detected_objects
 
-    def showResults(self, image, rectangles, confidences, class_ids, indexes, detected_objects):
-        colors = np.random.uniform(0, 255, size=(len(self.classes), 3))
+
+class Visualizer:
+    def __init__(self, classes):
+        self.classes = classes
+        self.colors = np.random.uniform(0, 255, size=(len(self.classes), 3))
+
+    def showResults(self, image, rectangles, confidences, class_ids, indexes, detected_objects, colors):
         for i in indexes.flatten():
             leftX, leftY, widthRectangle, heightRectangle = rectangles[i]
             label = str(self.classes[class_ids[i]])
@@ -91,7 +96,7 @@ class YOLOv4Detector:
         cv2.imshow('Result', image)
         cv2.waitKey(0)
 
-    def processVideo(self, video_path, output_dir):
+    def processVideo(self, video_path, output_dir, detector, colors):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -104,9 +109,9 @@ class YOLOv4Detector:
             ret, frame = cap.read()
             if not ret:
                 break
-            height, width, channels = self.preprocessImage(frame)
-            rectangles, confidences, classIDS, indexes, detected_objects = self.objectsDetection(height, width, channels, frame)
-            result_frame = self.showResults(frame, rectangles, confidences, classIDS, indexes, detected_objects)
+            height, width, channels = detector.preprocessImage(frame)
+            rectangles, confidences, classIDS, indexes, detected_objects = detector.objectsDetection(height, width, channels, frame)
+            result_frame = self.showResults(frame, rectangles, confidences, classIDS, indexes, detected_objects, colors)
 
             cv2.imshow('Result', result_frame)
             output_path = os.path.join(output_dir, f'frame_{frame_number:04d}.jpg')
@@ -121,6 +126,22 @@ class YOLOv4Detector:
 
         cap.release()
         cv2.destroyAllWindows()
+    def createVideoFromFrames(self, output_dir, output_video_path, fps=30):
+        frames = [img for img in os.listdir(output_dir) if img.endswith(".jpg")]
+        frames.sort()
+
+        first_frame = cv2.imread(os.path.join(output_dir, frames[0]))
+        height, width, layers = first_frame.shape
+
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+
+        for frame in frames:
+            img_path = os.path.join(output_dir, frame)
+            img = cv2.imread(img_path)
+            out.write(img)
+
+        out.release()
 
 def cli_argument_parser():
     parser = argparse.ArgumentParser()
@@ -176,16 +197,19 @@ def cli_argument_parser():
 def main():
     args = cli_argument_parser()
     detector = YOLOv4Detector(args.weights_path, args.config_path, args.classes_path, args.conf_threshold, args.nms_threshold)
+    visualizer = Visualizer(detector.classes)
 
     if args.mode == 'image':
-        image = detector.readImage(args.input_path)
+        image = visualizer.readImage(args.input_path)
         height, width, channels = detector.preprocessImage(image)
         rectangles, confidences, classIDS, indexes, detected_objects = detector.objectsDetection(height, width, channels, image)
-        resultImage = detector.showResults(image, rectangles, confidences, classIDS, indexes, detected_objects)
-        detector.writeImage(args.output_path, resultImage)
-        detector.showImage(resultImage)
+        resultImage = visualizer.showResults(image, rectangles, confidences, classIDS, indexes, detected_objects, visualizer.colors)
+        visualizer.writeImage(args.output_path, resultImage)
+        visualizer.showImage(resultImage)
     elif args.mode == 'video':
-        detector.processVideo(args.input_path, args.output_dir)
+        visualizer.processVideo(args.input_path, args.output_dir, detector, visualizer.colors)
+        output_video_path = os.path.join(args.output_dir, 'output_video.avi')
+        visualizer.createVideoFromFrames(args.output_dir, output_video_path)
     else:
         raise ValueError('Unsupported \'mode\' value')
 
