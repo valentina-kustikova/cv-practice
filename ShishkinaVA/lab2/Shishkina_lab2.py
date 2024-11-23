@@ -57,7 +57,6 @@ class YOLOv4Detector:
 
         return rectangles, valid_confidences, valid_classIds, indexes, detected_objects
 
-
 class Visualizer:
     def __init__(self, classes):
         self.classes = classes
@@ -96,14 +95,12 @@ class Visualizer:
         cv2.imshow('Result', image)
         cv2.waitKey(0)
 
-    def processVideo(self, video_path, output_dir, detector, colors):
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
+    def processVideo(self, video_path, detector, colors):
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise ValueError('Unable to open video file')
 
+        frames = []
         frame_number = 0
         while True:
             ret, frame = cap.read()
@@ -114,8 +111,7 @@ class Visualizer:
             result_frame = self.showResults(frame, rectangles, confidences, classIDS, indexes, detected_objects, colors)
 
             cv2.imshow('Result', result_frame)
-            output_path = os.path.join(output_dir, f'frame_{frame_number:04d}.jpg')
-            self.writeImage(output_path, result_frame)
+            frames.append(result_frame)
             frame_number += 1
 
             key = cv2.waitKey(0) & 0xFF
@@ -126,20 +122,17 @@ class Visualizer:
 
         cap.release()
         cv2.destroyAllWindows()
-    def createVideoFromFrames(self, output_dir, output_video_path, fps=30):
-        frames = [img for img in os.listdir(output_dir) if img.endswith(".jpg")]
-        frames.sort()
+        return frames
 
-        first_frame = cv2.imread(os.path.join(output_dir, frames[0]))
+    def createVideoFromFrames(self, frames, output_video_path, fps=30):
+        first_frame = frames[0]
         height, width, layers = first_frame.shape
 
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
         out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
 
         for frame in frames:
-            img_path = os.path.join(output_dir, frame)
-            img = cv2.imread(img_path)
-            out.write(img)
+            out.write(frame)
 
         out.release()
 
@@ -207,9 +200,9 @@ def main():
         visualizer.writeImage(args.output_path, resultImage)
         visualizer.showImage(resultImage)
     elif args.mode == 'video':
-        visualizer.processVideo(args.input_path, args.output_dir, detector, visualizer.colors)
+        frames = visualizer.processVideo(args.input_path, detector, visualizer.colors)
         output_video_path = os.path.join(args.output_dir, 'output_video.avi')
-        visualizer.createVideoFromFrames(args.output_dir, output_video_path)
+        visualizer.createVideoFromFrames(frames, output_video_path)
     else:
         raise ValueError('Unsupported \'mode\' value')
 
