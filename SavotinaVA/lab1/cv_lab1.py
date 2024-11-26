@@ -22,6 +22,12 @@ def arg_parser():
                         dest = 'scale',
                         default = 0.5)
     
+    parser.add_argument('-r', '--radius',
+                        help = 'Radius for vignette',
+                        type = float,
+                        dest = 'radius',
+                        default = 1)
+    
     parser.add_argument('-st', '--step',
                         help = 'Step for pixelation',
                         type = int,
@@ -38,19 +44,18 @@ def arg_parser():
     return args
 
 
-
 def GrayShades(image):
-    height, width, nchannels = image.shape
-    gray = np.zeros((height, width, 1), dtype = np.uint8)
+    b = image[:, :, 0]
+    g = image[:, :, 1]
+    r = image[:, :, 2]
     
-    for i in range(height):
-        for j in range(width):
-            b, g, r = image[i, j]
-            gr = 0.114 * b + 0.587 * g + 0.299 * r
-            gray[i, j] = gr
+    gr = 0.114 * b + 0.587 * g + 0.299 * r  
             
-            
-    return gray
+    image[:, :, 0] = gr
+    image[:, :, 1] = gr
+    image[:, :, 2] = gr
+    
+    return image
 
 
 def Resize(image, scale):
@@ -68,152 +73,142 @@ def Resize(image, scale):
 
 
 def Sepia(image):
-    height, width, nchannels = image.shape
-    sepia = np.zeros((height, width, nchannels), dtype = np.uint8)
+    b = image[:, :, 0]
+    g = image[:, :, 1]
+    r = image[:, :, 2]
     
-    for i in range(height):
-        for j in range(width):
-            b, g, r = image[i, j]
+    tr = 0.393*r + 0.769*g + 0.189*b
+    tg = 0.349*r + 0.686*g + 0.168*b
+    tb = 0.272*r + 0.534*g + 0.131*b
             
-            tr = 0.393*r + 0.769*g + 0.189*b
-            tg = 0.349*r + 0.686*g + 0.168*b
-            tb = 0.272*r + 0.534*g + 0.131*b
-            
-            if tr > 255:
-                r = 255 
-            else: 
-                r = tr
-            if tg > 255:
-                g = 255 
-            else: 
-                g = tg
-            if tb > 255:
-                b = 255 
-            else: 
-                b = tb
-
-            sepia[i, j] = b, g, r
+    image[:, :, 0] = tb
+    image[:, :, 1] = tg
+    image[:, :, 2] = tr
                  
-    return sepia
-
-
-def Vignette(image):
-    height, width, nchannels = image.shape
-    center_x = int(height / 2)
-    center_y = int(width / 2)
-    
-    final_img = image[:height, :width]
-    for i in range(height):
-        for j in range(width):
-            val_x = 1 - np.abs(i - center_x) / center_x
-            val_y = 1 - np.abs(j - center_y) / center_y
-            final_img[i, j] = image[i, j] * val_x * val_y
-    
-    return final_img
-    
-    
-def Pixelation(image, step):
-    height, width = image.shape[:2]
-    xstart = int(height / 5)
-    xend = int(height / 2.5)
-    ystart = int(width / 5)
-    yend = int(width / 2.5)
-    
-    part_of_img = image[xstart:xend, ystart:yend]
-    b, g, r = 0, 0, 0
-
-    for i in range(xstart, xend, step):
-        for j in range(ystart, yend, step):
-            part_of_img = image[i:(i + step), j:(j + step)]
-            b = np.mean(part_of_img[:, :, 0])
-            g = np.mean(part_of_img[:, :, 1])
-            r = np.mean(part_of_img[:, :, 2])
-            
-            for x in range(i, i + step):
-                for y in range(j, j + step):
-                    image[x, y] = b, g, r
-    
     return image
 
 
+def Vignette(image, rad):
+    height, width = image.shape[:2]
 
-def Gray_img(image_path, output_image):
+    x = int(height / 2)
+    y = int(width / 2)
+    
+    a = 1
+    b = 1
+    
+    if height > width:
+        a = b * height / width
+    elif height < width:
+        b = a * width / height
+
+    x_idx, y_idx = np.indices((height, width))
+
+    dist = np.sqrt(((x_idx - x) / a) ** 2 + ((y_idx - y) / b) ** 2)
+    coef = 1 - np.minimum(1, dist / rad)
+
+    final_img = image[:height, :width]
+    final_img[:, :, 0] = image[:, :, 0] * coef
+    final_img[:, :, 1] = image[:, :, 1] * coef
+    final_img[:, :, 2] = image[:, :, 2] * coef
+
+    return final_img.astype(np.uint8)
+        
+      
+def Pixelation(image, step, start, end):
+    region = image[start[1]:end[1], start[0]:end[0]]
+    
+    height, width = region.shape[:2]
+    copy_region = region[:height, :width]
+    final_image = region[:height, :width]
+
+    for i in range(0, height - 1, step):
+        for j in range(0, width - 1, step):
+            if i + step < height:
+                border_y = i + step
+            else:
+                border_y = height - 1
+            if j + step < width:
+                border_x = j + step
+            else:
+                border_x = width - 1
+            copy_region = region[i:border_y, j:border_x]
+            mean = [np.mean(copy_region[:, :, 0]), np.mean(copy_region[:, :, 1]), np.mean(copy_region[:, :, 2])]
+            final_image[i:border_y, j:border_x] = mean
+    
+    image[start[1]:end[1], start[0]:end[0]] = final_image
+    return image       
+      
+      
+def OnMouseClick(event, x, y, flags, param):
+    global start, end, selection_done, drawing
+    img, step= param
+
+    if (selection_done == False):
+        if event == cv.EVENT_LBUTTONDOWN:
+            start[0], start[1] = x, y
+            drawing = True
+            selection_done = False
+            
+        elif event == cv.EVENT_MOUSEMOVE and drawing:
+            end[0], end[1] = x, y
+            img_copy = img.copy()
+            cv.rectangle(img_copy, (start[0], start[1]), (end[0], end[1]), (255, 255, 255), 1)
+            cv.imshow('Init image', img_copy)
+            
+        elif event == cv.EVENT_LBUTTONUP:
+            end[0], end[1] = x, y
+            drawing = False
+            selection_done = True
+            cv.imshow('Init image', img)
+      
+    
+def SetRectangle(img, step):
+    global start, end, selection_done
+
+    cv.setMouseCallback('Init image', OnMouseClick, [img, step])
+    
+    while not selection_done:
+       cv.waitKey(1)
+
+
+def ReadImage(image_path):
     image = cv.imread(image_path)
     cv.imshow("Init image", image)
     
-    gray_img = GrayShades(image)
-    cv.imshow('Final image', gray_img)
-    cv.waitKey(0)
+    return image
 
-    cv.imwrite(output_image, gray_img)  
+def WriteImage(img, output_image = "output.jpg"):   
+    cv.waitKey(0)
+    cv.imwrite(output_image, img)
     cv.destroyAllWindows()
 
 
-def Resize_img(image_path, output_image, scale):
-    image = cv.imread(image_path)
-    cv.imshow("Init image", image)
-
-    resize_img = Resize(image, scale)   
-    cv.imshow('Final image', resize_img)
-    cv.waitKey(0)
-
-    cv.imwrite(output_image, resize_img)  
-    cv.destroyAllWindows()
-
-
-def Sepia_img(image_path, output_image):
-    image = cv.imread(image_path)
-    cv.imshow("Init image", image)
-    
-    sepia_img = Sepia(image)
-    cv.imshow('Final image', sepia_img)
-    cv.waitKey(0)
-
-    cv.imwrite(output_image, sepia_img)
-    cv.destroyAllWindows()
-    
-    
-def Vignette_img(image_path, output_image):
-    image = cv.imread(image_path)
-    cv.imshow("Init image", image)
-    
-    vignette_img = Vignette(image)
-    cv.imshow('Final image', vignette_img)
-    cv.waitKey(0)
-
-    cv.imwrite(output_image, vignette_img)
-    cv.destroyAllWindows()
-    
-    
-def Pixel_img(image_path, output_image, step):
-    image = cv.imread(image_path)
-    cv.imshow("Init image", image)
-    
-    pixel_img = Pixelation(image, step)
-    cv.imshow('Final image', pixel_img)
-    cv.waitKey(0)
-
-    cv.imwrite(output_image, pixel_img)  
-    cv.destroyAllWindows()
-    
-
+start = [0, 0]
+end = [0, 0]
+selection_done = False
+drawing = False
 
 def main():
     args = arg_parser()
+    image = ReadImage(args.image_path)
     
     if args.processing == "gray":
-        Gray_img(args.image_path, args.output_image)
+        output_img = GrayShades(image)
     elif args.processing == "resize":
-        Resize_img(args.image_path, args.output_image, args.scale)
+        output_img = Resize(image, args.scale)
     elif args.processing == "sepia":
-        Sepia_img(args.image_path, args.output_image)
+        output_img = Sepia(image)
     elif args.processing == "vignette":
-        Vignette_img(args.image_path, args.output_image)
+        output_img = Vignette(image, args.radius)
     elif args.processing == "pixelation":
-        Pixel_img(args.image_path, args.output_image, args.step)
-    else:
+        SetRectangle(image, args.step)
+        output_img = Pixelation(image, args.step, start, end)
+    else: 
         raise 'Unsupported \'processing\' value'
 
+    cv.imshow('Final image', output_img)
+    WriteImage(output_img, args.output_image)
 
 if __name__ == '__main__':
     sys.exit(main() or 0)
