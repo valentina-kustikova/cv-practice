@@ -12,38 +12,39 @@ def initialize_model(weight_file, config_file):
 def create_input_tensor(image, size=(300, 300), scale=0.007843, mean=(127.5, 127.5, 127.5)):
     return cv.dnn.blobFromImage(image, scale, size, mean, swapRB=True)
 
-#Получение выходных данных от модели
-def fetch_predictions(model, input_blob):
+#Получение и разбор выходных данных от модели
+def fetch_predictions(model, input_blob, h, w, confidence_threshold=0.5):
     model.setInput(input_blob)
-    return model.forward()
-
-#Обрабатываем предсказание модели
-def process_predictions(image, detections, h, w, confidence_threshold=0.5):
-    detected = {}
+    detections = model.forward()
+    
+    results = []
     for i in range(detections.shape[2]):
         confidence = detections[0, 0, i, 2]
         if confidence > confidence_threshold:
             class_id = int(detections[0, 0, i, 1])
             if class_id < len(CLASSES):
-                label = CLASSES[class_id]
                 box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
                 (x1, y1, x2, y2) = box.astype("int")
+                results.append((class_id, confidence, (x1, y1, x2, y2)))
+    return results
 
-                #Счёт количества найденных объектов
-                if label in detected:
-                    detected[label] += 1
-                else:
-                    detected[label] = 1
+#Отображаем результаты на изображении
+def draw_predictions(image, predictions):
+    detected = {}
+    for class_id, confidence, (x1, y1, x2, y2) in predictions:
+        label = CLASSES[class_id]
+        color = COLORS[class_id]
 
-                #Отображаем названия классов над прямоугольником
-                color = COLORS[class_id]
-                text = f"{label}: {confidence:.3f}"
-                cv.putText(image, label, (x1, y1 - 10), cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        if label in detected:
+            detected[label] += 1
+        else:
+            detected[label] = 1
 
-                #Изображение самого прямоугольника с уверенностью
-                cv.rectangle(image, (x1, y1), (x2, y2), color, 2)
-                cv.putText(image, f"{confidence:.3f}", (x1, y1 - 30), cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-
+        text = f"{label}: {confidence:.3f}"
+        cv.rectangle(image, (x1, y1), (x2, y2), color, 2)
+        cv.putText(image, label, (x1, y1 - 10), cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        cv.putText(image, f"{confidence:.3f}", (x1, y1 - 30), cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+    
     return image, detected
 
 #Обработка изображения
@@ -55,14 +56,13 @@ def handle_image(image_path, model, conf_threshold=0.5):
 
     h, w = image.shape[:2]
     blob = create_input_tensor(image)
-    predictions = fetch_predictions(model, blob)
-
-    processed_image, detected_objects = process_predictions(image, predictions, h, w, conf_threshold)
+    predictions = fetch_predictions(model, blob, h, w, conf_threshold)
+    processed_image, detected_objects = draw_predictions(image, predictions)
 
     for label, count in detected_objects.items():
         print(f"Обнаружено {count} объекта(ов) класса: {label}")
 
-    cv.imshow("Object detection", processed_image)
+    cv.imshow("Object Detection", processed_image)
     cv.waitKey(0)
     cv.destroyAllWindows()
 
@@ -76,7 +76,7 @@ def handle_video(video_path, model, conf_threshold=0.5):
             break
 
         processed_frame = handle_image_frame(frame, model, conf_threshold)
-        cv.imshow("Object detection", processed_frame)
+        cv.imshow("Object Detection", processed_frame)
 
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
@@ -88,9 +88,8 @@ def handle_video(video_path, model, conf_threshold=0.5):
 def handle_image_frame(frame, model, conf_threshold=0.5):
     h, w = frame.shape[:2]
     blob = create_input_tensor(frame)
-    predictions = fetch_predictions(model, blob)
-
-    processed_frame, detected_objects = process_predictions(frame, predictions, h, w, conf_threshold)
+    predictions = fetch_predictions(model, blob, h, w, conf_threshold)
+    processed_frame, detected_objects = draw_predictions(frame, predictions)
 
     for label, count in detected_objects.items():
         print(f"Обнаружено {count} объекта(ов) класса: {label}")
@@ -104,14 +103,14 @@ def main():
     parser.add_argument('-c', '--confidence', type=float, default=0.5, help="Порог уверенности для детектирования объектов")
     args = parser.parse_args()
 
-    #Инициализируем модель и классы
+    #Инициализмруем модель и классы
     model = initialize_model('mobilenet_iter_73000.caffemodel', 'deploy.prototxt')
     global CLASSES, COLORS
-    CLASSES = ('background',
-               'aeroplane', 'bicycle', 'bird', 'boat',
-               'bottle', 'bus', 'car', 'cat', 'chair',
-               'cow', 'diningtable', 'dog', 'horse',
-               'motorbike', 'person', 'pottedplant',
+    CLASSES = ('background', 
+               'aeroplane', 'bicycle', 'bird', 'boat', 
+               'bottle', 'bus', 'car', 'cat', 'chair', 
+               'cow', 'diningtable', 'dog', 'horse', 
+               'motorbike', 'person', 'pottedplant', 
                'sheep', 'sofa', 'train', 'tvmonitor')
     COLORS = np.random.uniform(0, 255, size=(len(CLASSES), 3))
 
