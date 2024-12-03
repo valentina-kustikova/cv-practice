@@ -21,7 +21,7 @@ def preprocess_image(image, scale=0.00392, size=(416, 416)):
     return cv2.dnn.blobFromImage(image, scale, size, (0, 0, 0), True, crop=False)
 
 # Функция для детектирования объектов на изображении или кадре
-def detect_objects_on_image(image):
+def detect_objects_on_image(image,arg_confidence):
     if isinstance(image, str):
         image = cv2.imread(image)
         if image is None:
@@ -48,7 +48,7 @@ def detect_objects_on_image(image):
             class_id = np.argmax(scores)
             max_score = max(scores)
             confidence = scores[class_id]
-            if confidence > 0.5:
+            if confidence > arg_confidence:
                 center_x = int(detection[0] * width)
                 center_y = int(detection[1] * height)
                 w = int(detection[2] * width)
@@ -118,11 +118,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Object detection using YOLOv3 and OpenCV.")
     parser.add_argument("--image", help="Path to the image file.")
     parser.add_argument("--video", help="Path to the video file.")
+    parser.add_argument("-c", "--confidence",type=float, help="Confidence threshold for object detection", default='0.5')
     args = parser.parse_args()
 
     if args.image:
         # Детектирование объектов на изображении
-        processed_image = detect_objects_on_image(args.image)
+        processed_image = detect_objects_on_image(args.image,args.confidence)
         if processed_image is not None:
             cv2.imshow("Detected Image", processed_image)
             cv2.waitKey(0)
