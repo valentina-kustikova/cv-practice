@@ -6,6 +6,7 @@ import cv2 as cv
 import numpy as np
 from argparse import RawTextHelpFormatter
 
+x1, y1, x2, y2 = -1, -1, -1, -1
 
 def grayscale(image):
     B, G, R = cv.split(image)
@@ -14,6 +15,8 @@ def grayscale(image):
     return grayscale_image
 
 def resize(image, coef):
+    if (coef <= 0):
+        raise ValueError("Invalid coefficient")
     original_height, original_width = image.shape[:2]
     
     new_width = int(original_width * coef)
@@ -40,7 +43,11 @@ def sepia(image):
     
     return sepia_image
 
-def vignette(image, coef):
+def vignette(image, radius):
+    if (radius < 0):
+        raise ValueError("Invalid radius")
+    coef = 10
+
     rows, cols = image.shape[:2]
     
     y_indices, x_indices = np.indices((rows, cols))
@@ -48,9 +55,10 @@ def vignette(image, coef):
     center_x, center_y = cols // 2, rows // 2
     distance = np.sqrt((x_indices - center_x) ** 2 +
                        (y_indices - center_y) ** 2)
-
-    vignette_value = np.exp(-coef * (distance ** 2) / 
-                            (center_x**2 + center_y**2))
+    
+    is_inside = (distance <= radius).astype(bool)
+    vignette_value = np.exp(-coef * ((distance - radius) ** 2) / 
+                            (center_x**2 + center_y**2)) * (~is_inside) + is_inside
     
     vignette_image = image.astype(np.float32) * vignette_value[:, :,
                                                                np.newaxis]
@@ -58,36 +66,65 @@ def vignette(image, coef):
     
     return vignette_image
 
-def pixelization(image, min_blocks_num):
-    height, width = image.shape[:2]
-    
-    square_size = min(height, width) // 2
+def select_an_area(image):
+    global x1, y1, x2, y2
+    cv.namedWindow('Area')
 
-    start_row = (height - square_size) // 2
-    start_col = (width - square_size) // 2
+    def mouse_handle(event, x, y, flags, param):
+        global x1, y1, x2, y2
 
-    center_square = image[start_row:start_row + square_size,
-                      start_col:start_col + square_size]
-    
-    candidates = np.arange(min_blocks_num, square_size // 2)
-    gcd_values = np.gcd(square_size, candidates)
-    suitable_divisors = gcd_values[gcd_values >= min_blocks_num]
-    
-    blocks_num = np.min(suitable_divisors)
-    split_square = np.split(center_square, blocks_num, axis=0)
-    
+        if event == cv.EVENT_LBUTTONDOWN:
+            x1, y1 = x, y
+        elif event == cv.EVENT_MOUSEMOVE:
+            if flags == cv.EVENT_FLAG_LBUTTON:
+                x2, y2 = x, y
+                image_copy = param.copy()
+                cv.rectangle(image_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv.imshow("Area", image_copy)
+
+    cv.setMouseCallback('Area', mouse_handle, param=image)
+    cv.imshow("Area", image)
+    while True:
+        key = cv.waitKey(1)
+        if key == ord('\r'): 
+            break
+
+    cv.destroyWindow('Area')
+
+def pixelization(image, block_size):
+    global x1, x2, y1, y2
+    if x1 > x2:
+        x1, x2 = x2, x1
+    if y1 > y2:
+        y1, y2 = y2, y1
+
+    selected_region = image[y1:y2, x1:x2]
+    height, width = selected_region.shape[:2]
+
+    if (block_size > height or block_size > width):
+        raise ValueError("Invalid block size")
+
+    blocks_num_height = height // block_size
+    blocks_num_width = width // block_size
+
     blocks = []
-    for row in range(blocks_num):
-        blocks.extend(np.split(split_square[row], blocks_num, axis=1))
-        
+    for i in range(blocks_num_height):
+        for j in range(blocks_num_width):
+            block = selected_region[i * block_size:(i + 1) * block_size,
+                                    j * block_size:(j + 1) * block_size]
+            blocks.append(block)
+
     np.random.shuffle(blocks)
+
     new_image = []
-    for row in range(blocks_num):
-        new_image.append(np.hstack(blocks[row * blocks_num:
-                                          row * blocks_num + blocks_num]))
+    for i in range(blocks_num_height):
+        new_row = np.hstack(blocks[i * blocks_num_width:(i + 1) * blocks_num_width])
+        new_image.append(new_row)
         
-    image[start_row:start_row + square_size,
-                      start_col:start_col + square_size] = np.vstack(new_image)
+    pixelized_region = np.vstack(new_image)
+    height, width = pixelized_region.shape[:2]
+    
+    image[y1:y1 + height, x1:x1 + width] = pixelized_region
     
     return image
 
@@ -133,23 +170,39 @@ def argument_parser():
     
     return args
 
+def read_image(image_path):
+    if image_path is None:
+        raise ValueError('Empty path to the image')
+    image = cv.imread(image_path)
+
+    if image is None:
+        raise ValueError('Unable to load image')
+    cv.imshow('Original image', cv.imread(image_path))
+
+    return image
+
 def main():
     args = argument_parser()
-    
-    image = cv.imread(args.image_path)
+    image = read_image(args.image_path)
     
     if args.filter == 'grayscale':
         new_image = grayscale(image)
     elif args.filter == 'resize':
+        if args.parameter is None:
+            raise ValueError("Required parameter not specified")
         new_image = resize(image, args.parameter)
     elif args.filter == 'sepia':
         new_image = sepia(image)
     elif args.filter == 'vignette':
+        if args.parameter is None:
+            raise ValueError("Required parameter not specified")
         new_image = vignette(image, args.parameter)
     elif args.filter == 'pixelization':
+        if args.parameter is None:
+            raise ValueError("Required parameter not specified")
+        select_an_area(image)
         new_image = pixelization(image, int(args.parameter))
-        
-    cv.imshow('Original image', cv.imread(args.image_path))
+    
     cv.imwrite(args.output_image, new_image)
     cv.imshow('New image', new_image)
     cv.waitKey(0)
