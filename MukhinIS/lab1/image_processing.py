@@ -9,29 +9,15 @@ from pathlib import Path
 def pixelization(image, x1, y1, x2, y2, num_blocks):
     height, width = abs(x2 - x1), abs(y2 - y1)
     tmp = image[min(y1, y2):min(y1, y2) + width, min(x1, x2):min(x1, x2) + height]
-    tmp = np.array_split(tmp, num_blocks, axis=0)
+    tmp1 = np.array_split(tmp, num_blocks, axis=0)
     blocks = []
-    for elem in tmp:
+    for elem in tmp1:
         blocks.extend(np.array_split(elem, num_blocks, axis=1))
-    
-    shuffled = []
-    lst_of_numbers = np.array(np.arange(0, num_blocks * num_blocks - 1))
-    print(lst_of_numbers.shape)
-    for _ in range(0, num_blocks * num_blocks):
-        if len(lst_of_numbers) == 0:
-            break
-        el = np.random.choice(lst_of_numbers)
-        idx = np.where(lst_of_numbers == el)
-        print(el, lst_of_numbers, idx[0][0])
-        shuffled.extend(blocks[el])
-        print(blocks[el].shape)
-        lst_of_numbers = np.delete(lst_of_numbers, idx[0][0], axis=0)
+    for bl in blocks:
+        avr_color = bl.mean(axis=(0, 1)).astype(int)
+        bl[:, :] = avr_color
 
-
-    l = [block.reshape((block.shape[0]*block.shape[1] * 3)) for block in shuffled]
-    h = np.concatenate(l, axis=0)
-    p = h.reshape([width, height, 3])
-    image[min(y1, y2):min(y1, y2) + width, min(x1, x2):min(x1, x2) + height] = p
+    image[min(y1, y2):min(y1, y2) + width, min(x1, x2):min(x1, x2) + height] = tmp
 
     return image
     
