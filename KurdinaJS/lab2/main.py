@@ -68,7 +68,8 @@ def load_model(weights_path, config_path, names_path):
     return model, names, colors
 
 
-def draw_predictions(image, nms_indices, bounding_boxes, class_labels, colors, detection_confidences, detected_classes):
+def draw_predictions(image, nms_indices, bounding_boxes, class_labels, colors, 
+                     detection_confidences, detected_classes):
     obj_count = {}
     for idx in nms_indices:
         x, y, width, height = bounding_boxes[idx]
@@ -84,7 +85,8 @@ def draw_predictions(image, nms_indices, bounding_boxes, class_labels, colors, d
     return obj_count
 
 
-def detect_and_display_objects(image, outputs, class_labels, colors, height, width, conf_threshold, nms_threshold):
+def detect_and_display_objects(image, outputs, class_labels, colors, height, width, 
+                               conf_threshold, nms_threshold):
     bounding_boxes = []
     detection_confidences = []
     detected_classes = []
@@ -102,16 +104,18 @@ def detect_and_display_objects(image, outputs, class_labels, colors, height, wid
                 detection_confidences.append(confidence_score)
                 detected_classes.append(predicted_class)
 
-    nms_indices = cv.dnn.NMSBoxes(bounding_boxes, detection_confidences, conf_threshold, nms_threshold)
+    nms_indices = cv.dnn.NMSBoxes(bounding_boxes, detection_confidences, 
+                                  conf_threshold, nms_threshold)
     nms_indices.flatten()
 
-    obj_count = draw_predictions(image, nms_indices, bounding_boxes, class_labels, colors, detection_confidences,
-                                 detected_classes)
+    obj_count = draw_predictions(image, nms_indices, bounding_boxes, class_labels, colors, 
+                                 detection_confidences, detected_classes)
 
     return image, obj_count
 
 
-def image_processing(image, model, classes, colors, confidence_threshold, nms_threshold):
+def image_processing(image, model, classes, colors, 
+                     confidence_threshold, nms_threshold):
     height, width = image.shape[:2]
 
     blob = cv.dnn.blobFromImage(image, 1 / 255, (416, 416), (0, 0, 0), True, crop=False)
@@ -122,18 +126,21 @@ def image_processing(image, model, classes, colors, confidence_threshold, nms_th
     outputs = model.forward(output_layers)
 
     result_image, detected_obj = detect_and_display_objects(
-        image, outputs, classes, colors, height, width, confidence_threshold, nms_threshold
+        image, outputs, classes, colors, height, width, 
+        confidence_threshold, nms_threshold
     )
 
     return result_image, detected_obj
 
 
-def objectDetection_image(image_path, model, classes, colors, confidence_threshold, nms_threshold):
+def objectDetection_image(image_path, model, classes, colors, 
+                          confidence_threshold, nms_threshold):
     image = cv.imread(image_path)
     if image is None:
         raise ValueError('Empty path to the image')
 
-    result_image, detected_obj = image_processing(image, model, classes, colors, confidence_threshold, nms_threshold)
+    result_image, detected_obj = image_processing(image, model, classes, colors, 
+                                                  confidence_threshold, nms_threshold)
 
     print(f"The image contains:")
     for obj, count in detected_obj.items():
@@ -145,7 +152,8 @@ def objectDetection_image(image_path, model, classes, colors, confidence_thresho
         cv.destroyAllWindows()
 
 
-def objectDetection_video(video_path, model, classes, colors, confidence_threshold, nms_threshold):
+def objectDetection_video(video_path, model, classes, colors, 
+                          confidence_threshold, nms_threshold):
     cap = cv.VideoCapture(video_path)
     if not cap.isOpened():
         raise ValueError("Empty path to the video")
@@ -155,8 +163,8 @@ def objectDetection_video(video_path, model, classes, colors, confidence_thresho
         if not ret:
             break
 
-        result_frame, detected_obj = image_processing(frame, model, classes, colors, confidence_threshold,
-                                                      nms_threshold)
+        result_frame, detected_obj = image_processing(frame, model, classes, colors, 
+                                                      confidence_threshold, nms_threshold)
         k += 1
         print(f"Frame: {k}")
         for obj, count in detected_obj.items():
@@ -177,9 +185,11 @@ def main():
     model, classes, colors = load_model(args.weights_path, args.config_path, args.names_path)
 
     if args.mode == 'image' and args.image_path:
-        objectDetection_image(args.image_path, model, classes, colors, args.confidence_threshold, args.nms_threshold)
+        objectDetection_image(args.image_path, model, classes, colors, 
+                              args.confidence_threshold, args.nms_threshold)
     elif args.mode == 'video' and args.video_path:
-        objectDetection_video(args.video_path, model, classes, colors, args.confidence_threshold, args.nms_threshold)
+        objectDetection_video(args.video_path, model, classes, colors, 
+                              args.confidence_threshold, args.nms_threshold)
     else:
         raise ValueError("Unsupported 'mode' value or missing path")
 
