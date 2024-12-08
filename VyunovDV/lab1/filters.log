@@ -1,0 +1,13 @@
+2024-12-08 21:04:31,328 - INFO - Loaded image imgs/img_1.png (960x1280).
+2024-12-08 21:04:31,884 - INFO - Grayscale filter applied.
+2024-12-08 21:04:33,875 - INFO - Sepia filter applied.
+2024-12-08 21:04:34,005 - INFO - Image resized to 200x150.
+2024-12-08 21:04:42,852 - INFO - Vignette filter applied.
+2024-12-08 21:04:42,962 - INFO - Pixelation applied to area (50, 50) - (200, 200), size 10.
+2024-12-08 21:04:43,088 - INFO - Loaded image imgs/img_2.jpg (960x1280).
+2024-12-08 21:04:43,728 - INFO - Grayscale filter applied.
+2024-12-08 21:04:45,923 - INFO - Sepia filter applied.
+2024-12-08 21:04:46,090 - INFO - Image resized to 200x150.
+2024-12-08 21:04:55,884 - INFO - Vignette filter applied.
+2024-12-08 21:04:56,015 - INFO - Pixelation applied to area (50, 50) - (200, 200), size 10.
+2024-12-08 21:04:56,026 - INFO - All filters applied successfully.
