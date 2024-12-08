@@ -13,6 +13,9 @@
 Пример:
 - Исходный пиксель: `(120, 200, 150)`
 - Преобразованный пиксель: `(157, 157, 157)`
+<br>
+
+![img](https://github.com/E-Kozyreva/cv-practice/blob/KozyrevaEA/KozyrevaEA/lab1/results/grayscale_test1.jpg)
 
 ---
 
@@ -26,7 +29,9 @@
 Пример:
 - Исходный пиксель: `(120, 200, 150)`
 - Преобразованный пиксель: `(217, 192, 150)`
+<br>
 
+![img](https://github.com/E-Kozyreva/cv-practice/blob/KozyrevaEA/KozyrevaEA/lab1/results/sepia_test1.jpg)
 ---
 
 ### 3. **Изменение разрешения (Resize)**
@@ -35,7 +40,9 @@
   - `src_x = x * original_width / new_width`
   - `src_y = y * original_height / new_height`  
 - Цвет нового пикселя копируется из соответствующего пикселя исходного изображения.
+<br>
 
+![img](https://github.com/E-Kozyreva/cv-practice/blob/KozyrevaEA/KozyrevaEA/lab1/results/resized_test1.jpg)
 ---
 
 ### 4. **Виньетка (Vignette)**
@@ -47,7 +54,9 @@
 
 Пример:
 - Центральные пиксели остаются без изменений, а краевые затемняются.
+<br>
 
+![img](https://github.com/E-Kozyreva/cv-practice/blob/KozyrevaEA/KozyrevaEA/lab1/results/vignette_test1.jpg)
 ---
 
 ### 5. **Пикселизация области (Pixelate Area)**
@@ -57,12 +66,12 @@
 
 Пример:
 - Область 10x10 пикселей заменяется на один цвет, усредненный по всем пикселям блока.
+<br>
 
+![img](https://github.com/E-Kozyreva/cv-practice/blob/KozyrevaEA/KozyrevaEA/lab1/results/pixelated_test1.jpg)
 ---
 
 ## Использование
 1. Убедитесь, что у вас установлен Python и библиотека `Pillow`.
 2. Загрузите изображения в папку `imgs/`.
-3. Запустите скрипт:
-   ```bash
-   python filters.py
+3. Запустите скрипт: <code>python filters.py</code>
