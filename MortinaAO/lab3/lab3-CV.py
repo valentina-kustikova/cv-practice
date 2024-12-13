@@ -79,19 +79,25 @@ class BoVWFeatureExtractor:
         return np.array(features)
 
     #Визуализация ключевых точек
-    def visualize_features(self, images):
-        for i, img in enumerate(images[:5]):
+    def visualize_features(self, images, num_images=5):
+        import random 
+    
+        random_indices = random.sample(range(len(images)), min(num_images, len(images)))
+        
+        for i, idx in enumerate(random_indices):
+            img = images[idx]
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             sift_keypoints, _ = self.sift.detectAndCompute(gray, None)
             img_with_sift_keypoints = cv2.drawKeypoints(
                 img, sift_keypoints, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
             )
-
+    
             plt.figure(figsize=(8, 6))
             plt.imshow(cv2.cvtColor(img_with_sift_keypoints, cv2.COLOR_BGR2RGB))
-            plt.title(f'SIFT Keypoints - Image {i + 1}')
+            plt.title(f'SIFT Keypoints - Image {idx + 1}')
             plt.axis('off')
             plt.show()
+
 
     #Визуализация гистограммы для каждого класса
     def visualize_combined_histogram(self, descriptors_list, labels, class_names):
