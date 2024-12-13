@@ -1,205 +1,250 @@
-import os
 import cv2
 import numpy as np
-import argparse
-import pickle
-from sklearn.cluster import KMeans
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
+import os
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_curve, auc
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import matplotlib.pyplot as plt
-from sklearn.metrics import pairwise_distances_argmin_min
+import argparse
+from sklearn.utils import shuffle
 
+def load_images(folder, label):
+    images = []
+    labels = []
+    for filename in os.listdir(folder):
+        path = os.path.join(folder, filename)
+        img = cv2.imread(path)
+        if img is not None:
+            img = cv2.resize(img, (256, 256))
+            images.append(img)
+            labels.append(label)
+    return images, labels
 
-class ImageClassifier:
-    def __init__(self, n_clusters=100):
+class DataframeExtractor:
+    def __init__(self, n_clusters=100, descriptor='sift'):
         self.n_clusters = n_clusters
-        self.kmeans = None
-        self.scaler = StandardScaler()
-        self.rf_classifier = RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1)
+        self.kmeans = KMeans(n_clusters=self.n_clusters, random_state=42)
+        if descriptor == 'sift':
+            self.detector = cv2.SIFT_create()
+        elif descriptor == 'orb':
+            self.detector = cv2.ORB_create()
+        else:
+            raise ValueError(f"Unknown descriptor: {descriptor}")
 
-    def load_images(self, directory):
-        images = []
-        labels = []
-        for filename in os.listdir(directory):
-            img_path = os.path.join(directory, filename)
-            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-            if img is not None:
-                img = cv2.resize(img, (128, 128))
-                images.append(img)
-                if 'cat' in filename:
-                    labels.append(0)
-                elif 'dog' in filename:
-                    labels.append(1)
-        return images, labels
-
-    # Извлечение дескрипторов SIFT
-    def extract_sift_features(self, images):
-        sift = cv2.SIFT_create()
+    def extract_features(self, images):
         descriptors_list = []
+        keypoints_counts = []
         for img in images:
-            keypoints, descriptors = sift.detectAndCompute(img, None)
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            keypoints, descriptors = self.detector.detectAndCompute(gray, None)
             if descriptors is not None:
                 descriptors_list.append(descriptors)
-            else:
-                descriptors_list.append(np.array([]))
+                keypoints_counts.append(len(keypoints))
+        self.average_keypoints = np.mean(keypoints_counts) if keypoints_counts else 0
         return descriptors_list
 
-    # Создание визуального словаря
-    def create_visual_dictionary(self, descriptors_list):
-        all_descriptors = np.vstack(descriptors_list)
-        self.kmeans = KMeans(n_clusters=self.n_clusters, random_state=42)
+    def compute_bow_histograms(self, images):
+        features = []
+        for img in images:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            keypoints, descriptors = self.detector.detectAndCompute(gray, None)
+            histogram = np.zeros(self.n_clusters)
+            if descriptors is not None:
+                predictions = self.kmeans.predict(descriptors)
+                for pred in predictions:
+                    histogram[pred] += 1
+            features.append(histogram)
+        return np.array(features)
+
+    def fit_kmeans(self, descriptors_list):
+        all_descriptors = []
+        for desc in descriptors_list:
+            if desc is not None:
+                all_descriptors.append(desc)
+        all_descriptors = np.vstack(all_descriptors)
         self.kmeans.fit(all_descriptors)
 
-    # Преобразование изображений в гистограммы признаков
-    def compute_bow_histograms(self, descriptors_list):
-        histograms = []
-        for descriptors in descriptors_list:
-            if descriptors.size > 0:
-                labels = self.kmeans.predict(descriptors)
-                hist, _ = np.histogram(labels, bins=range(self.n_clusters + 1), density=True)
-                histograms.append(hist)
-            else:
-                histograms.append(np.zeros(self.n_clusters))
-        return np.array(histograms)
+class ModelClass:
+    def __init__(self):
+        self.model = RandomForestClassifier(n_estimators=100, class_weight='balanced', min_samples_split=4, min_samples_leaf=3, max_depth=4, max_features='log2', random_state=42)
+        self.scaler = StandardScaler()
 
-    def save_model(self, model_file):
-        with open(model_file, 'wb') as f:
-            pickle.dump((self.kmeans, self.scaler, self.rf_classifier, self.n_clusters), f)
-        print(f"Модель сохранена в {model_file}")
+    def train(self, X_train, y_train):
+        X_train_scaled = self.scaler.fit_transform(X_train)
+        self.model.fit(X_train_scaled, y_train)
 
-    def load_model(self, model_file):
-        with open(model_file, 'rb') as f:
-            self.kmeans, self.scaler, self.rf_classifier, self.n_clusters = pickle.load(f)
+    def stats(self, X_test, y_test):
+        X_test_scaled = self.scaler.transform(X_test)
+        y_pred = self.model.predict(X_test_scaled)
+        y_prob = self.model.predict_proba(X_test_scaled)[:, 1]
+        accuracy = accuracy_score(y_test, y_pred)
+        return accuracy, y_pred, y_prob
 
-    # Обучение модели
-    def train(self, train_dir, model_file):
-        train_images, train_labels = self.load_images(train_dir)
-        descriptors_list = self.extract_sift_features(train_images)
-        self.create_visual_dictionary(descriptors_list)
-        train_histograms = self.compute_bow_histograms(descriptors_list)
+def visualize_features(images, descriptor):
+    for i, img in enumerate(images[:5]):
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            keypoints = descriptor.detect(gray, None)
+            img_with_keypoints = cv2.drawKeypoints(gray, keypoints, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+            plt.figure(figsize=(6, 6))
+            plt.imshow(img_with_keypoints, cmap='gray')
+            plt.title(f"Image {i + 1}: {len(keypoints)} keypoints detected")
+            plt.axis('off')
+            plt.show()
+    
+def plot_confusion_matrix(y_true, y_pred, class_names):
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(8, 6))
+    plt.imshow(cm, interpolation='nearest', cmap='coolwarm')
+    plt.title('Confusion Matrix')
+    plt.colorbar()
+    tick_marks = np.arange(len(class_names))
+    plt.xticks(tick_marks, class_names)
+    plt.yticks(tick_marks, class_names)
 
-        train_histograms_scaled = self.scaler.fit_transform(train_histograms)
+    thresh = cm.max() / 2.
+    for i, j in np.ndindex(cm.shape):
+        plt.text(j, i, format(cm[i, j], 'd'),
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
 
-        X_train, X_val, y_train, y_val = train_test_split(train_histograms_scaled, train_labels, test_size=0.2, random_state=42)
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.show()
 
-        self.rf_classifier.fit(X_train, y_train)
+def plot_descriptors_histogram(cats_descriptors, dogs_descriptors, kmeans, n_clusters):
+    all_cats_descriptors = np.vstack([desc for desc in cats_descriptors if desc is not None])
+    all_dogs_descriptors = np.vstack([desc for desc in dogs_descriptors if desc is not None])
 
-        val_accuracy = self.rf_classifier.score(X_val, y_val)
-        print(f"Validation accuracy: {val_accuracy:.4f}")
+    cats_predictions = kmeans.predict(all_cats_descriptors)
+    dogs_predictions = kmeans.predict(all_dogs_descriptors)
 
-        self.save_model(model_file)
+    cats_histogram = np.bincount(cats_predictions, minlength=n_clusters)
+    dogs_histogram = np.bincount(dogs_predictions, minlength=n_clusters)
 
-    # Тестирование модели
-    def test(self, test_dir, model_file, labels_file):
-        self.load_model(model_file)
+    plt.figure(figsize=(14, 7))
 
-        test_images, _ = self.load_images(test_dir)
-        true_labels = self.load_true_labels(labels_file)
+    plt.subplot(1, 2, 1)
+    plt.bar(range(n_clusters), cats_histogram, color='skyblue')
+    plt.xlabel('Cluster Index')
+    plt.ylabel('Number of Descriptors')
+    plt.title(f'Histogram of Descriptors Distribution for Cats')
 
-        test_descriptors_list = self.extract_sift_features(test_images)
-        test_histograms = self.compute_bow_histograms(test_descriptors_list)
-        test_histograms_scaled = self.scaler.transform(test_histograms)
+    plt.subplot(1, 2, 2)
+    plt.bar(range(n_clusters), dogs_histogram, color='orange')
+    plt.xlabel('Cluster Index')
+    plt.ylabel('Number of Descriptors')
+    plt.title(f'Histogram of Descriptors Distribution for Dogs')
 
-        probabilities = self.rf_classifier.predict_proba(test_histograms_scaled)
-        predictions = np.argmax(probabilities, axis=1)
+    plt.tight_layout()
+    plt.show()
 
-        accuracy = np.mean(np.array(true_labels) == np.array(predictions))
-        print(f"Test accuracy: {accuracy:.4f}")
+def plot_classification_results(y_true, y_pred, class_names):
+    cm = confusion_matrix(y_true, y_pred)
+    
+    cats_count = cm[0, 0].sum()
+    dogs_count = cm[1, 1].sum()
 
-        self.plot_confusion_matrix(true_labels, predictions)
-        self.plot_roc_curve(true_labels, probabilities)
-        self.plot_probability_histogram(probabilities)
-        self.print_most_confident_incorrect_predictions(true_labels, predictions, probabilities)
-        self.plot_classification_results(true_labels, predictions)
+    misclassified_count = cm[0, 1] + cm[1, 0]
 
-    # Загрузка правильных меток
-    def load_true_labels(self, labels_file):
-        true_labels = []
-        with open(labels_file, 'r') as f:
-            for line in f:
-                _, label = line.strip().split()
-                true_labels.append(int(label))
-        return true_labels
+    counts = [cats_count, dogs_count, misclassified_count]
+    labels = ['Cats', 'Dogs', 'Misclassified']
+    colors = ['green', 'green', 'red']
 
-    # Матрица ошибок
-    def plot_confusion_matrix(self, true_labels, predictions):
-        cm = confusion_matrix(true_labels, predictions)
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['Cat', 'Dog'])
-        disp.plot(cmap='viridis')
-        plt.show()
+    plt.figure(figsize=(8, 6))
+    plt.bar(labels, counts, color=colors)
 
-    # ROC-кривая
-    def plot_roc_curve(self, true_labels, probabilities):
-        fpr, tpr, _ = roc_curve(true_labels, probabilities[:, 1])
-        roc_auc = auc(fpr, tpr)
-        plt.figure()
-        plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
-        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('Receiver Operating Characteristic')
-        plt.legend(loc="lower right")
-        plt.show()
+    plt.xlabel('Categories')
+    plt.ylabel('Number of images')
+    plt.title('Classification Results')
 
-    # Гистограмма вероятностей
-    def plot_probability_histogram(self, probabilities):
-        plt.hist(probabilities[:, 1], bins=20, alpha=0.7, label='Dog')
-        plt.hist(probabilities[:, 0], bins=20, alpha=0.7, label='Cat')
-        plt.xlabel("Probability")
-        plt.ylabel("Frequency")
-        plt.title("Distribution of Prediction Probabilities")
-        plt.legend()
-        plt.show()
+    for i, count in enumerate(counts):
+        plt.text(i, count + 1, str(count), ha='center', fontsize=12)
 
-    # Вывод самых уверенных ошибок
-    def print_most_confident_incorrect_predictions(self, true_labels, predictions, probabilities):
-        confidence = np.max(probabilities, axis=1)
-        incorrect_indices = np.where(np.array(true_labels) != predictions)[0]
-        confident_errors = sorted(incorrect_indices, key=lambda i: confidence[i], reverse=True)
+    plt.tight_layout()
+    plt.show()
 
-        print("\nMost confident incorrect predictions:")
-        for i in confident_errors[:5]:  # Покажем топ-5
-            print(f"Image {i + 1}: True Label = {true_labels[i]}, Predicted = {predictions[i]}, Confidence = {confidence[i]:.4f}")
 
-    # Гистограмма правильных и неправильных классификаций
-    def plot_classification_results(self, true_labels, predictions):
-        cat_correct = np.sum((predictions == 0) & (np.array(true_labels) == 0))
-        dog_correct = np.sum((predictions == 1) & (np.array(true_labels) == 1))
-        incorrect = np.sum(np.array(true_labels) != np.array(predictions))
+class ArgumentParser:
+    def cli_argument_parser():
+        parser = argparse.ArgumentParser(description="Image classification using various algorithms and Bag of Words with SIFT and ORB.")
 
-        labels = ['Correct Cats', 'Correct Dogs', 'Incorrect']
-        counts = [cat_correct, dog_correct, incorrect]
+        parser.add_argument('-td', '--train_dir',
+                            help='Directory with training images (cats and dogs)',
+                            type=str,
+                            dest='train_dir')
+        parser.add_argument('-tsd', '--test_dir',
+                            help='Directory with test images',
+                            type=str,
+                            dest='test_dir')
+        parser.add_argument('-nc', '--n_clusters',
+                            help='Number of clusters for visual dictionary',
+                            type=int,
+                            dest='n_clusters',
+                            default=100)
+        parser.add_argument('-d', '--descriptor',
+                            help='Descriptor to use sift or orb',
+                            type=str,
+                            choices=['sift', 'orb'],
+                            dest='descriptor',
+                            default='sift')
 
-        plt.bar(labels, counts, color=['blue', 'green', 'red'])
-        plt.xlabel("Category")
-        plt.ylabel("Count")
-        plt.title("Classification Results: Correct and Incorrect Predictions")
-        plt.show()
+        args = parser.parse_args()
+        return args
 
+def main(args):
+    #python lab3.py -td dataset\train -tsd dataset\test -nc 100 -d sift
+    
+    data = DataframeExtractor(n_clusters=args.n_clusters, descriptor=args.descriptor)
+
+    model = ModelClass()
+
+    cats_train, y_cats_train = load_images(os.path.join(args.train_dir, 'cats'), 0)
+    dogs_train, y_dogs_train = load_images(os.path.join(args.train_dir, 'dogs'), 1)
+    cats_test, y_cats_test = load_images(os.path.join(args.test_dir, 'cats'), 0)
+    dogs_test, y_dogs_test = load_images(os.path.join(args.test_dir, 'dogs'), 1)
+
+    Train_images = cats_train + dogs_train
+    Train_labels = y_cats_train + y_dogs_train
+    Test_images = cats_test + dogs_test
+    Test_labels = y_cats_test + y_dogs_test
+
+    Train_images, Train_labels = shuffle(Train_images, Train_labels, random_state=42)
+    Test_images, Test_labels = shuffle(Test_images, Test_labels, random_state=42)
+    
+    
+    train_descriptors = data.extract_features(Train_images)
+    data.fit_kmeans(train_descriptors)
+    print(f"Среднее количество точек, обнаруженных на тренировочных изображениях: {data.average_keypoints}")
+    
+    print(f"Визуализация ключевых точек для некоторых картинок...")
+    visualize_features(Train_images, data.detector)
+    
+    print(f"Визуализация дескрипторов для двух классов...")
+    cats_descriptors = data.extract_features([cats_train[10]])
+    dogs_descriptors = data.extract_features([dogs_train[10]])
+    plot_descriptors_histogram(cats_descriptors, dogs_descriptors, data.kmeans, data.n_clusters)
+    
+    print(f"Преобразование дескрипторов в гистограммы частот...")
+    X_train_features = data.compute_bow_histograms(Train_images)
+    X_test_features = data.compute_bow_histograms(Test_images)
+    
+    print(f"Тренировка модели...")
+    model.train(X_train_features, Train_labels)
+
+    train_accuracy, y_train_pred, y_train_prob = model.stats(X_train_features, Train_labels)
+    test_accuracy, y_test_pred, y_test_prob = model.stats(X_test_features, Test_labels)
+
+    print("Train Accuracy:", train_accuracy)
+    print("Test Accuracy:", test_accuracy)
+
+
+    class_names = ['Cats', 'Dogs']
+    plot_confusion_matrix(Test_labels, y_test_pred, class_names)
+    plot_classification_results(Test_labels, y_test_pred, class_names)
+    
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Image classification using Random Forest and Bag of Words.")
-    subparsers = parser.add_subparsers(dest="mode", help="Mode: train or test")
-
-    train_parser = subparsers.add_parser("train", help="Train the random forest model")
-    train_parser.add_argument("--train_dir", type=str, required=True, help="Directory with training images (cats and dogs)")
-    train_parser.add_argument("--model_file", type=str, required=True, help="File to save the trained model")
-    train_parser.add_argument("--n_clusters", type=int, default=100, help="Number of clusters for visual dictionary")
-
-    test_parser = subparsers.add_parser("test", help="Test the random forest model")
-    test_parser.add_argument("--test_dir", type=str, required=True, help="Directory with test images")
-    test_parser.add_argument("--model_file", type=str, required=True, help="File with the trained model")
-    test_parser.add_argument("--labels_file", type=str, required=True, help="File with true labels for test images")
-
-    args = parser.parse_args()
-
-    if args.mode == "train":
-        classifier = ImageClassifier(n_clusters=args.n_clusters)
-        classifier.train(args.train_dir, args.model_file)
-    elif args.mode == "test":
-        classifier = ImageClassifier(n_clusters=100)
-        classifier.test(args.test_dir, args.model_file, args.labels_file)
-    else:
-        parser.print_help()
-
+    args = ArgumentParser.cli_argument_parser()
+    main(args)
