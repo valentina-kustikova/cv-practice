@@ -236,12 +236,8 @@ class YoloxTiny:
         self.input = self.image.preproccess_image(self.mean, self.std)
         self.net.setInput(self.input)
 
-    def _sigmoid(self, x) -> float:
-        return 1 / (1 + np.exp(-x))
-
     def inference(self):
         self.result = self.net.forward()
-        print(self.result)
 
     def nms(self, boxes, scores, nms_thr):
         x1 = boxes[:, 0]
@@ -313,7 +309,6 @@ class YoloxTiny:
     def output_process(self):
         raw_out = self.result
         predictions = self.demo_postprocess(raw_out[0], (416, 416))
-        print(predictions.shape)
         ratio = min(416 / self.image.original_image.shape[0], 416 / self.image.original_image.shape[1])
         boxes = predictions[:, :4]
         scores = predictions[:, 4:5] * predictions[:, 5:]
@@ -355,15 +350,12 @@ def video_inference(video_path, model_path, classes_path):
     vid.gen_video()
 
 
-
-
 def main():
     args = cli_argument_parser()
-    print(str(args.image_path))
-    #if str(args.image_path) is not None:
-    #    image_inference(image_path=args.image_path, model_path=args.model_path, classes_path=args.classes_path)
-    #elif str(args.video_path) is not None:
-    video_inference(args.video_path, args.model_path, args.classes_path)
+    if str(args.image_path) is not None:
+        image_inference(image_path=args.image_path, model_path=args.model_path, classes_path=args.classes_path)
+    elif str(args.video_path) is not None:
+        video_inference(args.video_path, args.model_path, args.classes_path)
 
 
 if __name__=='__main__':
