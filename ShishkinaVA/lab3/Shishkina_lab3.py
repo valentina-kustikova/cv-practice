@@ -23,10 +23,15 @@ class ImageLoader:
             path = os.path.join(folder, filename)
             img = cv2.imread(path)
             if img is not None:
+                img = self.denoise_image(img)
                 img = cv2.resize(img, self.image_size)
                 images.append(img)
                 labels.append(label)
         return images, labels
+    def denoise_image(self, img):
+        # Применение медианной фильтрации для удаления шумов
+        denoised_img = cv2.medianBlur(img, 3)
+        return denoised_img
 
 class FeatureExtractor:
     def __init__(self, k=100, descriptor='sift'):
@@ -301,6 +306,10 @@ def main(args):
     print(f"Количество тренировочных изображений: {len(X_train)}")
     print(f"Количество тестовых изображений: {len(X_test)}")
 
+    X_train, y_train = shuffle(X_train, y_train, random_state=42)
+
+    X_test, y_test = shuffle(X_test, y_test, random_state=42)
+
     train_descriptors = feature_extractor.extract_features(X_train)
     feature_extractor.fit_kmeans(train_descriptors)
 
@@ -326,8 +335,8 @@ def main(args):
     print(test_report)
 
     class_names = ['Cats', 'Dogs']
-    visualizer.plot_classification_histogram(y_train, y_train_pred, class_names, 'Train')
-    visualizer.plot_classification_histogram(y_test, y_test_pred, class_names, 'Test')
+    # visualizer.plot_classification_histogram(y_train, y_train_pred, class_names, 'Train')
+    # visualizer.plot_classification_histogram(y_test, y_test_pred, class_names, 'Test')
 
     visualizer.plot_classification_results(y_train, y_train_pred, class_names, 'Train')
     visualizer.plot_classification_results(y_test, y_test_pred, class_names, 'Test')
