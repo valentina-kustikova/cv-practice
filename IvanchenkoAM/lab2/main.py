@@ -47,16 +47,17 @@ class YOLODetector:
 
     def process_frame(self, frame, conf_threshold, nms_threshold, input_size):
         output_frame, detected_objects = self.detect_objects(frame, conf_threshold, nms_threshold, input_size)
+        print('Objects in the frame:')
         for obj, count in detected_objects.items():
             print(f"{obj}: {count}")
         return output_frame
-
+'''
     def process_batch(self, batch, conf_threshold, nms_threshold, input_size):
         output_batch, detected_objects_batch = self.detect_objects(batch, conf_threshold, nms_threshold, input_size)
         for obj, count in detected_objects.items():
             print(f"{obj}: {count}")
         return output_frame
-
+'''
 def display_frame(frame, window_name="Object Detection", wait_for_key=False):
    cv.imshow(window_name, frame)
    if wait_for_key:
@@ -70,59 +71,47 @@ def cleanup():
 
 def process_input(input_path, yolo, conf_threshold, nms_threshold, input_size):
     if input_path.endswith((".mp4", ".avi")):
-        '''
-        cap = cv.VideoCapture(input_path)
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            print(ret, type(frame))
-            output_frame = yolo.process_frame(frame, conf_threshold, nms_threshold, input_size)
-            if not display_frame(output_frame):
-                break
-        cap.release()
-        '''
         vidcap = cv.VideoCapture(input_path)
         frame_width = int(vidcap.get(cv.CAP_PROP_FRAME_WIDTH))
         frame_height = int(vidcap.get(cv.CAP_PROP_FRAME_HEIGHT))
         fps = vidcap.get(cv.CAP_PROP_FPS)
         
-        fourcc = cv.VideoWriter_fourcc(*'XVID')
+        fourcc = cv.VideoWriter_fourcc(*'mp4v')
         out = cv.VideoWriter('output_video_path.mp4', fourcc, fps/4, (frame_width, frame_height))
         success,frame = vidcap.read()
         count = 0
-        frame_list = list()
+        #frame_list = list()
         while success:
             output_frame = yolo.process_frame(frame, conf_threshold, nms_threshold, input_size)
-            print(input_size)
-            frame_list.append(frame)
+            cv.imshow('detection', output_frame)
+            if cv.waitKey(30) > 0:
+                print("Stopped by user")
+                break
+            #frame_list.append(frame)
             #cv.imwrite("frames/frame%d.jpg" % count, output_frame)     # save frame as JPEG file      
             out.write(output_frame)
             success,frame = vidcap.read()
-            print('Read a new frame: ', success)
-            count += 1    
+            count += 1 
         vidcap.release()
         out.release() 
         '''
-
-        success,frame = vidcap.read()
-        count = 0
-        frame_list = list()
-        while success:
-            frame_list.append(frame)
-        
-        batch_size = (len(frame_list), input_size[0], input_size[1])
-        output_frame = yolo.process_frame(frame_list, conf_threshold, nms_threshold, batch_size)
-        
-        for f in output_frame:
-            #cv.imwrite("frames/frame%d.jpg" % count, output_frame)     # save frame as JPEG file      
-            out.write(f)
             success,frame = vidcap.read()
-            print('Read a new frame: ', success)
-            count += 1    
-        vidcap.release()
-        out.release()     
-        
+            count = 0
+            frame_list = list()
+            while success:
+                frame_list.append(frame)
+            
+            batch_size = (len(frame_list), input_size[0], input_size[1])
+            output_frame = yolo.process_frame(frame_list, conf_threshold, nms_threshold, batch_size)
+            
+            for f in output_frame:
+                #cv.imwrite("frames/frame%d.jpg" % count, output_frame)     # save frame as JPEG file      
+                out.write(f)
+                success,frame = vidcap.read()
+                print('Read a new frame: ', success)
+                count += 1    
+            vidcap.release()
+            out.release()     
         ''' 
     else:
         image = cv.imread(input_path)

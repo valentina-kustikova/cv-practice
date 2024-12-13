@@ -51,13 +51,13 @@
 
 1. Для обработки изображения:
    ```bash
-   python lab2.py -i test.jpg -w yolov3.weights -cfg yolov3.cfg -names coco.names -c 0.5 -n 0.4 -s 416 416
+   python main.py -i test.jpg -w yolov3.weights -cfg yolov3.cfg -names coco.names -c 0.5 -n 0.4 -s 416 416
 2. Для обработки видео:
    ```bash
-   python lab2.py -i test.mp4 -w yolov3.weights -cf yolov3.cfg -nms coco.names -c 0.5 -n 0.4 -s 416 416
+   python main.py -i test.mp4 -w yolov3.weights -cfg yolov3.cfg -names coco.names -c 0.5 -n 0.4 -s 416 416
 3. Для обработки файла со стандартными параметрами:
    ```bash
-   python lab2.py -i test.gif -w yolov3.weights -cf yolov3.cfg -nms coco.names
+   python main.py -i test.jpg -w yolov3.weights -cfg yolov3.cfg -names coco.names
 4. Для просмотра доступных параметров:
    ```bash
-   python lab2.py --help
+   python main.py --help
