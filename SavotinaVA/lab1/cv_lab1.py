@@ -45,17 +45,11 @@ def arg_parser():
 
 
 def GrayShades(image):
-    b = image[:, :, 0]
-    g = image[:, :, 1]
-    r = image[:, :, 2]
+    gr = 0.114 * image[:, :, 0] + 0.587 * image[:, :, 1] + 0.299 * image[:, :, 2]
     
-    gr = 0.114 * b + 0.587 * g + 0.299 * r  
-            
-    image[:, :, 0] = gr
-    image[:, :, 1] = gr
-    image[:, :, 2] = gr
+    gray = np.array(gr, dtype=np.uint8)
     
-    return image
+    return gray
 
 
 def Resize(image, scale):
