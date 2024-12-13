@@ -34,14 +34,14 @@ class YOLODetector:
                     class_ids.append(class_id)
 
         indices = cv.dnn.NMSBoxes(boxes, confidences, conf_threshold, nms_threshold)
-
-        for i in indices.flatten():
-            x, y, width, height = boxes[i]
-            detected_objects[self.classes[classes[i]]] = detected_objects.get(self.classes[classes[i]], 0) + 1
-            color = self.colors[class_ids[i]]
-            label = f"{self.classes[class_ids[i]]}: {confidences[i]:.3f}"
-            cv.rectangle(frame, (x, y), (x + width, y + height), color, 2)
-            cv.putText(frame, label, (x, y - 10), cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        if len(indices) > 0:
+            for i in indices.flatten():
+                x, y, width, height = boxes[i]
+                detected_objects[self.classes[classes[i]]] = detected_objects.get(self.classes[classes[i]], 0) + 1
+                color = self.colors[class_ids[i]]
+                label = f"{self.classes[class_ids[i]]}: {confidences[i]:.3f}"
+                cv.rectangle(frame, (x, y), (x + width, y + height), color, 2)
+                cv.putText(frame, label, (x, y - 10), cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
         return frame, detected_objects
 
