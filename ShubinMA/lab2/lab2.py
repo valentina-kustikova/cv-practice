@@ -1,10 +1,7 @@
-#python lab2.py -m Image -i test_2.jpg -o out.jpg -c yolov4tf.cfg -w yolov4tf.weights -l coco_80cl.txt
-
 import cv2 as cv
 import numpy as np
 import argparse
 import os
-from time import sleep
 
 
 BB_TEXT_OFFSET_X = 0
@@ -19,7 +16,7 @@ def cli_argument_parser():
     parser.add_argument('-m', '--mode',
                         help='Input mode.',
                         required=True,
-                        choices=['Image', 'Video'],
+                        choices=['Image', 'Video', 'VideoStream'],
                         type=str,
                         dest='mode')
     parser.add_argument('-i', '--input',
@@ -94,7 +91,7 @@ class Detector:
         indexes = cv.dnn.NMSBoxes(rectangles.tolist(), confidences.tolist(), self.conf_threshold, self.nms_threshold)
 
         detections = {}
-        for i in indexes.flatten():
+        for i in indexes:
             class_id = class_ids[i]
             detections[class_id] = (1) if (class_id not in detections.keys()) else (detections[class_id] + 1)
 
@@ -102,9 +99,10 @@ class Detector:
 
     def DetectOnVideo(self, _frames):
         results = []
-        for frame in _frames:
-            rectangles, confidences, class_ids, indexes, detections = self.DetectOnImage(frame)
+        for i in range(len(_frames)):
+            rectangles, confidences, class_ids, indexes, detections = self.DetectOnImage(_frames[i])
             results.append((rectangles, confidences, class_ids, indexes, detections))
+            print("Frame", i+1, "of", len(_frames), "processed (detection).")
 
         return results
 
@@ -140,7 +138,7 @@ class Visualizer:
         self.labels = _labels
 
     def ApplyImageResults(self, _image, _rectangles, _confidences, _class_ids, _indexes, _detections, _colors):
-        for i in _indexes.flatten():
+        for i in _indexes:
             left_x, left_y, rect_width, rect_height = _rectangles[i]
             label = str(self.labels[_class_ids[i]])
             cv.rectangle(_image, (left_x, left_y), (left_x + rect_width, left_y + rect_height), _colors[_class_ids[i]], 2)
@@ -158,8 +156,9 @@ class Visualizer:
     def ApplyVideoResults(self, _frames, _processed_frames, _colors):
         frames = []
         for i in range(len(_frames)):
-            result_frame = self.ShowResults(_frames[i], _processed_frames[i][0], _processed_frames[i][1], _processed_frames[i][2], _processed_frames[i][3], _processed_frames[i][4], _colors)
+            result_frame = self.ApplyImageResults(_frames[i], _processed_frames[i][0], _processed_frames[i][1], _processed_frames[i][2], _processed_frames[i][3], _processed_frames[i][4], _colors)
             frames.append(result_frame)
+            print("Frame", i+1, "of", len(_frames), "processed (results application).")
 
         return frames
 
@@ -170,11 +169,9 @@ class Visualizer:
 
     def ShowVideo(self, _frames, _window_name = 'Detection result', _fps=30, _wait = True):
         for i in range(len(_frames)):
-            self.ShowImage(_frames, _window_name, False)
-            sleep(1/_fps)
-
-        if _wait:
-            cv.waitKey(0)
+            self.ShowImage(_frames[i], _window_name, False)
+            if (_wait):
+                cv.waitKey(max(int(1/_fps), 1))
 
 
 class IOManager:
@@ -217,6 +214,35 @@ class IOManager:
 
         out.release()
 
+    def ProcessVideoStream(self, _detector, _visualizer, _colors, _video_path, _output_path, _window_name = 'Detection result', _fps = 30, _frame_size = (608, 608)):
+        capture = cv.VideoCapture(_video_path)
+        if not capture.isOpened():
+            raise ValueError('Unable to read video file')
+
+        if _output_path != None:
+            fourcc = cv.VideoWriter_fourcc(*'XVID')
+            out = cv.VideoWriter(_output_path, fourcc, _fps, _frame_size)
+
+        while True:
+            ret, frame = capture.read()
+            if not ret:
+                break
+
+            rectangles, confidences, class_ids, indexes, detections = _detector.DetectOnImage(frame)
+            result_frame = _visualizer.ApplyImageResults(frame, rectangles, confidences, class_ids, indexes, detections, _colors)
+
+            _visualizer.ShowImage(result_frame, _window_name, False)
+
+            cv.waitKey(max(int(1/_fps), 1))
+
+            if _output_path != None:
+                out.write(frame)
+
+        if _output_path != None:
+            out.release()
+        capture.release()
+        cv.destroyAllWindows()
+
 
 def main():
     args = cli_argument_parser()
@@ -232,13 +258,15 @@ def main():
         visualizer.ShowImage(result)
         if args.output != None:
             io_manager.WriteImage(result, args.output)
-    else:
+    elif args.mode == 'Video':
         frames = io_manager.ReadVideo(args.input)
         processed_frames = detector.DetectOnVideo(frames)
         results = visualizer.ApplyVideoResults(frames, processed_frames, colors)
-        visualizer.ShowVideo(results)
+        visualizer.ShowVideo(results, _wait = True)
         if args.output != None:
             io_manager.WriteVideo(results, args.output)
+    else:
+        io_manager.ProcessVideoStream(detector, visualizer, colors, args.input, args.output)
 
 if __name__ == '__main__':
     main()
