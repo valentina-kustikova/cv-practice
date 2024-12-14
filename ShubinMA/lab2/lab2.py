@@ -25,7 +25,7 @@ def cli_argument_parser():
                         type=str,
                         dest='input')
     parser.add_argument('-o', '--output',
-                        help='Output image path.',
+                        help='Output path.',
                         type=str,
                         dest='output')
     parser.add_argument('-c', '--config',
