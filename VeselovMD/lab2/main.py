@@ -85,6 +85,54 @@ def draw_predictions(image, detections, classes):
     return image
 
 
+def process_video(video_path, output_path, net, output_layers, classes):
+    """
+    Обрабатывает видеофайл, детектируя объекты на каждом кадре.
+
+    Параметры:
+        video_path: путь к входному видео
+        output_path: путь к выходному видео
+        net: модель для детектирования
+        output_layers: выходные слои модели
+        classes: список классов объектов
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f"Error: Could not open video '{video_path}'")
+        return
+
+    # Настраиваем запись видео
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Выполняем детектирование
+        detections = detect_objects(frame, net, output_layers, classes)
+
+        # Рисуем результаты на кадре
+        frame_with_predictions = draw_predictions(frame, detections, classes)
+
+        # Пишем кадр в выходное видео
+        out.write(frame_with_predictions)
+
+        # Отображаем кадр (опционально)
+        cv2.imshow("Detections", frame_with_predictions)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    out.release()
+    cv2.destroyAllWindows()
+    print(f"Video saved to {output_path}")
+
+
 def main():
     # Пути к файлам модели и именам классов
     model_cfg = "yolov4.cfg"
@@ -98,6 +146,13 @@ def main():
     # Загружаем модель
     net = load_model(model_cfg, model_weights)
     output_layers = get_output_layers(net)
+
+    # Задаем путь к видео
+    video_path = "test_video_2.mp4"
+    output_video_path = "output_video.mp4"
+
+    # Обработка видео
+    process_video(video_path, output_video_path, net, output_layers, classes)
 
     # Загружаем изображение
     image_path = "test_image_2.jpg"
@@ -121,10 +176,6 @@ def main():
     for class_name, count in stats.items():
         print(f"{class_name}: {count}")
 
-    # Отображаем изображение
-    # cv2.imshow("Detections", image_with_predictions)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
     # Сохраняем изображение
     output_image_path = "output_image.jpg"
     cv2.imwrite(output_image_path, image_with_predictions)
