@@ -135,7 +135,7 @@ def argument_parser():
     parser = argparse.ArgumentParser(description="Image classification using Bag of Visual Words and SVM.")
     parser.add_argument("--train_dir", required=True, help="Path to the training dataset directory.")
     parser.add_argument("--test_dir", required=True, help="Path to the testing dataset directory.")
-    parser.add_argument("--clusters", type=int, default=100, help="Number of clusters for visual vocabulary.")
+    parser.add_argument("--clusters", type=int, default=10, help="Number of clusters for visual vocabulary.")
     return parser.parse_args()
 
 def main():
