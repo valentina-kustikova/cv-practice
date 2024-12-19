@@ -4,8 +4,7 @@ import numpy as np
 from sklearn.svm import SVC
 from sklearn.cluster import KMeans
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, ConfusionMatrixDisplay
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 import matplotlib.pyplot as plt
 import argparse
 import random
@@ -22,16 +21,6 @@ def load_images_from_folder(folder, label, image_size=(256, 256)):
         img = cv2.resize(img, image_size)
         images.append((img, label))
     return images
-
-def extract_sift_descriptors(images):
-    sift = cv2.SIFT_create()
-    descriptors = []
-    for img, _ in images:
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        _, des = sift.detectAndCompute(gray, None)
-        if des is not None:
-            descriptors.append(des)
-    return np.vstack(descriptors) if descriptors else np.array([])
 
 def build_visual_vocab(descriptors, num_clusters):
     kmeans = KMeans(n_clusters=num_clusters, n_init=10, random_state=42)
@@ -60,9 +49,9 @@ def train_and_evaluate(train_data, test_data, vocab):
     train_features = compute_bow_features(train_data, vocab, sift)
 
     label_encoder = LabelEncoder()
-    train_labels_encoded = label_encoder.fit_transform(train_labels)
-
     scaler = StandardScaler()
+
+    train_labels_encoded = label_encoder.fit_transform(train_labels)
     train_features_scaled = scaler.fit_transform(train_features)
 
     model = SVC(kernel='rbf', probability=True, gamma=0.01, C=1, random_state=42)
@@ -71,9 +60,8 @@ def train_and_evaluate(train_data, test_data, vocab):
     test_labels = [label for _, label in test_data]
     test_features = compute_bow_features(test_data, vocab, sift)
 
-    test_features_scaled = scaler.transform(test_features)
-
     test_labels_encoded = label_encoder.transform(test_labels)
+    test_features_scaled = scaler.transform(test_features)
 
     train_predictions = model.predict(train_features_scaled)
     train_accuracy = accuracy_score(train_labels_encoded, train_predictions)
@@ -132,6 +120,16 @@ def plot_confusion_matrix(y_true, y_pred, classes, title="Confusion Matrix"):
     
     plt.title(title)
     plt.show()
+
+def extract_sift_descriptors(images):
+    sift = cv2.SIFT_create()
+    descriptors = []
+    for img, _ in images:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, des = sift.detectAndCompute(gray, None)
+        if des is not None:
+            descriptors.append(des)
+    return np.vstack(descriptors) if descriptors else np.array([])
 
 def argument_parser():
     parser = argparse.ArgumentParser(description="Image classification using Bag of Visual Words and SVM.")
