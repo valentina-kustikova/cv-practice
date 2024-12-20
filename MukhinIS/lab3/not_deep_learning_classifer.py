@@ -1,7 +1,8 @@
 import cv2 as cv
 import numpy as np
 import os
-from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.svm import SVC
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.cluster import KMeans
 from sklearn.metrics import accuracy_score
 import argparse
@@ -34,7 +35,11 @@ def cli_argument_parser():
                         required=False,
                         default=50,
                         dest='clusters')
-
+    parser.add_argument('--method',
+                        help='Classifer',
+                        type=str,
+                        required=False,
+                        dest='method')
     args = parser.parse_args()
 
     return args
@@ -115,15 +120,23 @@ def main():
     model.create_bow()
     train_features = model.bow_features(images_train)
     test_features = model.bow_features(images_test)
-    grad = GradientBoostingClassifier()
-    grad.fit(train_features, labels_train)
-    predictions = grad.predict(test_features)
-    acc = accuracy_score(labels_test, predictions)
-    print(f'Accuracy = {acc}')
+    classifer = None
+    if args.method == 'forest':
+        classifer = RandomForestClassifier()
+    elif args.method == 'grad':
+        classifer = GradientBoostingClassifier()
+    elif args.method == 'svc':
+        classifer = SVC(kernel='rbf', probability=True, gamma=0.01)
+    else:
+        classifer= GradientBoostingClassifier()
 
-
-
-
+    classifer.fit(train_features, labels_train)
+    predictions_train = classifer.predict(train_features)
+    predictions_test = classifer.predict(test_features)
+    acc_train = accuracy_score(labels_train, predictions_train)
+    acc_test = accuracy_score(labels_test, predictions_test)
+    print(f'Accuracy on train data = {acc_train}')
+    print(f'Accuracy on test data = {acc_test}')
 
 
 if __name__=='__main__':
