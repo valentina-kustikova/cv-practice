@@ -85,7 +85,7 @@ def visualize_features(images, sift, number):
         plt.figure(figsize=(8, 6))
         plt.subplot(1, 1, 1)
         plt.imshow(cv2.cvtColor(img_with_sift_keypoints, cv2.COLOR_BGR2RGB))
-        plt.title('SIFT Keypoints')
+        plt.title('Пример изображения')
         plt.axis('off')
         plt.show()
 
