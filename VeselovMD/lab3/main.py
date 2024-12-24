@@ -1,15 +1,15 @@
+import argparse
 import os
-import zipfile
 import random
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.cluster import MiniBatchKMeans
-from sklearn.model_selection import train_test_split
-from sklearn.svm import SVC
 from sklearn.metrics import classification_report, accuracy_score
+from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import LabelEncoder
-import matplotlib.pyplot as plt
+from sklearn.svm import SVC
 
 
 def load_images_from_folder(folder, label, image_size=(150, 150)):
@@ -40,6 +40,28 @@ def visualize_histogram(hist, title="Гистограмма слов"):
     plt.show()
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train and test a classifier using the bag of words approach.')
+
+    parser.add_argument('-td', '--train_dir',
+                        help='Directory with training images (cats and dogs)',
+                        type=str,
+                        dest='train_dir',
+                        default='dataset/train')
+    parser.add_argument('-tsd', '--test_dir',
+                        help='Directory with test images',
+                        type=str,
+                        dest='test_dir',
+                        default='dataset/test')
+    parser.add_argument('-nc', '--n_clusters',
+                        help='Number of clusters for visual dictionary',
+                        type=int,
+                        dest='n_clusters',
+                        default=200)
+    args = parser.parse_args()
+    return args
+
+
 def extract_features_bag_of_words(images, n_clusters=50):
     """
     Извлечение признаков с помощью алгоритма "мешок слов".
@@ -49,7 +71,9 @@ def extract_features_bag_of_words(images, n_clusters=50):
 
     # Извлекаем дескрипторы для всех изображений
     for img in images:
-        keypoints, descriptor = sift.detectAndCompute(img, None)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, descriptor = sift.detectAndCompute(gray, None)
+
         if descriptor is not None:
             descriptors.append(descriptor)
 
@@ -63,13 +87,14 @@ def extract_features_bag_of_words(images, n_clusters=50):
 
     # Кластеризация с использованием MiniBatchKMeans
     print("Кластеризация дескрипторов...")
-    kmeans = MiniBatchKMeans(n_clusters=n_clusters, random_state=42)
+    kmeans = MiniBatchKMeans(n_clusters=n_clusters, random_state=42, init='k-means++')
     kmeans.fit(descriptors)
 
     # Построение гистограмм
     histograms = []
     for img in images:
-        keypoints, descriptor = sift.detectAndCompute(img, None)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, descriptor = sift.detectAndCompute(gray, None)
         histogram = np.zeros(n_clusters, dtype=np.float32)
         if descriptor is not None:
             words = kmeans.predict(descriptor)
@@ -81,19 +106,15 @@ def extract_features_bag_of_words(images, n_clusters=50):
 
 
 def main():
+    args = parse_args()
     # Параметры
     image_size = (150, 150)
-    train_folder_cats = "dataset/train/cats"
-    train_folder_dogs = "dataset/train/dogs"
-    test_folder_cats = "dataset/test/cats"
-    test_folder_dogs = "dataset/test/dogs"
-    n_clusters = 50
 
     # Загружаем тренировочные и тестовые данные
-    train_cats, train_labels_cats = load_images_from_folder(train_folder_cats, "cat", image_size)
-    train_dogs, train_labels_dogs = load_images_from_folder(train_folder_dogs, "dog", image_size)
-    test_cats, test_labels_cats = load_images_from_folder(test_folder_cats, "cat", image_size)
-    test_dogs, test_labels_dogs = load_images_from_folder(test_folder_dogs, "dog", image_size)
+    train_cats, train_labels_cats = load_images_from_folder(args.train_dir + '/cats', "cat", image_size)
+    train_dogs, train_labels_dogs = load_images_from_folder(args.train_dir + '/dogs', "dog", image_size)
+    test_cats, test_labels_cats = load_images_from_folder(args.test_dir + '/cats', "cat", image_size)
+    test_dogs, test_labels_dogs = load_images_from_folder(args.test_dir + '/dogs', "dog", image_size)
 
     train_images = train_cats + train_dogs
     train_labels = train_labels_cats + train_labels_dogs
@@ -102,14 +123,15 @@ def main():
 
     # Извлечение признаков для тренировочной выборки
     print("Извлечение признаков с использованием алгоритма 'мешок слов'...")
-    train_histograms, kmeans = extract_features_bag_of_words(train_images, n_clusters)
+    train_histograms, kmeans = extract_features_bag_of_words(train_images, args.n_clusters)
 
     # Извлечение признаков для тестовой выборки
     test_histograms = []
     sift = cv2.SIFT_create()
     for img in test_images:
-        keypoints, descriptor = sift.detectAndCompute(img, None)
-        histogram = np.zeros(n_clusters, dtype=np.float32)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, descriptor = sift.detectAndCompute(gray, None)
+        histogram = np.zeros(args.n_clusters, dtype=np.float32)
         if descriptor is not None:
             words = kmeans.predict(descriptor)
             for word in words:
@@ -124,7 +146,7 @@ def main():
 
     # Обучаем классификатор
     print("Обучение модели классификации...")
-    model = SVC(kernel="linear")
+    model = SVC(kernel='rbf', probability=True, gamma=0.001, C=10, random_state=42)
     model.fit(train_histograms, train_labels_encoded)
 
     # Оцениваем модель
@@ -144,9 +166,10 @@ def main():
     for i, idx in enumerate(random_indices):
         # Получаем исходное изображение и ключевые точки
         img = test_images[idx]
-        keypoints, _ = sift.detectAndCompute(img, None)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        keypoints, _ = sift.detectAndCompute(gray, None)
         img_with_keypoints = cv2.drawKeypoints(img, keypoints, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        img_with_keypoints = img_with_keypoints[:, :, ::-1]  # Преобразуем BGR в RGB для matplotlib
+        img_with_keypoints = img_with_keypoints[:, :, ::-1]  # BGR -> RGB
 
         # Предсказываем класс
         predicted_label = label_encoder.inverse_transform([test_predictions[idx]])[0]
@@ -161,6 +184,15 @@ def main():
     plt.tight_layout()
     plt.show()
 
+    # param_grid = {
+    #     'C': [0.1, 1, 10, 100],
+    #     'gamma': [0.001, 0.01, 0.1, 1],
+    # }
+    # grid = GridSearchCV(SVC(kernel='rbf', probability=True, random_state=42), param_grid, cv=3, scoring='accuracy')
+    # grid.fit(train_histograms, train_labels_encoded)
+    # print(f"Best parameters: {grid.best_params_}")
+
 
 if __name__ == "__main__":
     main()
+
