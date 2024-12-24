@@ -1,3 +1,5 @@
+import argparse
+
 import cv2
 import numpy as np
 
@@ -20,7 +22,7 @@ def get_output_layers(net):
     return [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
 
 
-def detect_objects(image, net, output_layers, classes, confidence_threshold=0.6, nms_threshold=0.3):
+def detect_objects(image, net, output_layers, confidence_threshold=0.6, nms_threshold=0.3):
     """
     Выполняет детектирование объектов на изображении.
 
@@ -58,7 +60,6 @@ def detect_objects(image, net, output_layers, classes, confidence_threshold=0.6,
                 confidences.append(float(confidence))
                 class_ids.append(class_id)
 
-    # Non-Maximum Suppression
     indices = cv2.dnn.NMSBoxes(boxes, confidences, confidence_threshold, nms_threshold)
 
     # Рисуем рамки
@@ -114,7 +115,7 @@ def process_video(video_path, output_path, net, output_layers, classes):
             break
 
         # Выполняем детектирование
-        detections = detect_objects(frame, net, output_layers, classes)
+        detections = detect_objects(frame, net, output_layers)
 
         # Рисуем результаты на кадре
         frame_with_predictions = draw_predictions(frame, detections, classes)
@@ -127,47 +128,17 @@ def process_video(video_path, output_path, net, output_layers, classes):
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
+        # Выводим статистику
+        print(f"== Frame # {cap.get(cv2.CAP_PROP_POS_FRAMES)} ==")
+        statistic(detections, classes)
+
     cap.release()
     out.release()
     cv2.destroyAllWindows()
     print(f"Video saved to {output_path}")
 
 
-def main():
-    # Пути к файлам модели и именам классов
-    model_cfg = "yolov4.cfg"
-    model_weights = "yolov4.weights"
-    class_file = "coco.names"
-
-    # Загружаем классы объектов
-    with open(class_file, "r") as f:
-        classes = [line.strip() for line in f.readlines()]
-
-    # Загружаем модель
-    net = load_model(model_cfg, model_weights)
-    output_layers = get_output_layers(net)
-
-    # Задаем путь к видео
-    video_path = "test_video_2.mp4"
-    output_video_path = "output_video.mp4"
-
-    # Обработка видео
-    process_video(video_path, output_video_path, net, output_layers, classes)
-
-    # Загружаем изображение
-    image_path = "test_image_2.jpg"
-    image = cv2.imread(image_path)
-    if image is None:
-        print(f"Error: Could not open or find the image '{image_path}'")
-        return
-
-    # Выполняем детектирование
-    detections = detect_objects(image, net, output_layers, classes)
-
-    # Рисуем результаты
-    image_with_predictions = draw_predictions(image, detections, classes)
-
-    # Выводим статистику
+def statistic(detections, classes):
     stats = {}
     for _, _, _, _, class_id, _ in detections:
         class_name = classes[class_id]
@@ -176,10 +147,94 @@ def main():
     for class_name, count in stats.items():
         print(f"{class_name}: {count}")
 
-    # Сохраняем изображение
-    output_image_path = "output_image.jpg"
-    cv2.imwrite(output_image_path, image_with_predictions)
-    print(f"Image saved to {output_image_path}")
+
+def cli_argument_parser():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-m', '--mode',
+                        help='Mode (\'image\' or \'video\')',
+                        type=str,
+                        dest='mode',
+                        default='image')
+    parser.add_argument('-i', '--input',
+                        help='Path to an image or video',
+                        type=str,
+                        dest='input_path')
+    parser.add_argument('-o', '--output',
+                        help='Output image or video name',
+                        type=str,
+                        dest='output_path',
+                        default='output.jpg')
+    parser.add_argument('-c', '--config',
+                        help='Path to the config file',
+                        type=str,
+                        dest='model_cfg',
+                        default='yolov4.cfg')
+    parser.add_argument('-w', '--weights',
+                        help='Path to the weights file',
+                        type=str,
+                        dest='model_weights',
+                        default='yolov4.weights')
+    parser.add_argument('-cl', '--classes',
+                        help='Path to the classes file',
+                        type=str,
+                        dest='class_file',
+                        default='coco.names')
+    parser.add_argument('-ct', '--conf_threshold',
+                        help='Confidence threshold',
+                        type=float,
+                        dest='conf_threshold',
+                        default=0.6)
+    parser.add_argument('-nt', '--nms_threshold',
+                        help='NMS threshold',
+                        type=float,
+                        dest='nms_threshold',
+                        default=0.3)
+
+    args = parser.parse_args()
+    return args
+
+
+def main():
+    args = cli_argument_parser()
+
+    # Загружаем классы объектов
+    with open(args.class_file, "r") as f:
+        classes = [line.strip() for line in f.readlines()]
+
+    # Загружаем модель
+    net = load_model(args.model_cfg, args.model_weights)
+    output_layers = get_output_layers(net)
+
+    if (args.mode == "image"):
+        # Загружаем изображение
+        image_path = "test_image_2.jpg"
+        image = cv2.imread(image_path)
+        if image is None:
+            print(f"Error: Could not open or find the image '{image_path}'")
+            return
+
+        # Выполняем детектирование
+        detections = detect_objects(image, net, output_layers)
+
+        # Рисуем результаты
+        image_with_predictions = draw_predictions(image, detections, classes)
+
+        # Выводим статистику
+        statistic(detections, classes)
+
+        # Сохраняем изображение
+        output_image_path = "output_image.jpg"
+        cv2.imwrite(output_image_path, image_with_predictions)
+        print(f"Image saved to {output_image_path}")
+
+    if (args.mode == "video"):
+        # Задаем путь к видео
+        video_path = "test_video_2.mp4"
+        output_video_path = "output_video.mp4"
+
+        # Обработка видео
+        process_video(video_path, output_video_path, net, output_layers, classes)
 
 
 if __name__ == "__main__":
