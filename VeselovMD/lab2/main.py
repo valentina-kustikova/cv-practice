@@ -206,7 +206,7 @@ def main():
     net = load_model(args.model_cfg, args.model_weights)
     output_layers = get_output_layers(net)
 
-    if (args.mode == "image"):
+    if args.mode == "image":
         # Загружаем изображение
         image_path = "test_image_2.jpg"
         image = cv2.imread(image_path)
@@ -228,7 +228,7 @@ def main():
         cv2.imwrite(output_image_path, image_with_predictions)
         print(f"Image saved to {output_image_path}")
 
-    if (args.mode == "video"):
+    if args.mode == "video":
         # Задаем путь к видео
         video_path = "test_video_2.mp4"
         output_video_path = "output_video.mp4"
