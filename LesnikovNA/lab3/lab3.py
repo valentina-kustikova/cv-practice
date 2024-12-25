@@ -16,11 +16,13 @@ Width = 200
 Height = 200
 
 class Classifier:
-    def __init__(self, Classifier='svc'):
-        if Classifier == "randomForest":
+    def __init__(self, classifier='svc'):
+        if classifier == "randomForest":
             self.Model = RandomForestClassifier(n_estimators=100)
-        else:
+        elif classifier == "scv":
             self.Model = SVC(probability=True, kernel='linear', random_state=23)
+        else:
+            raise ValueError(f"Unknown classifier")
         self.Scaler = StandardScaler()
 
     def Train(self, X_train, Y_train):
@@ -75,15 +77,15 @@ def PlotDescriptorsHistogram(CatsDescriptors, DogsDescriptors, KMeans, NClusters
 
     plt.subplot(1, 2, 1)
     plt.bar(range(NClusters), CatsHistogram, color='skyblue')
-    plt.xlabel('Cluster Index')
-    plt.ylabel('Number of Descriptors')
-    plt.title(f'Histogram of Descriptors Distribution for Cats')
+    plt.xlabel('Cluster index')
+    plt.ylabel('Number of descriptors')
+    plt.title('Cats')
 
     plt.subplot(1, 2, 2)
     plt.bar(range(NClusters), DogsHistogram, color='orange')
     plt.xlabel('Cluster Index')
-    plt.ylabel('Number of Descriptors')
-    plt.title(f'Histogram of Descriptors Distribution for Dogs')
+    plt.ylabel('Number of descriptors')
+    plt.title('Dogs')
 
     plt.tight_layout()
     plt.show()
@@ -92,7 +94,7 @@ def PlotConfusionMatrix(YTrue, YPred, ClassNames):
     Cm = confusion_matrix(YTrue, YPred)
     plt.figure(figsize=(8, 6))
     plt.imshow(Cm, interpolation='nearest', cmap='coolwarm')
-    plt.title('Confusion Matrix')
+    plt.title('Confusion matrix')
     plt.colorbar()
     TickMarks = np.arange(len(ClassNames))
     plt.xticks(TickMarks, ClassNames)
