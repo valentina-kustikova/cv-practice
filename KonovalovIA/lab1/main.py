@@ -94,9 +94,9 @@ def draw(res, pixel_size, x, y, w, h):
     res[y: y + h, x: x + w] = block
     return res
 
-def pixelate(image, pixel_size):
+def pixelate(image, pixel_size, area):
     res = image.copy()
-    x, y, w, h = get_area(res, pixel_size)
+    x, y, w, h = area
     print(x, y, w, h)
     return draw(res, pixel_size, x, y, w, h)
 
@@ -128,7 +128,8 @@ def main():
             raise ValueError('Unspecified or invalid radius')
         result = vignette(image, args.radius)
     elif args.task == 'pixelate':
-        result = pixelate(image, args.pixel_size)
+        area = get_area(image, args.pixel_size)
+        result = pixelate(image, args.pixel_size, area)
     else:
         raise ValueError('Unsupported mode')
 
