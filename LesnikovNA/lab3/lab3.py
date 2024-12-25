@@ -18,7 +18,7 @@ Height = 200
 class Classifier:
     def __init__(self, classifier='svc'):
         if classifier == "randomForest":
-            self.Model = RandomForestClassifier(n_estimators=100)
+            self.Model = RandomForestClassifier(n_estimators=100, max_depth=5)
         elif classifier == "svc":
             self.Model = SVC(probability=True, kernel='linear', random_state=23)
         else:
@@ -32,9 +32,8 @@ class Classifier:
     def Stats(self, X_test, Y_test):
         XTestScaled = self.Scaler.transform(X_test)
         YPred = self.Model.predict(XTestScaled)
-        YProb = self.Model.predict_proba(XTestScaled)[:, 1]
         Accuracy = accuracy_score(Y_test, YPred)
-        return Accuracy, YPred, YProb
+        return Accuracy, YPred
 
 def PlotClassificationResults(YTrue, YPred, ClassNames):
     Cm = confusion_matrix(YTrue, YPred)
@@ -74,6 +73,8 @@ def PlotConfusionMatrix(YTrue, YPred, ClassNames):
     plt.tight_layout()
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
+    for i, j in np.ndindex(Cm.shape):
+        plt.text(j, i, format(Cm[i, j], 'd'), horizontalalignment="center", color="white" )
     plt.show()
 
 def ParseArguments():
@@ -122,7 +123,7 @@ class Extractor:
             if Descriptors is not None:
                 DescriptorsList.append(Descriptors)
                 KeyPointsCounts.append(len(KeyPoints))
-        self.AverageKeyPoints = np.mean(KeyPointsCounts) if KeyPointsCounts else 0
+        self.AverageKeyPoints = np.mean(KeyPointsCounts) 
         return DescriptorsList
 
     def ComputeBowHistograms(self, Images):
@@ -172,8 +173,8 @@ def main():
 
     Model = Classifier(Args.Classifier)
     Model.Train(XTrainFeatures, TrainLabels)
-    TrainAccuracy, YTrainPred, YTrainProb = Model.Stats(XTrainFeatures, TrainLabels)
-    TestAccuracy, YTestPred, YTestProb = Model.Stats(XTestFeatures, TestLabels)
+    TrainAccuracy, YTrainPred = Model.Stats(XTrainFeatures, TrainLabels)
+    TestAccuracy, YTestPred = Model.Stats(XTestFeatures, TestLabels)
     print("Train Accuracy:", TrainAccuracy)
     print("Test Accuracy:", TestAccuracy)
     ClassNames = ['Cats', 'Dogs']
