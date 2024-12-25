@@ -19,7 +19,7 @@ class Classifier:
     def __init__(self, classifier='svc'):
         if classifier == "randomForest":
             self.Model = RandomForestClassifier(n_estimators=100)
-        elif classifier == "scv":
+        elif classifier == "svc":
             self.Model = SVC(probability=True, kernel='linear', random_state=23)
         else:
             raise ValueError(f"Unknown classifier")
@@ -53,42 +53,14 @@ def PlotClassificationResults(YTrue, YPred, ClassNames):
     plt.show()
 
 def VisualizeFeatures(Images, Descriptor):
-    for i, Img in enumerate(Images[:5]):
+    for i, Img in enumerate(Images[:3]):
         Gray = cv2.cvtColor(Img, cv2.COLOR_BGR2GRAY)
         KeyPoints = Descriptor.detect(Gray, None)
         ImgWithKeyPoints = cv2.drawKeypoints(Gray, KeyPoints, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        plt.figure(figsize=(6, 6))
+        plt.figure(figsize=(5, 4))
         plt.imshow(ImgWithKeyPoints, cmap='gray')
-        plt.title(f"Image {i + 1}: {len(KeyPoints)} keypoints detected")
-        plt.axis('off')
+        plt.title(f"{len(KeyPoints)} keypoints")
         plt.show()
-
-def PlotDescriptorsHistogram(CatsDescriptors, DogsDescriptors, KMeans, NClusters):
-    AllCatsDescriptors = np.vstack([Desc for Desc in CatsDescriptors if Desc is not None])
-    AllDogsDescriptors = np.vstack([Desc for Desc in DogsDescriptors if Desc is not None])
-
-    CatsPredictions = KMeans.predict(AllCatsDescriptors)
-    DogsPredictions = KMeans.predict(AllDogsDescriptors)
-
-    CatsHistogram = np.bincount(CatsPredictions, minlength=NClusters)
-    DogsHistogram = np.bincount(DogsPredictions, minlength=NClusters)
-
-    plt.figure(figsize=(14, 7))
-
-    plt.subplot(1, 2, 1)
-    plt.bar(range(NClusters), CatsHistogram, color='skyblue')
-    plt.xlabel('Cluster index')
-    plt.ylabel('Number of descriptors')
-    plt.title('Cats')
-
-    plt.subplot(1, 2, 2)
-    plt.bar(range(NClusters), DogsHistogram, color='orange')
-    plt.xlabel('Cluster Index')
-    plt.ylabel('Number of descriptors')
-    plt.title('Dogs')
-
-    plt.tight_layout()
-    plt.show()
 
 def PlotConfusionMatrix(YTrue, YPred, ClassNames):
     Cm = confusion_matrix(YTrue, YPred)
@@ -99,11 +71,6 @@ def PlotConfusionMatrix(YTrue, YPred, ClassNames):
     TickMarks = np.arange(len(ClassNames))
     plt.xticks(TickMarks, ClassNames)
     plt.yticks(TickMarks, ClassNames)
-    Thresh = Cm.max() / 2.
-    for i, j in np.ndindex(Cm.shape):
-        plt.text(j, i, format(Cm[i, j], 'd'),
-                 horizontalalignment="center",
-                 color="white" if Cm[i, j] > Thresh else "black")
     plt.tight_layout()
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
@@ -192,16 +159,14 @@ def main():
     TrainLabels = YCatsTrain + YDogsTrain
     TestImages = CatsTest + DogsTest
     TestLabels = YCatsTest + YDogsTest
-    TrainImages, TrainLabels = shuffle(TrainImages, TrainLabels, random_state=42)
-    TestImages, TestLabels = shuffle(TestImages, TestLabels, random_state=42)
+    TrainImages, TrainLabels = shuffle(TrainImages, TrainLabels, random_state=23)
+    TestImages, TestLabels = shuffle(TestImages, TestLabels, random_state=12)
     TrainDescriptors = Data.ExtractFeatures(TrainImages)
     Data.FitKMeansClusterization(TrainDescriptors)
 
     print(f"Average number of control points: ", Data.AverageKeyPoints)
     VisualizeFeatures(TrainImages, Data.Detector)
-    CatsDescriptors = Data.ExtractFeatures([CatsTrain[10]])
-    DogsDescriptors = Data.ExtractFeatures([DogsTrain[10]])
-    PlotDescriptorsHistogram(CatsDescriptors, DogsDescriptors, Data.KMeans, Data.NClusters)
+
     XTrainFeatures = Data.ComputeBowHistograms(TrainImages)
     XTestFeatures = Data.ComputeBowHistograms(TestImages)
 
