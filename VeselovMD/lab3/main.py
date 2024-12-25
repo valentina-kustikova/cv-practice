@@ -5,9 +5,12 @@ import random
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import MiniBatchKMeans, KMeans
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import GridSearchCV
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import SVC
 
@@ -69,7 +72,6 @@ def extract_features_bag_of_words(images, n_clusters=50):
     sift = cv2.SIFT_create()
     descriptors = []
 
-    # Извлекаем дескрипторы для всех изображений
     for img in images:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         _, descriptor = sift.detectAndCompute(gray, None)
@@ -77,17 +79,15 @@ def extract_features_bag_of_words(images, n_clusters=50):
         if descriptor is not None:
             descriptors.append(descriptor)
 
-    # Проверка на наличие дескрипторов
     if len(descriptors) == 0:
         print("Ошибка: не удалось извлечь дескрипторы ни для одного изображения.")
         return np.array([]), None
 
-    # Объединяем все дескрипторы
     descriptors = np.vstack(descriptors)
 
-    # Кластеризация с использованием MiniBatchKMeans
     print("Кластеризация дескрипторов...")
-    kmeans = MiniBatchKMeans(n_clusters=n_clusters, random_state=42, init='k-means++')
+    # kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    kmeans = MiniBatchKMeans(n_clusters=n_clusters, random_state=42, init='k-means++', batch_size=3072)
     kmeans.fit(descriptors)
 
     # Построение гистограмм
@@ -107,10 +107,8 @@ def extract_features_bag_of_words(images, n_clusters=50):
 
 def main():
     args = parse_args()
-    # Параметры
     image_size = (150, 150)
 
-    # Загружаем тренировочные и тестовые данные
     train_cats, train_labels_cats = load_images_from_folder(args.train_dir + '/cats', "cat", image_size)
     train_dogs, train_labels_dogs = load_images_from_folder(args.train_dir + '/dogs', "dog", image_size)
     test_cats, test_labels_cats = load_images_from_folder(args.test_dir + '/cats', "cat", image_size)
@@ -147,6 +145,9 @@ def main():
     # Обучаем классификатор
     print("Обучение модели классификации...")
     model = SVC(kernel='rbf', probability=True, gamma=0.001, C=10, random_state=42)
+    # model = KNeighborsClassifier(n_neighbors=10)
+    # model = LogisticRegression(max_iter= 100, C=1, random_state=42)
+    # model = RandomForestClassifier(n_estimators=200, random_state=42)
     model.fit(train_histograms, train_labels_encoded)
 
     # Оцениваем модель
