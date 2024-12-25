@@ -51,16 +51,24 @@ def select_region(event, x, y, flags, param):
         region.append((x, y))
     if len(region) == 2:
         if  region[0] != region[1]:
-            x1 = min(region[0][0],  region[1][0])
-            y1 = min(region[0][1],  region[1][1])
-            w = abs(region[0][0] - region[1][0])
-            h = abs(region[0][1] - region[1][1])
-            src_img = pixelate_region(src_img, x1, y1, w, h, pixel_size)
+            x0 = min(region[0][0],  region[1][0])
+            y0 = min(region[0][1],  region[1][1])
+            x1 = max(region[0][0],  region[1][0])
+            y1 = max(region[0][1],  region[1][1])
+            src_img = pixelate_region(src_img, x0, y0, x1, y1, pixel_size)
         region.clear()
 
-def pixelate_region(src_img, x, y, w, h, numOfPixels):
-    region = src_img[y:y+h, x:x+w]
-    temp = resize(region, numOfPixels, numOfPixels)
-    pixelatedRegion = resize(temp, w, h)
-    src_img[y:y+h, x:x+w] = pixelatedRegion
+def pixelate_region(src_img, x0, y0, x1, y1, numOfPixels):
+    region = src_img[y0:y1, x0:x1]
+    block_y = (y1-y0) // numOfPixels
+    block_x = (x1-x0) // numOfPixels
+    for i in range(block_y):
+        for j in range(block_x):
+            block = region[i*numOfPixels:(i+1)*numOfPixels, j*numOfPixels:(j+1)*numOfPixels]
+            avg = np.mean(block, axis=(0, 1))
+            region[i*numOfPixels:(i+1)*numOfPixels, j*numOfPixels:(j+1)*numOfPixels] = avg.astype(np.uint8)
+    src_img[y0:y1, x0:x1] = region
+    #tmp = resize(region, numOfPixels, numOfPixels)
+    #pixelatedRegion = resize(tmp, x1-x0, y1-y0)
+    #src_img[y0:y1, x0:x1] = pixelatedRegion
     return src_img

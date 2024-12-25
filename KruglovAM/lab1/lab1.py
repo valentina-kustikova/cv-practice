@@ -51,6 +51,7 @@ def imgproc_samples(args):
         raise ValueError('Empty path to the image')
     # Загрузка изображения
     src_image = cv.imread(args.image_path)
+    print (src_image.shape)
     image_placeholder = src_image.copy()
 
     if(args.mode=="grey_color"):
@@ -82,6 +83,9 @@ def imgproc_samples(args):
         region = []
         cv.namedWindow("Choose the region to pixelate")
         cv.setMouseCallback("Choose the region to pixelate", fakeCv.select_region, [image_placeholder, region, args.pixel_size])
+        
+        # cv.imshow("Choose the region to pixelate", image_placeholder)
+        # cv.waitKey(0)
         while True:
             cv.imshow("Choose the region to pixelate", image_placeholder)
             key = cv.waitKey(1) & 0xFF
