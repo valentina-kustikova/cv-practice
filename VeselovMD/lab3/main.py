@@ -9,8 +9,6 @@ from sklearn.cluster import MiniBatchKMeans, KMeans
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score
-from sklearn.model_selection import GridSearchCV
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import SVC
 
@@ -91,6 +89,7 @@ def extract_features_bag_of_words(images, n_clusters=50):
     kmeans.fit(descriptors)
 
     # Построение гистограмм
+    print("Построение гистограмм...")
     histograms = []
     for img in images:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -124,6 +123,7 @@ def main():
     train_histograms, kmeans = extract_features_bag_of_words(train_images, args.n_clusters)
 
     # Извлечение признаков для тестовой выборки
+    print("Извлечение признаков для тестовой выборки...")
     test_histograms = []
     sift = cv2.SIFT_create()
     for img in test_images:
@@ -144,7 +144,7 @@ def main():
 
     # Обучаем классификатор
     print("Обучение модели классификации...")
-    model = SVC(kernel='rbf', probability=True, gamma=0.001, C=10, random_state=42)
+    model = SVC(kernel='rbf', gamma=0.001, C=10, random_state=42)
     # model = KNeighborsClassifier(n_neighbors=10)
     # model = LogisticRegression(max_iter= 100, C=1, random_state=42)
     # model = RandomForestClassifier(n_estimators=200, random_state=42)
@@ -170,7 +170,7 @@ def main():
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         keypoints, _ = sift.detectAndCompute(gray, None)
         img_with_keypoints = cv2.drawKeypoints(img, keypoints, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        img_with_keypoints = img_with_keypoints[:, :, ::-1]  # BGR -> RGB
+        img_with_keypoints = img_with_keypoints[:, :, ::-1]
 
         # Предсказываем класс
         predicted_label = label_encoder.inverse_transform([test_predictions[idx]])[0]
