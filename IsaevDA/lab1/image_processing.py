@@ -74,13 +74,11 @@ def show_end_image(img, output_image):
 
 # Функция перевода изображения в оттенки серого
 def grayscale(img):
-  gray_img = np.zeros_like(img,np.uint8)
+  gray_img = np.zeros_like(img.shape[0],np.uint8)
+ 
+  gray_img = 0.3*img[:,:,2] + 0.59*img[:,:,1] + 0.11*img[:,:,0]
 
-  gray_img[:,:,0] = 0.3*img[:,:,2] + 0.59*img[:,:,1] + 0.11*img[:,:,0]
-  gray_img[:,:,1] = gray_img[:,:,0]
-  gray_img[:,:,2] = gray_img[:,:,0]
-
-  return gray_img
+  return gray_img.astype(np.uint8)
 
 # Функция изменения разрешения изображения
 def resize(img, scale):
