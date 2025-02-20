@@ -1,68 +1,53 @@
-# Image Filters Implementation
+# Image Filtering Script
 
-Этот проект представляет собой набор фильтров для обработки изображений с использованием только базовых операций из библиотеки `Pillow`. 
+## Requirements
+- Python 3.10+
+- OpenCV (`cv2`)
+- NumPy
 
-## Описание фильтров
+## Installation
+1. Clone this repository or download the files.
+2. Install dependencies:
+   ```sh
+   pip install -r requirements.txt
+   ```
 
-### 1. **Градации серого (Grayscale)**
-Алгоритм преобразует изображение в оттенки серого, вычисляя среднее значение интенсивности цветов RGB для каждого пикселя:
-- **Формула:**  
-  `gray = (R + G + B) // 3`  
-  Все три цветовых компонента заменяются этим значением.  
+## Usage
+Run the script with the following options:
 
-Пример:
-- Исходный пиксель: `(120, 200, 150)`
-- Преобразованный пиксель: `(157, 157, 157)`
+```sh
+python main.py --image_path <path_to_image> --filter <filter_name> [options]
+```
 
----
+### Available Filters and Options
 
-### 2. **Сепия (Sepia)**
-Фильтр придает изображению теплый коричневатый оттенок, используя взвешенные суммы цветовых компонентов:
-- **Формулы:**  
-  `new_R = min(0.393*R + 0.769*G + 0.189*B, 255)`  
-  `new_G = min(0.349*R + 0.686*G + 0.168*B, 255)`  
-  `new_B = min(0.272*R + 0.534*G + 0.131*B, 255)`  
+#### Vignette Effect
+```sh
+python main.py --image_path imgs\test.jpg --filter vignette --radius 200 --intensity 1.0
+```
+- `--radius` (float): Radius of the vignette effect (default: 1.5)
+- `--intensity` (float): Intensity of the effect (default: 1.0)
 
-Пример:
-- Исходный пиксель: `(120, 200, 150)`
-- Преобразованный пиксель: `(217, 192, 150)`
+#### Pixelation
+```sh
+python main.py --image_path imgs\test.jpg --filter pixelate --pixel_size 10
+```
+- `--pixel_size` (int): Size of pixels for pixelation (default: 10)
+- Requires selecting a region manually with the mouse.
 
----
+#### Grayscale Conversion
+```sh
+python main.py --image_path imgs\test.jpg --filter grayscale
+```
 
-### 3. **Изменение разрешения (Resize)**
-Метод изменяет размеры изображения, вычисляя пиксели нового изображения путем пересчета координат:
-- Для каждого пикселя нового изображения определяются его координаты в исходном:
-  - `src_x = x * original_width / new_width`
-  - `src_y = y * original_height / new_height`  
-- Цвет нового пикселя копируется из соответствующего пикселя исходного изображения.
+#### Resizing
+```sh
+python main.py --image_path imgs\test.jpg --filter resize --resize_width 200 --resize_height 300
+```
+- `--resize_width` (int): New width
+- `--resize_height` (int): New height
 
----
-
-### 4. **Виньетка (Vignette)**
-Фильтр затемняет края изображения, уменьшая интенсивность пикселей по мере увеличения расстояния от центра:
-- Вычисляется расстояние пикселя от центра изображения:
-  - `distance = sqrt((x - center_x)^2 + (y - center_y)^2)`
-- Интенсивность уменьшается пропорционально расстоянию:
-  - `alpha = 1 - (distance / max_distance)`
-
-Пример:
-- Центральные пиксели остаются без изменений, а краевые затемняются.
-
----
-
-### 5. **Пикселизация области (Pixelate Area)**
-Фильтр делит указанную область изображения на блоки фиксированного размера и заменяет их на средний цвет:
-- Для каждого блока вычисляется среднее значение всех его пикселей.
-- Все пиксели блока заменяются на это среднее значение.
-
-Пример:
-- Область 10x10 пикселей заменяется на один цвет, усредненный по всем пикселям блока.
-
----
-
-## Использование
-1. Убедитесь, что у вас установлен Python и библиотека `Pillow`.
-2. Загрузите изображения в папку `imgs/`.
-3. Запустите скрипт:
-   ```bash
-   python filters.py
+#### Sepia Effect
+```sh
+python main.py --image_path imgs\test.jpg --filter sepia
+```
