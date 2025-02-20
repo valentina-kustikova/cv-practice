@@ -206,12 +206,17 @@ def main():
     net = load_model(args.model_cfg, args.model_weights)
     output_layers = get_output_layers(net)
 
+    input_path = args.input_path
+    output_path = args.output_path
+    if input_path is None:
+        print(f"Error: Input path is not specified")
+        return
+
     if args.mode == "image":
         # Загружаем изображение
-        image_path = "test_image_2.jpg"
-        image = cv2.imread(image_path)
+        image = cv2.imread(input_path)
         if image is None:
-            print(f"Error: Could not open or find the image '{image_path}'")
+            print(f"Error: Could not open or find the image '{input_path}'")
             return
 
         # Выполняем детектирование
@@ -224,17 +229,14 @@ def main():
         statistic(detections, classes)
 
         # Сохраняем изображение
-        output_image_path = "output_image.jpg"
-        cv2.imwrite(output_image_path, image_with_predictions)
-        print(f"Image saved to {output_image_path}")
+        cv2.imwrite(output_path, image_with_predictions)
+        print(f"Image saved to {output_path}")
 
     if args.mode == "video":
         # Задаем путь к видео
-        video_path = "test_video_2.mp4"
-        output_video_path = "output_video.mp4"
 
         # Обработка видео
-        process_video(video_path, output_video_path, net, output_layers, classes)
+        process_video(input_path, output_path, net, output_layers, classes)
 
 
 if __name__ == "__main__":

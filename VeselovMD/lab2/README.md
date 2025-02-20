@@ -79,3 +79,9 @@
 ### Выходные файлы
 - Обработанное изображение сохраняется как output_image.jpg.
 - Обработанное видео сохраняется как output_video.mp4.
+
+
+## Пример использования:
+```bash
+python main.py -i input.jpg -o output.jpg -f grayscale
+```
