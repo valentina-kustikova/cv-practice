@@ -1,29 +1,51 @@
-# Object Detection Using MobileNet
 
-## Описание
+# Object Detection using SSD MobileNet
 
-Этот проект реализует обнаружение объектов (автомобилей) на изображениях с использованием предварительно обученной модели MobileNet, доступной через OpenCV DNN. Программа загружает изображение, применяет модель для детекции объектов, отображает результат и сохраняет обработанное изображение в папку `result`.
+## Requirements
 
-## Алгоритм
+Make sure you have the following libraries installed:
+- OpenCV
+- NumPy
 
-1. **Загрузка модели**: Модель MobileNet загружается с использованием OpenCV DNN через файлы `deploy.prototxt` и `mobilenet_iter_73000.caffemodel`.
-2. **Предобработка изображения**: Изображение преобразуется в формат blob с помощью функции `cv2.dnn.blobFromImage()`, нормализуется и изменяется до размеров 300x300 пикселей.
-3. **Детекция объектов**: Программа выполняет инференс модели для обнаружения объектов на изображении. Детектируются объекты с уверенность более 20%.
-4. **Отображение и сохранение**: Детектированные объекты аннотируются на изображении (выделяются прямоугольниками) и результат сохраняется в папке `result` под новым именем.
+You can install the required libraries using pip:
+```bash
+pip install -r requirements.txt
+```
 
-## Модели
+## Model Files
 
-Используемая модель:
-- **MobileNet**: Предварительно обученная модель для детекции объектов, доступная в формате Caffe. Модель была обучена на большом наборе данных, включая автомобили (класс с индексом `7`).
+You will need the following model files for the object detection:
+- `mobilenet_iter_73000.caffemodel`: The trained weights for the SSD MobileNet model.
+- `deploy.prototxt`: The configuration file for the model.
 
-## Результат
+## Usage
 
-После выполнения программы изображение с аннотированными результатами (прямоугольниками вокруг обнаруженных автомобилей) отображается и сохраняется в директории `result`. Логгирование событий (например, успешная обработка) сохраняется в файл `object_detection.log`.
+### Command-Line Arguments
 
-## Структура файлов
+You can run the script from the command line with the following arguments:
 
-- `models/deploy.prototxt`: Конфигурационный файл модели MobileNet.
-- `models/mobilenet_iter_73000.caffemodel`: Веса предварительно обученной модели.
-- `test_images/image.png`: Пример изображения для обработки.
-- `result/`: Папка для сохранения изображений с детекцией.
-- `object_detection.log`: Лог файл, содержащий информацию о процессе выполнения программы.
+- `-i`, `--input`: Path to the input image or video (required).
+- `-c`, `--confidence`: Confidence threshold for object detection (default: 0.5).
+
+### Example Commands
+
+To process an image:
+```bash
+python main.py -i dataset\test\img.png  -c 0.5
+```
+
+To process a video:
+```bash
+python main.py -i dataset\test\video.mp4 -c 0.5
+```
+
+## How It Works
+1. **ObjectDetector Class**: Loads the model and processes images or video frames to detect objects.
+2. **ImageProcessor Class**: Handles loading and processing images, drawing bounding boxes around detected objects.
+3. **VideoProcessor Class**: Processes video frames in real-time, applying the object detection model frame by frame.
+4. **Main Function**: Parses command-line arguments and invokes the appropriate processing based on the input type (image or video).
+
+## Output
+
+The detected objects will be displayed with bounding boxes and labels. The counts of detected objects for each class will also be printed to the console.
+Press `k` to stop processing video.
