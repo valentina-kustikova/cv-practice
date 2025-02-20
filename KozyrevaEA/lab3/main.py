@@ -25,18 +25,27 @@ logging.basicConfig(
 
 
 class ImageLoader:
-    def __init__(self, img_size=(256, 256)):
-        self.img_size = img_size
+    """Класс для загрузки и предобработки изображений из указанной директории"""
 
-    def load_images(self, dataset_path):
-        images = []
-        labels = []
+    def __init__(self, img_size: tuple[int, int] = (256, 256)) -> None:
+        """Инициализация загрузчика изображений"""
+
+        self.img_size: tuple[int, int] = img_size
+
+
+    def load_images(self, dataset_path: str):
+        """Загружает изображения из указанной директории, преобразует их в градации серого и изменяет размер"""
+
+        images: list = []
+        labels: list[int] = []
+
         for img_name in os.listdir(dataset_path):
-            img_path = os.path.join(dataset_path, img_name)
+            img_path: str = os.path.join(dataset_path, img_name)
+
             if img_name.startswith("cat."):
-                label = 1
+                label: int = 1
             elif img_name.startswith("dog."):
-                label = 0
+                label: int = 0
             else:
                 logging.warning(f"Файл {img_name} не соответствует формату. Пропуск.")
                 continue
@@ -48,71 +57,106 @@ class ImageLoader:
                 labels.append(label)
             else:
                 logging.warning(f"Не удалось загрузить изображение: {img_path}")
+
         return np.array(images), np.array(labels)
 
 
 class FeatureExtractor:
-    def __init__(self, feature_type='sift'):
+    """Класс для извлечения ключевых точек и дескрипторов из изображений"""
+
+    def __init__(self, feature_type: str = 'sift') -> None:
+        """Инициализация экстрактора признаков"""
+
         if feature_type == 'sift':
-            self.extractor = cv2.SIFT_create()
+            self.extractor: cv2.SIFT = cv2.SIFT_create()
         elif feature_type == 'orb':
-            self.extractor = cv2.ORB_create()
+            self.extractor: cv2.ORB = cv2.ORB_create()
         else:
             raise ValueError("Unsupported feature type. Choose 'sift' or 'orb'.")
+    
 
-    def extract_features(self, images):
-        keypoints_list = []
-        descriptors_list = []
+    def extract_features(self, images: list[np.ndarray]):
+        """Извлекает ключевые точки и дескрипторы из списка изображений"""
+
+        keypoints_list: list = []  # список ключевых точек
+        descriptors_list: list = []  # список дескрипторов
+        
         for img in images:
             keypoints, descriptors = self.extractor.detectAndCompute(img, None)
             keypoints_list.append(keypoints)
-            if descriptors is not None:
-                descriptors_list.append(descriptors)
-            else:
-                descriptors_list.append(None)
+            descriptors_list.append(descriptors if descriptors is not None else None)
+        
         return keypoints_list, descriptors_list
 
 
 class KMeansTrainer:
-    def __init__(self, num_clusters):
-        self.num_clusters = num_clusters
+    """Класс для обучения модели KMeans и построения гистограмм признаков"""
+
+    def __init__(self, num_clusters: int) -> None:
+        """Инициализация KMeansTrainer"""
+
+        self.num_clusters: int = num_clusters
         self.kmeans = None
 
-    def train(self, descriptors_list):
+
+    def train(self, descriptors_list: list) -> None:
+        """Обучает модель KMeans на переданных дескрипторах"""
+
         logging.info("Обучение KMeans")
-        all_descriptors = np.vstack([desc for desc in descriptors_list if desc is not None])
+        valid_descriptors = [desc for desc in descriptors_list if desc is not None]
+        if not valid_descriptors:
+            raise ValueError("Нет доступных дескрипторов для обучения KMeans.")
+        
+        all_descriptors = np.vstack(valid_descriptors)
         self.kmeans = KMeans(n_clusters=self.num_clusters, random_state=42)
         self.kmeans.fit(all_descriptors)
 
-    def build_histogram(self, descriptors):
+
+    def build_histogram(self, descriptors) -> np.ndarray:
+        """Строит гистограмму признаков на основе обученной модели KMeans"""
+
+        if self.kmeans is None:
+            raise ValueError("Модель KMeans не обучена.")
+        
         histogram = np.zeros(self.num_clusters)
         if descriptors is not None:
             predictions = self.kmeans.predict(descriptors)
             for pred in predictions:
                 histogram[pred] += 1
+        
         return histogram
 
-
 class Classifier:
-    def __init__(self, classifier_type='svm'):
-        self.scaler = StandardScaler()
+    """Класс для обучения и предсказания с использованием различных моделей классификации."""
+
+    def __init__(self, classifier_type = 'svm') -> None:
+        """Инициализация классификатора"""
+
+        self.scaler: StandardScaler = StandardScaler()
+        self.model = None
+
         if classifier_type == 'svm':
-            self.model = SVC(kernel='rbf', C= 1, random_state=42)
+            self.model = SVC(kernel='rbf', C=1, random_state=42)
         elif classifier_type == 'random_forest':
             self.model = RandomForestClassifier(n_estimators=200, random_state=42)
         elif classifier_type == 'log_reg':
-            self.model = LogisticRegression(max_iter= 100, C = 1, random_state=42)
+            self.model = LogisticRegression(max_iter=100, C=1, random_state=42)
         else:
-            raise ValueError("Unsupported classifier type. Choose 'svm', 'random_forest', or 'logistic_regression'.")
+            raise ValueError("Unsupported classifier type. Choose 'svm', 'random_forest', or 'log_reg'.")
 
-    def train(self, X_train, y_train):
+
+    def train(self, X_train: np.ndarray, y_train: np.ndarray) -> None:
+        """Обучает модель классификации"""
+
         X_train_scaled = self.scaler.fit_transform(X_train)
         self.model.fit(X_train_scaled, y_train)
 
-    def predict(self, X_test):
+
+    def predict(self, X_test: np.ndarray) -> np.ndarray:
+        """Выполняет предсказание классов"""
+
         X_test_scaled = self.scaler.transform(X_test)
         return self.model.predict(X_test_scaled)
-
 
 class Visualizer:
     @staticmethod
@@ -219,7 +263,6 @@ def evaluate_classifier(y_true, y_pred, classifier_name):
     print(f"Precision (weighted avg): {precision:.4f}")
     print(f"Recall (weighted avg): {recall:.4f}")
     print(f"F1-score (weighted avg): {f1_score:.4f}")
-
 
 
 def main():
