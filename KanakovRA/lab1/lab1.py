@@ -4,9 +4,9 @@ import argparse
 
 
 # Организация работы с аргументами командной строки
-def parse():
+def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--imagePath', type = str)
+    parser.add_argument('-i', '--image_path', type = str)
     parser.add_argument('-f', '--filter', type = str,
                         choices = ['grayscale', 'resize', 'sepia',
                                    'vignette', 'pixelate'])
@@ -27,7 +27,7 @@ def picToScreen(name: str,
 
 
 # Определение фильтра grayscale
-def grayscale(image: np.ndarray) -> None:
+def grayscale(image: np.ndarray) -> np.ndarray:
     # Проверка корректности изображения
     if image.shape[2] != 3:
         raise RuntimeError("Image must have 3 channels or it was opened with an error.")
@@ -36,17 +36,14 @@ def grayscale(image: np.ndarray) -> None:
     B, G, R = cv2.split(image)
 
     # Вычисляем фильтр
-    greyImage = (R * 0.2989 + G * 0.5870 + B * 0.1140).astype(np.uint8)
-
-    # Собираем все вместе
-    greyImage = cv2.merge([greyImage, greyImage, greyImage])
-
-    picToScreen('Grey image', greyImage)
+    grayImage = (R * 0.2989 + G * 0.5870 + B * 0.1140).astype(np.uint8)
+    
+    return grayImage
 
 
 # Определение функции, изменяющей размер изображения
 def resize(image: np.ndarray,
-           value: float) -> None:
+           value: float) -> np.ndarray:
     # Проверка корректности значения value
     if value < 0:
         raise RuntimeError('Value must be greater than zero')
@@ -64,12 +61,11 @@ def resize(image: np.ndarray,
 
     # Делаем из y вектор-столбец и собираем итоговую матрицу
     resizedImage = image[y[:, None], x]
-
-    picToScreen('Resized image', resizedImage)
+    return resizedImage
 
 
 # Определение функции, дающей изображению фотоэффект сепии
-def sepia(image: np.ndarray) -> None:
+def sepia(image: np.ndarray) -> np.ndarray:
     # Проверка корректности изображения
     if image.shape[2] != 3:
         raise RuntimeError("Image must have 3 channels or it was opened with an error.")
@@ -84,13 +80,12 @@ def sepia(image: np.ndarray) -> None:
 
     # Собираем все вместе
     sepiaImage = cv2.merge([newB, newG, newR])
-
-    picToScreen('Sepia image', sepiaImage)
+    return sepiaImage
 
 
 # Определение функции, дающей изображению фотоэффект виньетки
 def vignette(image: np.ndarray,
-             radius: float) -> None:
+             radius: float) -> np.ndarray:
     # Проверка корректности радиуса
     if radius <= 0:
         raise RuntimeError("Radius must be greater then zero.")
@@ -120,8 +115,7 @@ def vignette(image: np.ndarray,
     R = (R * mask).astype(np.uint8)
 
     vignetteImage = cv2.merge([B, G, R])
-
-    picToScreen('Vignette image', vignetteImage)
+    return vignetteImage
 
 
 # Переменные, которые нужно определить глобально для корректной работы функции пикселизации
@@ -130,8 +124,8 @@ drawing = False
 
 
 # Определение пикселизации заданной прямоугольной области изображения
-def pixelFilter(image: np.ndarray,
-                 size: int) -> None:
+def pixel_filter(image: np.ndarray,
+                 size: int) -> np.ndarray:
     global x1, y1, x2, y2
 
     # Если x1 == y1 == x2 == y2 == -1, то это означает, что пользователь не выбрал область и
@@ -159,8 +153,7 @@ def pixelFilter(image: np.ndarray,
             block[startY:endY, startX:endX] = (block[startY:endY, startX:endX].mean(axis = (0, 1))).astype(int)
 
     image[y1:y2, x1:x2] = block
-
-    picToScreen('Pixelated image', image)
+    return image
 
 
 # Функция, отвечающая за обработку события мыши для рисования прямоугольника и пикселизации выбранной области
@@ -184,7 +177,7 @@ def draw(event: int,
 
 # Сама функция пикселизации
 def pixelImage(image: np.ndarray,
-                size: int) -> None:
+                size: int) -> np.ndarray:
     # Проверка корректности размера блока
     if size <= 0:
         raise RuntimeError("Block size must be greater then zero.")
@@ -195,39 +188,44 @@ def pixelImage(image: np.ndarray,
     cv2.setMouseCallback('Image without pixelation', draw)
 
     while True:
-        imageCopy = image.copy()
+        img_copy = image.copy()
 
         # Отображение выбранной прямоугольной области на экран
         if x1 != -1 and y1 != -1 and x2 != -1 and y2 != -1:
-            cv2.rectangle(imageCopy, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.rectangle(img_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-        cv2.imshow('Image without pixelation', imageCopy)
+        cv2.imshow('Image without pixelation', img_copy)
 
         # Если нажата нужная кнопка (p), то появляется пикселизированное изображение
         key = cv2.waitKey(1)
         if key == ord('p'):
             cv2.destroyWindow('Image without pixelation')
-            pixelFilter(image, size)
             break
+    return pixel_filter(image, size)
 
 
 def main():
-    args = parse()
-    imagePath = args.imagePath
-    image = cv2.imread(imagePath)
+    args = parse_args()
+    image_path = args.image_path
+    image = cv2.imread(image_path)
 
     picToScreen('Original image', image)
 
     if args.filter == 'grayscale':
-        grayscale(image)
+        grayImage = grayscale(image)
+        picToScreen('Gray image', grayImage)
     elif args.filter == 'resize':
-        resize(image, args.resizeValue)
+        resizedImage = resize(image, args.resizeValue)
+        picToScreen('Resized image', resizedImage)
     elif args.filter == 'sepia':
-        sepia(image)
+        sepiaImage = sepia(image)
+        picToScreen('Sepia image', sepiaImage)
     elif args.filter == 'vignette':
-        vignette(image, args.vignetteRadius)
+        vignetteImage = vignette(image, args.vignetteRadius)
+        picToScreen('Vignette image', vignetteImage)
     elif args.filter == 'pixelate':
-        pixelImage(image, args.pixelationBlockSize)
+        pixelatedImage = pixelImage(image, args.pixelationBlockSize)
+        picToScreen('Pixelated image', pixelatedImage)
 
 
 if __name__ == '__main__':
