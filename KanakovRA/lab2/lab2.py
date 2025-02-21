@@ -7,19 +7,20 @@ import argparse
 def parse():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--imagePath', type = str)
+    parser.add_argument('-v', '--videoPath', type = str)
     parser.add_argument('-c', '--confidence', type = float, default = 0.5)
     parser.add_argument('-n', '--nms', type = float, default = 0.4)
     return parser.parse_args()
 
 
 # Загрузка предобученной модели YOLOv3
-def initializeModel() -> list:
+def initializeModel():
     modelCfg, modelWeights, classNames = "yolov3.cfg", "yolov3.weights", "coco.names"
 
     # Загрузка модели в OpenCV
     net = cv2.dnn.readNet(modelWeights, modelCfg)
 
-    # Получение имен всех слоев нейронной сети
+    # Получение имен всех выходных слоев нейронной сети
     layerNames = net.getLayerNames()
 
     # Получение названия несоединенных выходных слоев
@@ -132,6 +133,36 @@ def detect(image: np.ndarray, confidence: float, nms: float) -> np.ndarray:
     return image
 
 
+def detectVideo(videoPath: str, confidence: float, nms: float) -> None:
+    cap = cv2.VideoCapture(videoPath)
+
+    if not cap.isOpened():
+        raise RuntimeError("Can't open video")
+    
+    counter = 0
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        counter += 1
+
+        if counter % 10 == 0:
+            frame = detect(frame, confidence, nms)
+
+            cv2.imshow("Video frame", frame)
+
+            key = cv2.waitKey(0)
+            if key == ord('v'): # Переход к следующему кадру
+                continue
+            elif key == ord('q'): # Досрочное завершение
+                break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+
 def main():
     args = parse()
 
@@ -147,6 +178,10 @@ def main():
             cv2.destroyAllWindows()
     else:
         print("Use -i flag to provide image path.")
+    if args.videoPath:
+        detectVideo(args.videoPath, args.confidence, args.nms)
+    else:
+        print("Use -v flag to provide video path.")
 
 
 if __name__ == "__main__":
