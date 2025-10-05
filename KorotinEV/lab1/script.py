@@ -96,28 +96,29 @@ def add_simple_frame(image, frame_width=None, B=0, G=0, R=0):
 
     return frame_image
 
-def add_figure_frame(image, frame_number=0):
+
+def add_figure_frame(image, frame_number=0, threshold = 30.0):
+    frame = cv2.imread("src/frame" + str(frame_number) + ".jpg")
+    if frame is None:
+        print(f"Ошибка: не удалось загрузить рамку {frame_path}")
+        return image
+    
     h, w = image.shape[:2]
 
-    frame_color_list = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 255]]
-    frame_color = frame_color_list[frame_number]
-
-    try:
-        frame = cv2.imread("src\\frame" + str(frame_number) + ".jpg")
-        if frame is None:
-            print(f"Ошибка: не удалось загрузить изображение frame{frame_number}.jpg")
-            return image
-    except Exception as e:
-        print(f"Ошибка при загрузке изображения: {e}")
-        return
-
     if frame.shape != image.shape:
-        frame = resize_image(frame, width=w, height=h).astype(np.float32)
+    	frame = resize_image(frame, width=w, height=h)
 
-    frame = frame + image
-    frame -= np.clip(frame, 0, 255)
+    background_color_array = np.array([[255, 255, 255], [255, 255, 255], [255, 255, 255], [245, 245, 245], [255, 255, 255]])
+    background_color = background_color_array[frame_number]
+
+    color_diff = np.sqrt(np.sum((frame.astype(np.float32) - background_color.astype(np.float32)) ** 2, axis=2))
+    frame_mask = (color_diff > threshold).astype(np.uint8)
+    frame_mask = frame_mask[:,:,np.newaxis]
     
-    return np.clip(frame, 0, 255).astype(np.uint8)
+    frame = image * (1 - frame_mask) + frame * frame_mask
+    
+    return frame
+
 
 def add_glare(image, strength=0.5, scale=0.5, center=None):
     glared_image = image.astype(np.float32)
@@ -301,8 +302,9 @@ def parser():
     frame.add_argument('--g', type=int, default=0, help='Зелёный цвет')
     frame.add_argument('--b', type=int, default=0, help='Синий цвет')
 
-    figure_frame = subparsers.add_parser('figure_frame', help='Наложение выбранной фигурной рамки')
+    figure_frame = subparsers.add_parser('figure_frame', help='Наложение рамки на изображение')
     figure_frame.add_argument('--number', type=int, default=0, help='Номер фигурной рамки')
+    figure_frame.add_argument('--threshold', type=float, default=30.0, help='Критическое рассточние цветового различия')
 
     watercolor = subparsers.add_parser('watercolor', help='Наложение текстуры акварели')
     watercolor.add_argument('--intensity', type=float, default=1.0, help='Интенсивность текстуры')
@@ -382,7 +384,8 @@ def main():
         filtered_image = apply_filter(
         original_image, 
         add_figure_frame,
-        frame_number=args.number
+        frame_number=args.number,
+        threshold=args.threshold
         )
     elif args.filter_type == 'watercolor':
         filtered_image = apply_filter(
@@ -399,9 +402,6 @@ def main():
             args.center_y=None
         if args.center_x is not None and args.center_y is not None:
             center = (args.center_x, args.center_y)
-        if args.strength < 0.0 or args.strength > 1.0:
-            print ("Выход за границы параметра, strength должен лежать внутри [0.0, 1.0]")
-            return
         filtered_image = apply_filter(
         original_image, 
         add_glare,
@@ -417,7 +417,7 @@ def main():
         region_height=args.height, 
         pixel_size=args.size
         )
-        
+
     display_images(original_image, filtered_image, "Original Image", "Filtered Image")
     
     save_path = "filtered_" + os.path.basename(args.image_path)
