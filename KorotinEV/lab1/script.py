@@ -114,16 +114,6 @@ def add_figure_frame(image, frame_number=0):
     if frame.shape != image.shape:
         frame = resize_image(frame, width=w, height=h).astype(np.float32)
 
-    #color_code_matrix = frame_resized @ np.array([255**2, 255, 1])
-    #color_code_matrix -= frame_color_code[frame_number]
-    #color_code_matrix = color_code_matrix // color_code_diff[frame_number]
-    #color_code_matrix = color_code_matrix[:, :, np.newaxis]
-
-    #frame_resized *= (1 - color_code_matrix)
-    #frame_resized += image * color_code_matrix
-
-    #frame -= frame_color
-
     frame = frame + image
     frame -= np.clip(frame, 0, 255)
     
@@ -292,10 +282,9 @@ def parser():
     subparsers = parser.add_subparsers(dest='filter_type', help='Тип фильтра', required=True)
 
     resize_parser = subparsers.add_parser('resize', help='Изменение размера')
-    resize = resize_parser.add_mutually_exclusive_group(required=True)
-    resize.add_argument('--width', type=int, help='Новая ширина')
-    resize.add_argument('--height', type=int, help='Новая высота')
-    resize.add_argument('--scale', type=float, help='Коэффициент масштабирования')
+    resize_parser.add_argument('--width', type=int, help='Новая ширина')
+    resize_parser.add_argument('--height', type=int, help='Новая высота')
+    resize_parser.add_argument('--scale', type=float, help='Коэффициент масштабирования')
 
     sepia = subparsers.add_parser('sepia', help='Применеие фотоэффекта сепии')
     sepia.add_argument('--intensity', type=float, default=1.0, help='Интенсивность применения сепии')
@@ -385,9 +374,9 @@ def main():
         original_image, 
         add_simple_frame,
         frame_width=args.width,
-        B=args.B,
-        G=args.G,
-        R=args.R
+        B=args.b,
+        G=args.g,
+        R=args.r
         )
     elif args.filter_type == 'figure_frame':
         filtered_image = apply_filter(
@@ -429,8 +418,7 @@ def main():
         pixel_size=args.size
         )
         
-    
-    display_images(original_image, filtered_image, "Original Image", "Resized Image")
+    display_images(original_image, filtered_image, "Original Image", "Filtered Image")
     
     save_path = "filtered_" + os.path.basename(args.image_path)
     cv2.imwrite(save_path, filtered_image)
