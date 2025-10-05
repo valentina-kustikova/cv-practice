@@ -78,7 +78,7 @@ def pixelize(img, oblast, k):
     return res
 
 def rect_frame(img, thickness,color):
-    new_h,new_w, = img.shape[0]+2*thickness,img.shape[1]+2*thickness
+    new_h,new_w = img.shape[0]+2*thickness,img.shape[1]+2*thickness
     res = np.full((new_h, new_w, 3), color, dtype=np.uint8)
     res[thickness:thickness+img.shape[0],thickness:thickness+img.shape[1],:] = img
     return res
@@ -134,8 +134,7 @@ def frame(img, frame, thickness=100):
 def bliki(img, texture,k):
     h,w,_ = img.shape
     scaled_texture = resize_image(texture,h,w)
-    cropped_texture = scaled_texture[:h,:w]
-    res = np.clip((img + k*cropped_texture),0,255).astype(np.uint8)
+    res = np.clip((img + k*scaled_texture),0,255).astype(np.uint8)
     return res
 
 def watercolor(img, texture, k):
