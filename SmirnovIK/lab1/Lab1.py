@@ -2,8 +2,6 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
-import sys
-
 
 def resize_image(img, new_h=None,new_w=None,scale=None):
     if scale:
@@ -232,6 +230,4 @@ def main():
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-
-if __name__ == '__main__':
-    sys.exit(main() or 0)
+main()
