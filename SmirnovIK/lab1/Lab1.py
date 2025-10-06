@@ -105,28 +105,35 @@ def frame(img, frame, thickness=100):
 
     result = np.copy(img)
 
-    mask = cv2.cvtColor(corner_tl,cv2.COLOR_BGR2GRAY)>20
+    def rgb2gray(img):
+        B = img[:,:,0].astype(np.float32)
+        G = img[:,:,1].astype(np.float32)
+        R = img[:,:,2].astype(np.float32)
+        gray = 0.144*B + 0.587G + 0.299*R
+        return gray.astype(np.uint8)
+    
+    mask = rgb2gray(corner_tl)>20
     result[:thickness, :thickness][mask] = corner_tl[mask]
-
-    mask = cv2.cvtColor(corner_tr,cv2.COLOR_BGR2GRAY)>20
+    
+    mask = rgb2gray(corner_tr)>20
     result[:thickness, -thickness:][mask] = corner_tr[mask]
-
-    mask = cv2.cvtColor(corner_bl,cv2.COLOR_BGR2GRAY)>20
+    
+    mask = rgb2gray(corner_bl)>20
     result[-thickness:, :thickness][mask] = corner_bl[mask]
-
-    mask = cv2.cvtColor(corner_br,cv2.COLOR_BGR2GRAY)>20
+    
+    mask = rgb2gray(corner_br)>20
     result[-thickness:, -thickness:][mask] = corner_br[mask]
-
-    mask = cv2.cvtColor(top_resized,cv2.COLOR_BGR2GRAY)>20
+    
+    mask = rgb2gray(top_resized)>20
     result[:thickness, thickness:-thickness][mask] = top_resized[mask]
-
-    mask = cv2.cvtColor(bottom_resized,cv2.COLOR_BGR2GRAY)>20
+    
+    mask = rgb2gray(bottom_resized)>20
     result[-thickness:, thickness:-thickness][mask] = bottom_resized[mask]
-
-    mask = cv2.cvtColor(left_resized,cv2.COLOR_BGR2GRAY)>20
+    
+    mask = rgb2gray(left_resized)>20
     result[thickness:-thickness, :thickness][mask] = left_resized[mask]
-
-    mask = cv2.cvtColor(right_resized,cv2.COLOR_BGR2GRAY)>20
+    
+    mask = rgb2gray(right_resized)>20
     result[thickness:-thickness, -thickness:][mask] = right_resized[mask]
 
     return result
