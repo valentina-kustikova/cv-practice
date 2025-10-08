@@ -3,30 +3,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 import argparse
 
-def resize_image(img, new_h=None,new_w=None,scale=None):
-    if scale:
-        if scale==1:
-            return img
-        if scale!=1:
-            h,w,c = img.shape
-            res = np.zeros((int(h*scale),int(w*scale),c),dtype = np.uint8)
-            H,W,_ = res.shape
-            y = (np.arange(H)/scale).astype(np.uint32)
-            x = (np.arange(W)/scale).astype(np.uint32)
-            x_neigh_index,y_neigh_index = np.meshgrid(x,y)
-            res = img[y_neigh_index,x_neigh_index]
-            return res
-    else:
-        h,w,c = img.shape
-        res = np.zeros((new_h,new_w,c),dtype = np.uint8)
-        scale_h = new_h/h
-        scale_w = new_w/w
-        H,W,_ = res.shape
-        y = (np.arange(H)/scale_h).astype(np.uint32)
-        x = (np.arange(W)/scale_w).astype(np.uint32)
-        x_neigh_index,y_neigh_index = np.meshgrid(x,y)
-        res = img[y_neigh_index,x_neigh_index]
-        return res
+def resize_image(img, new_h=None, new_w=None, scale=None):
+    h, w, c = img.shape
+    
+    if scale is not None:
+        if scale == 1:
+            return img.copy()
+        new_h = int(h * scale)
+        new_w = int(w * scale)
+    
+    scale_h = h / new_h
+    scale_w = w / new_w
+
+    y = (np.arange(new_h) * scale_h).astype(np.int32)
+    x = (np.arange(new_w) * scale_w).astype(np.int32)
+    x_neigh_index, y_neigh_index = np.meshgrid(x, y)
+
+    res = img[y_neigh_index, x_neigh_index]
+    return res
     
 
 def sepia(img, k):
@@ -176,7 +170,8 @@ def main():
     
 
     if args.func == 'resize':
-        result = resize_image(img, scale = args.scale if args.scale is not None else 0.5)
+        new_h, new_w = args.new_size or (1,1)
+        result = resize_image(img, new_h, new_w, args.scale)
 
     elif args.func == 'sepia':
         result = sepia(img, args.k or 30)
