@@ -1,22 +1,29 @@
 import numpy as np
 
+
 # Изменение разрешения изображения
 def resize_image(img, scale=0.5):
     h, w = img.shape[:2]
     new_h, new_w = int(h * scale), int(w * scale)
+
+    # Интерполяция по ближайшему соседу
+    # h=100, new_h=50, то y_idx = [0, 2, 4, 6, ..., 98]
     y_idx = (np.linspace(0, h - 1, new_h)).astype(int)
     x_idx = (np.linspace(0, w - 1, new_w)).astype(int)
+
     resized = img[y_idx][:, x_idx]
+
     return resized
 
 
 # Сепия
 def apply_sepia(img):
+    # BGR матрица
     sepia_filter = np.array([[0.272, 0.534, 0.131],
                              [0.349, 0.686, 0.168],
                              [0.393, 0.769, 0.189]])
     sepia_img = img @ sepia_filter.T
-    sepia_img = np.clip(sepia_img, 0, 255).astype(np.uint8)
+    sepia_img = np.clip(sepia_img, 0, 255).astype(np.uint8)  # 0-255
     return sepia_img
 
 
@@ -25,17 +32,17 @@ def apply_vignette(img, strength=0.5):
     rows, cols = img.shape[:2]
     x = np.linspace(-1, 1, cols)
     y = np.linspace(-1, 1, rows)
-    X, Y = np.meshgrid(x, y)
+    X, Y = np.meshgrid(x, y)  # Двумерные сетки координат, X Y координат пикселей
     radius = np.sqrt(X ** 2 + Y ** 2)
     mask = np.exp(-radius ** 2 / (2 * strength ** 2))
-    vignette = img * mask[..., np.newaxis]
+    vignette = img * mask[..., np.newaxis]  # Добавляет новую размерность
     return np.clip(vignette, 0, 255).astype(np.uint8)
 
 
 # Пикселизация области
 def pixelate_region(img, x1, y1, x2, y2, pixel_size=10):
     img_copy = img.copy()
-    region = img_copy[y1:y2, x1:x2]
+    region = img_copy[y1:y2, x1:x2]  # Вырезка
     h, w = region.shape[:2]
     for y in range(0, h, pixel_size):
         for x in range(0, w, pixel_size):
@@ -62,6 +69,7 @@ def add_figure_frame(img, color=(0, 255, 0), thickness=20, frame_type='wave'):
     mask = np.zeros((h, w), dtype=np.uint8)
     x = np.arange(w)
     if frame_type == 'wave':
+        # x / 20 длина волны, 10 высота
         y = (np.sin(x / 20) * 10 + thickness).astype(np.int32)
         for i in range(w):
             mask[:y[i], i] = 1
@@ -83,7 +91,9 @@ def add_lens_flare(img, center=None, intensity=0.7):
     if center is None:
         center = (w // 2, h // 2)
     Y, X = np.ogrid[:h, :w]
+    # Расстояние пикселя от блика
     dist = np.sqrt((X - center[0]) ** 2 + (Y - center[1]) ** 2)
+    # Гауссовская функция спадающая от центра, 0.5 * w радиус свечения
     flare = np.exp(-(dist / (0.5 * w)) ** 2)
     flare = flare[..., np.newaxis]
     flare_color = np.array([1.0, 0.8, 0.6])
@@ -94,12 +104,13 @@ def add_lens_flare(img, center=None, intensity=0.7):
 
 # Текстура акварельной бумаги
 def add_paper_texture(img, scale=5, intensity=0.2):
+    # Генерация шумов по норм распределению
     noise = np.random.normal(0.5, 0.2, img.shape[:2])
     noise = np.clip(noise, 0, 1)
 
     # Простое размытие усреднением
     kernel_size = max(1, scale)
-    pad = kernel_size // 2
+    pad = kernel_size // 2  # Отступы по краям
     padded = np.pad(noise, pad, mode='reflect')
     smoothed = np.zeros_like(noise)
     for y in range(noise.shape[0]):

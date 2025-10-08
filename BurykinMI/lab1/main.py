@@ -2,13 +2,15 @@ import cv2
 import argparse
 from filters import *
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="Применение фильтров к изображению"
     )
 
     parser.add_argument("image", help="Путь к изображению для обработки")
-    parser.add_argument("filter", help="Тип фильтра (resize, sepia, vignette, pixelate, frame, figframe, flare, texture)")
+    parser.add_argument("filter",
+                        help="Тип фильтра (resize, sepia, vignette, pixelate, frame, figframe, flare, texture)")
     parser.add_argument("params", nargs="*", help="Дополнительные параметры фильтра (опционально)")
 
     args = parser.parse_args()
@@ -65,11 +67,12 @@ def main():
         print("Ошибка: неизвестный тип фильтра.")
         return
 
-    # --- Отображение изображений ---
+    # Отображение изображений
     cv2.imshow("Original", img)
     cv2.imshow("Result", result)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()
