@@ -76,7 +76,12 @@ def rect_frame(img, thickness,color):
     res = np.full((new_h, new_w, 3), color, dtype=np.uint8)
     res[thickness:thickness+img.shape[0],thickness:thickness+img.shape[1],:] = img
     return res
-
+def rgb2gray(img):
+    B = img[:,:,0].astype(np.float32)
+    G = img[:,:,1].astype(np.float32)
+    R = img[:,:,2].astype(np.float32)
+    gray = 0.144*B + 0.587*G + 0.299*R
+    return gray.astype(np.uint8)
 def frame(img, frame, thickness=100):
 
     h, w, _ = img.shape
@@ -98,13 +103,6 @@ def frame(img, frame, thickness=100):
     right_resized = resize_image(right, h-2*thickness,thickness)
 
     result = np.copy(img)
-
-    def rgb2gray(img):
-        B = img[:,:,0].astype(np.float32)
-        G = img[:,:,1].astype(np.float32)
-        R = img[:,:,2].astype(np.float32)
-        gray = 0.144*B + 0.587*G + 0.299*R
-        return gray.astype(np.uint8)
     
     mask = rgb2gray(corner_tl)>20
     result[:thickness, :thickness][mask] = corner_tl[mask]
