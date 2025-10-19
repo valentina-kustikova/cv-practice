@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import math
 from tkinter import Tk, Button, Label, filedialog, simpledialog, Canvas
 from PIL import Image, ImageTk
 
@@ -12,40 +11,38 @@ def Print_Image(img):
     return 0
     
 def Change_Res(img, nx, ny):
-    result = np.zeros((ny,nx,3), np.uint8)
     h, w, c = img.shape
-    for x in range(nx):
-        for y in range(ny):
-            result[y][x] = img[y*h//ny][x*w//nx]
-        
-    return result
+
+    x_idx = (np.linspace(0, w - 1, nx)).astype(int)
+    y_idx = (np.linspace(0, h - 1, ny)).astype(int)
+
+    result = img[y_idx[:, None], x_idx[None, :], :]
+    return result.astype(np.uint8)
+
 
 def Sep(img):
-    h, w, c = img.shape
-    for x in range(w):
-        for y in range(h):
-            b, g, r = img[y][x]
-            r = min(r * 0.393 + g * 0.769 + b * 0.189, 255)
-            g = min(r * 0.349 + g * 0.686 + b * 0.168, 255)
-            b = min(r * 0.272 + g * 0.534 + b * 0.131, 255)
-            img[y][x] = b, g, r
-    return img
+    img = img.astype(np.float32)
+    r = img[:, :, 2]
+    g = img[:, :, 1]
+    b = img[:, :, 0]
+    tr = 0.393 * r + 0.769 * g + 0.189 * b
+    tg = 0.349 * r + 0.686 * g + 0.168 * b
+    tb = 0.272 * r + 0.534 * g + 0.131 * b
+    sepia = np.stack([tb, tg, tr], axis=2)
+    sepia = np.clip(sepia, 0, 255).astype(np.uint8)
+    return sepia
+
 
 def Vinyetka(img):
     h, w, c = img.shape
-    centr = (w//2, h//2)
-    diag = math.sqrt(math.pow(centr[0], 2) + math.pow(centr[1], 2))
-    for x in range(w):
-        for y in range(h):
-            dist = math.sqrt((math.pow(x - centr[0], 2) + math.pow(y - centr[1], 2)))
-            if dist > 0:
-                b, g, r = img[y][x]
-                coef = 1 - math.pow(dist/diag, 2)
-                r = r * coef
-                g = g * coef
-                b = b * coef
-                img[y][x] = b, g, r
-    return img
+    y, x = np.ogrid[:h, :w]
+    cx, cy = w / 2, h / 2
+    dist = np.sqrt((x - cx)**2 + (y - cy)**2)
+    diag = np.sqrt(cx**2 + cy**2)
+    coef = 1 - (dist / diag)**2
+    coef = np.clip(coef, 0, 1)
+    vinetka = img * coef[..., np.newaxis]
+    return vinetka.astype(np.uint8)
 
 def Take_Points(image):
     points = []
@@ -71,62 +68,63 @@ def Pixels(image, points):
     block_size = 20
     x_l, x_r = sorted([points[0][0], points[1][0]])
     y_l, y_r = sorted([points[0][1], points[1][1]])
-    
-    for x in range(x_l, x_r, block_size):
-        for y in range(y_l, y_r, block_size):
-            
-            x_border = min(x + block_size, x_r)
-            y_border = min(y + block_size, y_r)
-            
-            image_part = image[y:y_border, x:x_border]
-            
-            mean_color = image_part.mean(axis = (0,1), dtype = int)
-            
-            image[y:y_border, x:x_border] = mean_color
-    return(image)
+
+    img_copy = image.copy()
+    region = img_copy[y_l:y_r, x_l:x_r]
+
+    ry, rx, _ = region.shape
+
+    ny = ry // block_size
+    nx = rx // block_size
+    trimmed = region[:ny * block_size, :nx * block_size]
+
+
+    small = trimmed.reshape(ny, block_size, nx, block_size, 3).mean(axis=(1, 3), dtype=int)
+    pixelated = np.repeat(np.repeat(small, block_size, axis=0), block_size, axis=1)
+
+    img_copy[y_l:y_l + pixelated.shape[0], x_l:x_l + pixelated.shape[1]] = pixelated
+
+    return img_copy
+
 
 def Rec_Frame(image, thick):
     h, w, c = image.shape
-    image[0:h, 0:thick] = [120, 50, 200]
-    image[0:h, w-thick:w] = [120, 50, 200]
-    image[0:thick, 0:w] = [120, 50, 200]
-    image[h-thick:h, 0:w] = [120, 50, 200]
-    return image
+    img = image.copy()
+    color = np.array([120, 50, 200], dtype=np.uint8)
+    img[:, :thick] = color
+    img[:, w-thick:] = color
+    img[:thick, :] = color
+    img[h-thick:, :] = color
+    return img
+
 
 def Frames(image, n_frame):
     h, w, c = image.shape
     path_names = ["Frame1.png", "Frame2.png", "Frame3.png"]
     frame = cv2.imread(path_names[n_frame])
-    
     frame = Change_Res(frame, w, h)
     
-    for x in range(w):
-        for y in range(h):
-            if(not np.all(frame[y][x]==[255,255,255])):
-                image[y][x] = frame[y][x]
-    
+    mask = ~(frame == [255, 255, 255]).all(axis=2)
+    image[mask] = frame[mask]
     return image
-    
+
+
 def Camera_Light(image):
     h, w, c = image.shape
     light = cv2.imread("blind.png")
-    light = Change_Res(light, w//2, h//2)
-    
-    for x in range(w//2):
-        for y in range(h//2):
-            if(not np.all(light[y][x]==[255,255,255])):
-                image[y][x] = (0.8 * light[y][x] + 0.2 * image[y][x]).astype(np.uint8)
+    light = Change_Res(light, w // 2, h // 2)
+    mask = ~(light == [255, 255, 255]).all(axis=2)
+    overlay = (0.8 * light + 0.2 * image[:h//2, :w//2]).astype(np.uint8)
+    image[:h//2, :w//2][mask] = overlay[mask]
     return image
+
 
 def Aqua_Paper(image):
     h, w, c = image.shape
     aqua = cv2.imread("aqua.png")
     aqua = Change_Res(aqua, w, h)
-    
-    for x in range(w):
-        for y in range(h):
-            image[y][x] = (0.3 * aqua[y][x] + 0.7 * image[y][x]).astype(np.uint8)
-    return image
+    result = (0.3 * aqua + 0.7 * image).astype(np.uint8)
+    return result
 
 ##########################Графический интерфейс##############################################
 
