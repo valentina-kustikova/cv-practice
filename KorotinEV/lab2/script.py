@@ -8,11 +8,9 @@ from sklearn.cluster import KMeans
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report, recall_score
 from sklearn.preprocessing import StandardScaler
-import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras import layers, models
-from tensorflow.keras.applications import VGG16, ResNet50
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import VGG16
 from tensorflow.keras.optimizers import Adam
 
 class LandmarkClassifier:
@@ -28,7 +26,6 @@ class LandmarkClassifier:
         
         self.class_names = ['Архангельский собор', 'Дворец труда', 'Нижегородский Кремль']
         self.label_to_id = {name: i for i, name in enumerate(self.class_names)}
-        self.id_to_label = {i: name for i, name in enumerate(self.class_names)}
         
     def extract_features(self, image_path):
         image = cv2.imread(image_path)
@@ -342,7 +339,7 @@ class LandmarkClassifier:
 
 def main():
     parser = argparse.ArgumentParser(description='Классификация достопримечательностей Нижнего Новгорода')
-    parser.add_argument('--data_dir', type=str, default='.', help='Путь к директории с изображениями')
+    parser.add_argument('--data_dir', type=str, default='./NNClassification', help='Путь к директории с изображениями')
     parser.add_argument('--train_file', type=str, default='train_test_split/train.txt', help='Путь к файлу train.txt')
     parser.add_argument('--test_file', type=str, default='train_test_split/test.txt', help='Путь к файлу test.txt')
     parser.add_argument('--algorithm', type=str, choices=['bow', 'cnn'], default='bow',
