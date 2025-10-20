@@ -32,6 +32,11 @@ def create_filter(filter_type, image, **kwargs):
             h=kwargs.get('h'),
             block=kwargs.get('block'),
         )
+    elif filter_type == 'pixelate_interactive':
+        return _roi_pixelate(
+            image,
+            block=kwargs.get('block'),
+        )
     elif filter_type == 'simple_border':
         return _add_simple_border(
             image,
@@ -165,6 +170,18 @@ def _pixelate_region(image, x, y, w, h, block):
 
     out[y0:y1, x0:x1] = pixelated
     return out
+
+
+def _roi_pixelate(image, block=16):
+    win_title = "Выдели область (Enter — применить, Esc — отменить)"
+    roi = cv2.selectROI(win_title, image, showCrosshair=True, fromCenter=False)
+    cv2.destroyWindow(win_title)
+
+    x, y, w, h = map(int, roi)
+    if w <= 0 or h <= 0:
+        return image.copy()
+
+    return _pixelate_region(image, x, y, w, h, block=int(block))
 
 
 def _add_simple_border(image, border, color=(0, 0, 0)):

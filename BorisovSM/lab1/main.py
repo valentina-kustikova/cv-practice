@@ -16,7 +16,7 @@ def cli_argument_parser():
         '-f', '--filter',
         type=str,
         required=True,
-        choices=['resize', 'sepia', 'vignette', 'pixelate', 'simple_border', 'border', 'flare', 'paper'],
+        choices=['resize', 'sepia', 'vignette', 'pixelate', 'pixelate_interactive', 'simple_border', 'border', 'flare', 'paper'],
         help='Тype of filter'
     )
 
