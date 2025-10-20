@@ -72,7 +72,7 @@ class LandmarkClassifier:
  
         train_features = []
         for descriptors in all_descriptors:
-            histogram = self.image_to_histogram(descriptors)
+            histogram = self.descr_to_histogram(descriptors)
             train_features.append(histogram)
         
         train_features = np.array(train_features)     
@@ -92,7 +92,7 @@ class LandmarkClassifier:
         test_features = []
         
         for path in test_paths:
-            histogram = self.image_to_histogram(self.extract_features(path))
+            histogram = self.descr_to_histogram(self.extract_features(path))
             test_features.append(histogram)
         
         test_features = np.array(test_features)
