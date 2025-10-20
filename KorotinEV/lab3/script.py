@@ -333,7 +333,6 @@ class CNNClassifier(BaseClassifier):
         self.model = tf.keras.models.load_model(os.path.join(model_dir, 'cnn_model.h5'))
         return True
 
-
 def create_classifier(algorithm, **kwargs):
     if algorithm == 'bow':
         return BOWClassifier(
@@ -395,7 +394,7 @@ def main():
     }
     
     classifier = create_classifier(args.algorithm, **classifier_kwargs)
-    
+
     print(f"Режим работы: {args.mode}")
     print(f"Алгоритм: {args.algorithm}")
     print(f"Директория с данными: {args.data_dir}")
@@ -412,7 +411,7 @@ def main():
             if not os.path.exists(args.model_dir):
                 print(f"Ошибка: директория с моделью {args.model_dir} не существует!")
                 return
-            classifier.load_model(args.model_dir)
+            load_model(args.model_dir)
         
         test_accuracy = classifier.test(args.test_file, args.data_dir)
     
