@@ -37,12 +37,14 @@ def main():
         result = apply_vignette(img, strength)
 
     elif ftype == "pixelate":
-        if len(params) < 4:
-            print("Ошибка: для pixelate нужны параметры x1 y1 x2 y2 [pixel_size]")
-            return
-        x1, y1, x2, y2 = map(int, params[:4])
-        pixel_size = int(params[4]) if len(params) > 4 else 10
-        result = pixelate_region(img, x1, y1, x2, y2, pixel_size)
+        # Интерактивный выбор области мышью
+        pixel_size = int(params[0]) if params else 10
+        print("Выберите область для пикселизации:")
+        print("- Зажмите левую кнопку мыши и выделите область")
+        print("- Отпустите кнопку для применения эффекта")
+        print("- Нажмите 'q' или ESC для выхода")
+        selector = PixelateSelector(img, pixel_size)
+        result = selector.select_region()
 
     elif ftype == "frame":
         color = (0, 0, 255)
@@ -56,22 +58,33 @@ def main():
         result = add_figure_frame(img, color, thickness, frame_type)
 
     elif ftype == "flare":
-        result = add_lens_flare(img)
+        if not params:
+            print("Ошибка: для flare нужен путь к текстуре блика")
+            print("Использование: python main.py image.jpg flare flare_texture.jpg [intensity]")
+            return
+        texture_path = params[0]
+        intensity = float(params[1]) if len(params) > 1 else 0.7
+        result = add_lens_flare(img, texture_path, intensity)
 
     elif ftype == "texture":
-        scale = int(params[0]) if params else 11
-        intensity = float(params[1]) if len(params) > 1 else 0.2
-        result = add_paper_texture(img, scale, intensity)
+        if not params:
+            print("Ошибка: для texture нужен путь к текстуре бумаги")
+            print("Использование: python main.py image.jpg texture paper_texture.jpg [intensity]")
+            return
+        texture_path = params[0]
+        intensity = float(params[1]) if len(params) > 1 else 0.3
+        result = add_paper_texture(img, texture_path, intensity)
 
     else:
         print("Ошибка: неизвестный тип фильтра.")
         return
 
-    # Отображение изображений
-    cv2.imshow("Original", img)
-    cv2.imshow("Result", result)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    if result is not None:
+        # Отображение изображений
+        cv2.imshow("Original", img)
+        cv2.imshow("Result", result)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

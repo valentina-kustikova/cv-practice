@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 
 
 # Изменение разрешения изображения
@@ -39,6 +40,53 @@ def apply_vignette(img, strength=0.5):
     return np.clip(vignette, 0, 255).astype(np.uint8)
 
 
+# Пикселизация области с выбором мышью
+class PixelateSelector:
+    def __init__(self, img, pixel_size=10):
+        self.img = img.copy()
+        self.original = img.copy()
+        self.pixel_size = pixel_size
+        self.start_point = None
+        self.end_point = None
+        self.drawing = False
+
+    def mouse_callback(self, event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self.drawing = True
+            self.start_point = (x, y)
+            self.img = self.original.copy()
+
+        elif event == cv2.EVENT_MOUSEMOVE:
+            if self.drawing:
+                self.img = self.original.copy()
+                cv2.rectangle(self.img, self.start_point, (x, y), (0, 255, 0), 2)
+
+        elif event == cv2.EVENT_LBUTTONUP:
+            self.drawing = False
+            self.end_point = (x, y)
+            x1 = min(self.start_point[0], self.end_point[0])
+            y1 = min(self.start_point[1], self.end_point[1])
+            x2 = max(self.start_point[0], self.end_point[0])
+            y2 = max(self.start_point[1], self.end_point[1])
+
+            if x1 < x2 and y1 < y2:
+                self.img = pixelate_region(self.original, x1, y1, x2, y2, self.pixel_size)
+                self.original = self.img.copy()
+
+    def select_region(self):
+        cv2.namedWindow('Pixelate - выберите область')
+        cv2.setMouseCallback('Pixelate - выберите область', self.mouse_callback)
+
+        while True:
+            cv2.imshow('Pixelate - выберите область', self.img)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q') or key == 27:  # q или ESC
+                break
+
+        cv2.destroyAllWindows()
+        return self.img
+
+
 # Пикселизация области
 def pixelate_region(img, x1, y1, x2, y2, pixel_size=10):
     img_copy = img.copy()
@@ -47,8 +95,9 @@ def pixelate_region(img, x1, y1, x2, y2, pixel_size=10):
     for y in range(0, h, pixel_size):
         for x in range(0, w, pixel_size):
             block = region[y:y + pixel_size, x:x + pixel_size]
-            color = block.mean(axis=(0, 1))
-            region[y:y + pixel_size, x:x + pixel_size] = color
+            if block.size > 0:
+                color = block.mean(axis=(0, 1))
+                region[y:y + pixel_size, x:x + pixel_size] = color
     img_copy[y1:y2, x1:x2] = region
     return img_copy
 
@@ -85,41 +134,62 @@ def add_figure_frame(img, color=(0, 255, 0), thickness=20, frame_type='wave'):
     return frame
 
 
-# Эффект бликов
-def add_lens_flare(img, center=None, intensity=0.7):
+# Эффект бликов через текстуру
+def add_lens_flare(img, texture_path, intensity=0.7):
+    flare_texture = cv2.imread(texture_path)
+    if flare_texture is None:
+        print(f"Ошибка: не удалось загрузить текстуру блика из {texture_path}")
+        return img
+
     h, w = img.shape[:2]
-    if center is None:
-        center = (w // 2, h // 2)
-    Y, X = np.ogrid[:h, :w]
-    # Расстояние пикселя от блика
-    dist = np.sqrt((X - center[0]) ** 2 + (Y - center[1]) ** 2)
-    # Гауссовская функция спадающая от центра, 0.5 * w радиус свечения
-    flare = np.exp(-(dist / (0.5 * w)) ** 2)
-    flare = flare[..., np.newaxis]
-    flare_color = np.array([1.0, 0.8, 0.6])
-    flare_img = img.astype(np.float32) / 255.0
-    flare_img += flare * flare_color * intensity
-    return np.clip(flare_img * 255, 0, 255).astype(np.uint8)
+    # Изменение размера текстуры
+    flare_h, flare_w = flare_texture.shape[:2]
+    scale_y = h / flare_h
+    scale_x = w / flare_w
+
+    # Интерполяция по ближайшему соседу
+    y_idx = (np.linspace(0, flare_h - 1, h)).astype(int)
+    x_idx = (np.linspace(0, flare_w - 1, w)).astype(int)
+    flare_resized = flare_texture[y_idx][:, x_idx]
+
+    # Нормализация
+    img_float = img.astype(np.float32) / 255.0
+    flare_float = flare_resized.astype(np.float32) / 255.0
+
+    # Режим наложения "Screen" (осветление)
+    result = 1 - (1 - img_float) * (1 - flare_float * intensity)
+
+    return np.clip(result * 255, 0, 255).astype(np.uint8)
 
 
 # Текстура акварельной бумаги
-def add_paper_texture(img, scale=5, intensity=0.2):
-    # Генерация шумов по норм распределению
-    noise = np.random.normal(0.5, 0.2, img.shape[:2])
-    noise = np.clip(noise, 0, 1)
+def add_paper_texture(img, texture_path, intensity=0.3):
+    paper_texture = cv2.imread(texture_path)
+    if paper_texture is None:
+        print(f"Ошибка: не удалось загрузить текстуру бумаги из {texture_path}")
+        return img
 
-    # Простое размытие усреднением
-    kernel_size = max(1, scale)
-    pad = kernel_size // 2  # Отступы по краям
-    padded = np.pad(noise, pad, mode='reflect')
-    smoothed = np.zeros_like(noise)
-    for y in range(noise.shape[0]):
-        for x in range(noise.shape[1]):
-            region = padded[y:y + kernel_size, x:x + kernel_size]
-            smoothed[y, x] = np.mean(region)
+    h, w = img.shape[:2]
+    # Изменение размера текстуры и интерполяция
+    paper_h, paper_w = paper_texture.shape[:2]
+    y_idx = (np.linspace(0, paper_h - 1, h)).astype(int)
+    x_idx = (np.linspace(0, paper_w - 1, w)).astype(int)
+    paper_resized = paper_texture[y_idx][:, x_idx]
 
-    texture = (smoothed - smoothed.min()) / (smoothed.max() - smoothed.min())
-    texture = np.repeat(texture[:, :, np.newaxis], 3, axis=2)
-    img_textured = img.astype(np.float32) / 255.0
-    img_textured *= (1 - intensity + texture * intensity)
-    return np.clip(img_textured * 255, 0, 255).astype(np.uint8)
+    # Преобразование в оттенки серого через взвешенное среднее (формула luminosity)
+    # Gray = 0.299*R + 0.587*G + 0.114*B (для BGR: 0.114*B + 0.587*G + 0.299*R)
+    paper_gray = (paper_resized[:, :, 0] * 0.114 +
+                  paper_resized[:, :, 1] * 0.587 +
+                  paper_resized[:, :, 2] * 0.299)
+    paper_normalized = paper_gray.astype(np.float32) / 255.0
+
+    # Расширение до 3 каналов
+    paper_3ch = np.repeat(paper_normalized[:, :, np.newaxis], 3, axis=2)
+
+    # Нормализация
+    img_float = img.astype(np.float32) / 255.0
+
+    # Режим наложения "Multiply" (умножение)
+    result = img_float * (1 - intensity + paper_3ch * intensity)
+
+    return np.clip(result * 255, 0, 255).astype(np.uint8)
