@@ -46,6 +46,9 @@ def resize_image(image, width=None, height=None, scale_factor=None):
     else:
         return image.copy()
     
+    # Выводим информацию о разрешениях
+    print(f"Изменение разрешения: {w}x{h} -> {new_width}x{new_height}")
+    
     # Создаем массив для нового изображения
     resized = np.zeros((new_height, new_width, 3), dtype=image.dtype)
     
