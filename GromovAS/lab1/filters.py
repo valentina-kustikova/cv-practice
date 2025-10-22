@@ -3,17 +3,140 @@ import numpy as np
 import sys
 
 # Фильтры
-# Изменение размера
-def resize_image(image, scale_x=1.0, scale_y=1.0):
-    h, w = image.shape[:2]
-    new_h, new_w = int(h * scale_y), int(w * scale_x)
-    resized = np.zeros((new_h, new_w, 3), dtype=np.uint8)
-    for i in range(new_h):
-        for j in range(new_w):
-            orig_i = min(int(i / scale_y), h - 1)
-            orig_j = min(int(j / scale_x), w - 1)
-            resized[i, j] = image[orig_i, orig_j]
-    return resized
+
+# Глобальные переменные для пикселизации
+pixelate_start = None
+pixelate_end = None
+drawing = False
+original_image = None
+current_image = None
+pixel_size = 10  # Размер пикселя по умолчанию
+
+
+# Коллбэк для мыши
+def mouse_callback_pixelate(event, x, y, flags, param):
+    global pixelate_start, pixelate_end, drawing, original_image, current_image, pixel_size
+
+    if event == cv2.EVENT_LBUTTONDOWN:
+        pixelate_start = (x, y)
+        pixelate_end = (x, y)
+        drawing = True
+
+    elif event == cv2.EVENT_MOUSEMOVE and drawing:
+        pixelate_end = (x, y)
+        # Показываем предварительный просмотр прямоугольника
+        temp_image = current_image.copy()
+        cv2.rectangle(temp_image, pixelate_start, pixelate_end, (0, 255, 0), 2)
+        cv2.imshow("Pixelate Tool - Select Region", temp_image)
+
+    elif event == cv2.EVENT_LBUTTONUP:
+        drawing = False
+        pixelate_end = (x, y)
+
+        # Применяем пикселизацию к выбранной области
+        x1, y1 = pixelate_start
+        x2, y2 = pixelate_end
+        x = min(x1, x2)
+        y = min(y1, y2)
+        w = abs(x2 - x1)
+        h = abs(y2 - y1)
+
+        if w > 0 and h > 0:
+            pixelated = pixelate_region(current_image, x, y, w, h, pixel_size)
+            current_image = pixelated
+            cv2.imshow("Pixelate Tool - Select Region", current_image)
+
+        # Сбрасываем координаты
+        pixelate_start = None
+        pixelate_end = None
+
+
+# Функция пикселизации (оптимизированная)
+def pixelate_region(image, x, y, w, h, pixel_size=10):
+    img_copy = image.copy()
+    x_end = min(x + w, image.shape[1])
+    y_end = min(y + h, image.shape[0])
+
+    for i in range(y, y_end, pixel_size):
+        for j in range(x, x_end, pixel_size):
+            i_end = min(i + pixel_size, y_end)
+            j_end = min(j + pixel_size, x_end)
+            block = img_copy[i:i_end, j:j_end]
+            if block.size > 0:
+                avg_color = np.mean(block, axis=(0, 1)).astype(np.uint8)
+                img_copy[i:i_end, j:j_end] = avg_color
+    return img_copy
+
+
+# Запуск интерактивного режима пикселизации
+def start_pixelate_interactive(image, initial_pixel_size=10):
+    """Запускает интерактивный режим пикселизации"""
+    global original_image, current_image, pixel_size
+    original_image = image.copy()
+    current_image = image.copy()
+    pixel_size = initial_pixel_size
+
+    cv2.namedWindow("Pixelate Tool - Select Region")
+    cv2.setMouseCallback("Pixelate Tool - Select Region", mouse_callback_pixelate)
+    cv2.imshow("Pixelate Tool - Select Region", image)
+
+    print("=== Pixelate Tool ===")
+    print("Инструкции:")
+    print("- Зажмите ЛКМ и выделите область для пикселизации")
+    print("- Отпустите ЛКМ для применения эффекта")
+    print("- '+'/-': Увеличить/уменьшить размер пикселя (текущий: {})".format(pixel_size))
+    print("- 'r': Сбросить к исходному изображению")
+    print("- 'q' или ESC: Выйти и вернуть результат")
+
+    while True:
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q') or key == 27:  # Q или ESC
+            break
+        elif key == ord('r'):  # Reset
+            current_image = original_image.copy()
+            cv2.imshow("Pixelate Tool - Select Region", current_image)
+            print("Изображение сброшено")
+        elif key == ord('+') or key == ord('='):  # Increase pixel size
+            pixel_size = min(50, pixel_size + 2)
+            print("Размер пикселя увеличен до:", pixel_size)
+        elif key == ord('-'):  # Decrease pixel size
+            pixel_size = max(2, pixel_size - 2)
+            print("Размер пикселя уменьшен до:", pixel_size)
+
+    cv2.destroyWindow("Pixelate Tool - Select Region")
+    return current_image
+
+
+# Функция пикселизации всей картинки
+def pixelate_whole_image(image, pixel_size=10):
+    return pixelate_region(image, 0, 0, image.shape[1], image.shape[0], pixel_size)
+
+# Изменение размера (убрать пиксельную обработку)
+def resize_image(img, new_h=None, new_w=None, scale=None):
+    h, w = img.shape[:2]
+
+    if scale is not None:
+        if scale == 1:
+            return img.copy()
+        new_h = int(h * scale)
+        new_w = int(w * scale)
+    elif new_h is None and new_w is None:
+        return img.copy()
+    elif new_h is None:
+        new_h = int(h * new_w / w)
+    elif new_w is None:
+        new_w = int(w * new_h / h)
+
+    # Векторизованный расчет индексов
+    scale_h = h / new_h
+    scale_w = w / new_w
+
+    y = (np.arange(new_h) * scale_h).astype(np.int32)
+    x = (np.arange(new_w) * scale_w).astype(np.int32)
+    x_neigh_index, y_neigh_index = np.meshgrid(x, y)
+
+    res = img[y_neigh_index, x_neigh_index]
+    return res
 
 # Сепия
 def sepia_effect(image):
@@ -24,7 +147,7 @@ def sepia_effect(image):
     sepia_img = np.dot(img_float.reshape(-1, 3), sepia_matrix.T).reshape(img_float.shape)
     return np.clip(sepia_img, 0, 255).astype(np.uint8)
 
-# Виньетка
+# Виньетка (расщеить на каналы)
 def vignette_effect(image, strength=0.5):
     h, w = image.shape[:2]
     Y, X = np.ogrid[:h, :w]
@@ -34,18 +157,6 @@ def vignette_effect(image, strength=0.5):
     for c in range(3):
         vignette[:,:,c] *= mask
     return np.clip(vignette, 0, 255).astype(np.uint8)
-
-# Пикселизация
-def pixelate_region(image, x, y, w, h, pixel_size=10):
-    img_copy = image.copy()
-    x_end = min(x + w, image.shape[1])
-    y_end = min(y + h, image.shape[0])
-    for i in range(y, y_end, pixel_size):
-        for j in range(x, x_end, pixel_size):
-            block = img_copy[i:i+pixel_size, j:j+pixel_size]
-            avg_color = np.mean(block, axis=(0,1)).astype(np.uint8)
-            img_copy[i:i+pixel_size, j:j+pixel_size] = avg_color
-    return img_copy
 
 # Прямоугольная граница
 def add_rectangular_border(image, color=(0,255,0), thickness=30):
@@ -85,67 +196,201 @@ def add_shape_border(image, color=(255,0,0), thickness=25, shape_type='ellipse')
     return bordered
 
 # Линза
-def lens_flare_effect(img, flare_center=(0.5,0.5), intensity=1.0):
-    h, w = img.shape[:2]
-    cx, cy = int(flare_center[0]*w), int(flare_center[1]*h)
+# Блик через стороннюю текстуру
+def lens_flare_texture(image, flare_image_path=None, flare_center=(0.5, 0.5), intensity=1.0, blend_mode='add'):
+    h, w = image.shape[:2]
+    cx, cy = int(flare_center[0] * w), int(flare_center[1] * h)
+
+    # Если путь к текстуре не указан, используем стандартный блик
+    if flare_image_path is None:
+        return lens_flare_standard(image, flare_center, intensity)
+
+    try:
+        # Загружаем текстуру блика
+        flare_img = cv2.imread(flare_image_path, cv2.IMREAD_UNCHANGED)
+        if flare_img is None:
+            print(f"Ошибка: не удалось загрузить текстуру блика '{flare_image_path}'")
+            return lens_flare_standard(image, flare_center, intensity)
+
+        # Масштабируем текстуру блика (примерно 1/3 от размера основного изображения)
+        flare_scale = min(w, h) / 3 / max(flare_img.shape[0], flare_img.shape[1])
+        new_flare_w = int(flare_img.shape[1] * flare_scale)
+        new_flare_h = int(flare_img.shape[0] * flare_scale)
+        flare_resized = cv2.resize(flare_img, (new_flare_w, new_flare_h))
+
+        # Позиционируем текстуру (центрируем относительно указанной точки)
+        flare_x = cx - new_flare_w // 2
+        flare_y = cy - new_flare_h // 2
+
+        # Создаем результат
+        result = image.astype(np.float32)
+
+        # Обрабатываем в зависимости от количества каналов в текстуре
+        if flare_resized.shape[2] == 4:  # RGBA
+            flare_rgb = flare_resized[:, :, :3].astype(np.float32)
+            flare_alpha = flare_resized[:, :, 3].astype(np.float32) / 255.0
+
+            # Применяем альфа-канал и интенсивность
+            flare_effect = flare_rgb * flare_alpha[:, :, np.newaxis] * intensity
+
+        else:  # RGB
+            flare_effect = flare_resized.astype(np.float32) * intensity
+
+        # Накладываем эффект на основное изображение
+        for i in range(new_flare_h):
+            for j in range(new_flare_w):
+                img_i = flare_y + i
+                img_j = flare_x + j
+
+                # Проверяем границы
+                if 0 <= img_i < h and 0 <= img_j < w:
+                    if blend_mode == 'add':
+                        result[img_i, img_j] += flare_effect[i, j]
+                    elif blend_mode == 'screen':
+                        # Screen blend: 1 - (1-a)*(1-b)
+                        a = result[img_i, img_j] / 255.0
+                        b = flare_effect[i, j] / 255.0
+                        result[img_i, img_j] = (1 - (1 - a) * (1 - b)) * 255
+                    elif blend_mode == 'lighten':
+                        result[img_i, img_j] = np.maximum(result[img_i, img_j], flare_effect[i, j])
+
+        return np.clip(result, 0, 255).astype(np.uint8)
+
+    except Exception as e:
+        print(f"Ошибка при обработке текстуры блика: {e}")
+        return lens_flare_standard(image, flare_center, intensity)
+
+
+# Стандартный блик (резервный вариант)
+def lens_flare_standard(image, flare_center=(0.5, 0.5), intensity=1.0):
+    h, w = image.shape[:2]
+    cx, cy = int(flare_center[0] * w), int(flare_center[1] * h)
+
     Y, X = np.ogrid[:h, :w]
-    mask = np.exp(-(np.sqrt((X - cx)**2 + (Y - cy)**2) / (0.25 * max(h,w)))**2)
-    mask = mask[:,:,np.newaxis]
-    flare_color = np.array([1.0,0.8,0.6])
-    flare_img = img.astype(np.float32)/255.0
-    flare_img += mask * flare_color * intensity
-    return np.clip(flare_img*255, 0, 255).astype(np.uint8)
+    dist = np.sqrt((X - cx) ** 2 + (Y - cy) ** 2)
+
+    main_flare = np.exp(-(dist / (0.15 * max(h, w))) ** 2)
+
+    flare1_center = (int(cx * 0.7), int(cy * 0.7))
+    flare2_center = (int(cx * 1.3), int(cy * 1.3))
+    dist1 = np.sqrt((X - flare1_center[0]) ** 2 + (Y - flare1_center[1]) ** 2)
+    dist2 = np.sqrt((X - flare2_center[0]) ** 2 + (Y - flare2_center[1]) ** 2)
+
+    flare1 = np.exp(-(dist1 / (0.08 * max(h, w))) ** 2) * 0.6
+    flare2 = np.exp(-(dist2 / (0.05 * max(h, w))) ** 2) * 0.4
+
+    combined_flare = main_flare + flare1 + flare2
+    combined_flare = combined_flare / combined_flare.max() * intensity
+
+    flare_texture = np.stack([combined_flare * 1.0, combined_flare * 0.8, combined_flare * 0.6], axis=2)
+
+    result = image.astype(np.float32) + flare_texture * 255
+    return np.clip(result, 0, 255).astype(np.uint8)
 
 # Бумага
-def watercolor_texture(image, scale=12, intensity=0.4):
+def watercolor_paper_texture(image, paper_texture_path):
     h, w = image.shape[:2]
-    base_noise = np.random.rand(h // scale + 2, w // scale + 2) * 0.8 + 0.2
-    noise = cv2.resize(base_noise, (w, h), interpolation=cv2.INTER_LINEAR)
-    kernel_size = max(3, scale // 2 * 2 + 1)
-    smoothed = np.zeros_like(noise)
-    offset = kernel_size // 2
-    padded = np.pad(noise, offset, mode='edge')
-    for y in range(h):
-        for x in range(w):
-            smoothed[y, x] = np.mean(padded[y:y+kernel_size, x:x+kernel_size])
-    texture = (smoothed - smoothed.min()) / (smoothed.max() - smoothed.min())
-    texture = np.repeat(texture[:, :, np.newaxis], 3, axis=2)
-    img_float = image.astype(np.float32) / 255.0
-    img_textured = img_float * (1 - intensity * 0.7 + texture * intensity * 1.3)
-    return np.clip(img_textured * 255, 0, 255).astype(np.uint8)
+    try:
+        # Загружаем текстуру бумаги
+        texture = cv2.imread(paper_texture_path)
+        if texture is None:
+            raise ValueError(f"Не удалось загрузить текстуру бумаги '{paper_texture_path}'")
+        # Масштабируем текстуру под размер изображения (как в вашем коде)
+        scaled_texture = resize_image(texture, h, w)
+        # Преобразуем в float и нормализуем (как в вашем коде)
+        tex = scaled_texture.astype(np.float32) / 255.0
+        tex = tex - tex.mean()  # Вычитаем среднее значение
+        img_f = image.astype(np.float32) / 255.0
+        # Применяем формулу из вашего кода: img_f + k * tex
+        k = 0.5  # Фиксированный коэффициент как в вашем коде
+        res = np.clip(img_f + k * tex, 0, 1)
+        return (res * 255).astype(np.uint8)
+
+    except Exception as e:
+        print(f"Ошибка в watercolor_paper_texture: {e}")
+        # В случае ошибки возвращаем оригинальное изображение
+        return image.copy()
 
 # Функция вызова фильтра
 def apply_filter(image, filter_type, *args):
     if filter_type == 'resize':
-        scale_x = float(args[0]) if len(args) > 0 else 1.0
-        scale_y = float(args[1]) if len(args) > 1 else scale_x
-        return resize_image(image, scale_x, scale_y)
+        if len(args) == 1:
+            scale = float(args[0])
+            return resize_image(image, scale=scale)
+        elif len(args) == 2:
+            try:
+                new_h = int(args[0])
+                new_w = int(args[1])
+                return resize_image(image, new_h=new_h, new_w=new_w)
+            except:
+                scale_x = float(args[0])
+                scale_y = float(args[1])
+                return resize_image(image, scale=scale_x)
+        else:
+            return resize_image(image, scale=1.0)
+
     elif filter_type == 'sepia':
         return sepia_effect(image)
+
     elif filter_type == 'vignette':
         strength = float(args[0]) if len(args) > 0 else 0.5
         return vignette_effect(image, strength)
+
     elif filter_type == 'pixelate':
-        x, y, w, h = map(int, args[:4])
-        pixel_size = int(args[4]) if len(args) > 4 else 10
-        return pixelate_region(image, x, y, w, h, pixel_size)
+        if len(args) == 0:
+            # Интерактивный режим - БЕЗ параметров
+            return start_pixelate_interactive(image)
+        elif len(args) == 1:
+            # Пикселизация всей картинки
+            pixel_size = int(args[0])
+            return pixelate_whole_image(image, pixel_size)
+        elif len(args) >= 4:
+            # Пикселизация конкретной области
+            x, y, w, h = map(int, args[:4])
+            pixel_size = int(args[4]) if len(args) > 4 else 10
+            return pixelate_region(image, x, y, w, h, pixel_size)
+        else:
+            # Если неправильное количество параметров, запускаем интерактивный режим
+            print("Неверное количество параметров. Запуск интерактивного режима...")
+            return start_pixelate_interactive(image)
+
     elif filter_type == 'rect_border':
         thickness = int(args[0]) if len(args) > 0 else 20
-        color = tuple(map(int, args[1:4])) if len(args) >= 4 else (0,255,0)
+        color = tuple(map(int, args[1:4])) if len(args) >= 4 else (0, 255, 0)
         return add_rectangular_border(image, color, thickness)
+
     elif filter_type == 'shape_border':
         thickness = int(args[0]) if len(args) > 0 else 20
-        color = tuple(map(int, args[1:4])) if len(args) >= 4 else (255,0,0)
+        color = tuple(map(int, args[1:4])) if len(args) >= 4 else (255, 0, 0)
         shape_type = args[4] if len(args) > 4 else 'ellipse'
         return add_shape_border(image, color, thickness, shape_type)
+
     elif filter_type == 'lens_flare':
-        flare_center = tuple(map(float, args[:2])) if len(args) >= 2 else (0.5,0.5)
-        intensity = float(args[2]) if len(args) > 2 else 1.0
-        return lens_flare_effect(image, flare_center, intensity)
+        # Новый формат: lens_flare [texture_path] [center_x] [center_y] [intensity] [blend_mode]
+        if len(args) == 0:
+            return lens_flare_texture(image)
+        elif len(args) >= 1:
+            # Проверяем, первый аргумент - это путь или число?
+            try:
+                # Если это число, то используем стандартный блик
+                float(args[0])
+                flare_center = tuple(map(float, args[:2])) if len(args) >= 2 else (0.5, 0.5)
+                intensity = float(args[2]) if len(args) > 2 else 1.0
+                return lens_flare_standard(image, flare_center, intensity)
+            except:
+                # Если это не число, то это путь к текстуре
+                texture_path = args[0]
+                flare_center = tuple(map(float, args[1:3])) if len(args) >= 3 else (0.5, 0.5)
+                intensity = float(args[3]) if len(args) > 3 else 1.0
+                blend_mode = args[4] if len(args) > 4 else 'add'
+                return lens_flare_texture(image, texture_path, flare_center, intensity, blend_mode)
+
+
     elif filter_type == 'watercolor':
-        scale = int(args[0]) if len(args) > 0 else 12
-        intensity = float(args[1]) if len(args) > 1 else 0.4
-        return watercolor_texture(image, scale, intensity)
+        if len(args) == 0:
+            raise ValueError("Для watercolor требуется путь к текстуре бумаги")
+        texture_path = args[0]
+        return watercolor_paper_texture(image, texture_path)
     else:
         raise ValueError("Неизвестный фильтр")
 
@@ -153,8 +398,23 @@ def apply_filter(image, filter_type, *args):
 def main():
     if len(sys.argv) < 3:
         print("Использование: python filters.py <image_path> <filter_type> [filter_params...]")
-        print("Пример: python filters.py image.jpg sepia")
-        print("Пример: python filters.py image.jpg pixelate 100 100 200 200 15")
+        print("Доступные фильтры:")
+        print("  resize [scale] - изменение размера (масштаб)")
+        print("  resize [height] [width] - изменение размера (точные размеры)")
+        print("  sepia - сепия")
+        print("  vignette [strength] - виньетка")
+        print("  pixelate - интерактивная пикселизация мышью")
+        print("  pixelate [size] - пикселизация всей картинки")
+        print("  pixelate [x y w h] [size] - пикселизация области")
+        print("  rect_border [thickness] [r g b] - прямоугольная граница")
+        print("  shape_border [thickness] [r g b] [type] - фигурная граница")
+        print("  lens_flare [center_x center_y] [intensity] - блик")
+        print("  watercolor [intensity] [scale] - акварельная бумага")
+        print("\nПримеры для pixelate:")
+        print("  python filters.py image.jpg pixelate                   # интерактивный режим")
+        print("  python filters.py image.jpg pixelate 15                # вся картинка с размером пикселя 15")
+        print("  python filters.py image.jpg pixelate 100 50 200 150    # область 100,50,200,150")
+        print("  python filters.py image.jpg pixelate 100 50 200 150 12 # область с размером пикселя 12")
         return
 
     image_path = sys.argv[1]
@@ -165,17 +425,20 @@ def main():
     if image is None:
         print("Ошибка: изображение не найдено")
         return
-
     try:
+        # Для пикселизации всегда обрабатываем в apply_filter
         filtered = apply_filter(image, filter_type, *filter_params)
+        # Показываем результат только для не-интерактивных фильтров
+        if filter_type != 'pixelate' or len(filter_params) > 0:
+            cv2.imshow("Original", image)
+            cv2.imshow(f"Filtered: {filter_type}", filtered)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
     except Exception as e:
         print("Ошибка при применении фильтра:", e)
+        import traceback
+        traceback.print_exc()
         return
-
-    cv2.imshow("Original", image)
-    cv2.imshow(f"Filtered: {filter_type}", filtered)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     main()
