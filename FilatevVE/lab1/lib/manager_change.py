@@ -207,3 +207,91 @@ def change_add_watercolor_texture(window):
 
     cv2.setMouseCallback(window.window_name, lambda *args: None)
     window.add_image_with_padding(window.load_current_image())
+
+
+def pixelate_region_manager(window):
+    """
+    Менеджер для пикселизации области
+    """
+    print("\nРежим пикселизации:")
+    print("Выберите область для пикселизации с помощью мыши")
+    print("Управление размером пикселя - клавиши W  и S")
+    print("Подтверждение выбора - клавиша Enter")
+    print("Выход из режима - клавиша Esc")
+
+    drawing = False
+    ix, iy = -1, -1
+    fx, fy = -1, -1
+    current_frame_coords = (-1, -1, -1, -1)
+    pixel_size = 10
+
+    image = window.load_current_image()
+    clone = image.copy()
+
+    def mouse_callback(event, x, y, flags, param):
+        nonlocal ix, iy, fx, fy, drawing, current_frame_coords, clone
+
+        if event == cv2.EVENT_LBUTTONDOWN:
+            drawing = True
+            ix, iy = x, y
+            fx, fy = x, y
+            clone = image.copy()
+
+        elif event == cv2.EVENT_MOUSEMOVE:
+            if drawing:
+                fx, fy = x, y
+                clone = image.copy()
+
+                x1, y1 = min(ix, fx), min(iy, fy)
+                x2, y2 = max(ix, fx), max(iy, fy)
+                cv2.rectangle(clone, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                current_frame_coords = (x1, y1, x2, y2)
+
+        elif event == cv2.EVENT_LBUTTONUP:
+            drawing = False
+            fx, fy = x, y
+
+            x1, y1 = min(ix, fx), min(iy, fy)
+            x2, y2 = max(ix, fx), max(iy, fy)
+            current_frame_coords = (x1, y1, x2, y2)
+
+            clone = image.copy()
+            cv2.rectangle(clone, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+    cv2.setMouseCallback(window.window, mouse_callback)
+
+    while True:
+        key = window.wait_key(60)
+
+        if key == 27:
+            break
+        elif key == 13:
+            if current_frame_coords[0] != -1:
+                x1, y1, x2, y2 = current_frame_coords
+                image = window.load_current_image()
+                pixelated_image = pixelate_region(image, x1, y1, x2, y2, pixel_size)
+                window.add_image_with_padding(pixelated_image)
+                clone = pixelated_image.copy()
+        elif key == ord('w'):
+            pixel_size = min(pixel_size + 2, 50)
+            if current_frame_coords[0] != -1:
+                x1, y1, x2, y2 = current_frame_coords
+                image = window.load_current_image()
+                preview = pixelate_region(image, x1, y1, x2, y2, pixel_size)
+                cv2.rectangle(preview, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                window.add_image_with_padding(preview)
+                clone = preview.copy()
+        elif key == ord('s'):
+            pixel_size = max(pixel_size - 2, 2)
+            if current_frame_coords[0] != -1:
+                x1, y1, x2, y2 = current_frame_coords
+                image = window.load_current_image()
+                preview = pixelate_region(image, x1, y1, x2, y2, pixel_size)
+                cv2.rectangle(preview, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                window.add_image_with_padding(preview)
+                clone = preview.copy()
+
+        window.add_image_with_padding(clone)
+
+    cv2.setMouseCallback(window.window, lambda *args: None)
+    window.add_image_with_padding(window.load_current_image())

@@ -114,10 +114,8 @@ def add_watercolor_texture(image, texture_intensity=0.3):
     """
     h, w = image.shape[:2]
 
-    # Создаем текстуру бумаги (зернистость + неравномерность)
     texture = np.random.normal(0, 0.1, (h, w)).astype(np.float32)
 
-    # Добавляем низкочастотный шум для неравномерности
     low_freq_noise = cv2.resize(
         np.random.normal(0, 0.05, (h // 10, w // 10)),
         (w, h),
@@ -133,3 +131,48 @@ def add_watercolor_texture(image, texture_intensity=0.3):
     result = cv2.GaussianBlur(result.astype(np.float32), (3, 3), 0)
 
     return np.clip(result, 0, 255).astype(np.uint8)
+
+
+def draw_green_frame(image, x1, y1, x2, y2):
+    """
+    Рисует зеленую рамку толщиной 1 пиксель по заданным координатам
+
+    Args:
+        image: исходное изображение
+        x1, y1: координаты левого верхнего угла
+        x2, y2: координаты правого нижнего угла
+    """
+    if x1 >= 0 and y1 >= 0 and x2 >= 0 and y2 >= 0 and x2 > x1 and y2 > y1:
+        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 1)
+
+    return image
+
+
+def pixelate_region(image, x1, y1, x2, y2, pixel_size=10):
+    """
+    Пикселизация заданной прямоугольной области изображения
+
+    Args:
+        image: исходное изображение
+        x1, y1: координаты левого верхнего угла области
+        x2, y2: координаты правого нижнего угла области
+        pixel_size: размер пикселя для пикселизации
+    """
+
+    if (x1 < 0 or y1 < 0 or x2 <= x1 or y2 <= y1 or
+            x2 > image.shape[1] or y2 > image.shape[0]):
+        return image
+
+    region = image[y1:y2, x1:x2]
+
+    h, w = region.shape[:2]
+
+    small_w = max(1, w // pixel_size)
+    small_h = max(1, h // pixel_size)
+    small = cv2.resize(region, (small_w, small_h), interpolation=cv2.INTER_LINEAR)
+
+    pixelated = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+
+    image[y1:y2, x1:x2] = pixelated
+
+    return image

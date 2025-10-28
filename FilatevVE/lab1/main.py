@@ -51,6 +51,10 @@ if __name__ == "__main__":
             change_apply_vignette_elliptical(window)
             print_manual()
 
+        elif key == ord('3'):
+            pixelate_region_manager(window)
+            print_manual()
+
         elif key == ord('4'):
             changer_add_rectangular_border(window)
             print_manual()
