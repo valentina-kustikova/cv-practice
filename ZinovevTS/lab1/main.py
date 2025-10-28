@@ -2,6 +2,7 @@ import argparse
 import sys
 import cv2 as cv
 import logging
+from pathlib import Path
 from filters import Filters
 
 def cli_argument_parser():
@@ -63,7 +64,10 @@ def cli_argument_parser():
 
 def image_read(image):
     if image is None:
-        raise ValueError('Incorrect or empty path to the image')
+        raise ValueError('Empty path to the image')
+    filepath = Path(image)
+    if not filepath.exists():
+        raise ValueError('Incorrect path to the image')
     src_image = cv.imread(image)
     cv.imshow("original", src_image)
     cv.waitKey(0)
@@ -126,6 +130,7 @@ def main():
                   args.amplitude, args.frequency, args.pattern_size)
     except Exception as e:
         logging.error(e)
+        sys.exit(1)
 
 
 if __name__ == '__main__':
