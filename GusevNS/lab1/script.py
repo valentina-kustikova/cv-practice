@@ -39,7 +39,7 @@ def resize_image(image, width, height):
     # Создаем новое изображение
     #resized = image[Y, X]
     
-    #return resized
+    return resized
 
 
 def sepia_filter(image):

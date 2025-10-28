@@ -17,6 +17,18 @@ from script import (
     add_watercolor_texture
 )
 
+def show_result(title, image, original=None):
+    """Показывает результат фильтра рядом с оригиналом."""
+    if original is not None:
+        cv.imshow('Исходное', original)
+        cv.imshow(title, image)
+    else:
+        cv.imshow(title, image)
+    
+    print(f"   >> Показ: {title}. Нажмите любую клавишу для продолжения...")
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+
 def demo_all_filters():
     """Демонстрирует работу всех фильтров."""
     print("Загрузка тестового изображения из файла...")
@@ -27,93 +39,80 @@ def demo_all_filters():
         print("Создание тестового изображения...")
         test_image = create_test_image()
     
-    # Создаем папку для результатов
     os.makedirs('demo_results', exist_ok=True)
     
     print("Демонстрация фильтров:")
+    print("=" * 60)
     
-    # 1. Изменение разрешения
-    print("1. Изменение разрешения...")
+    print("0. Исходное изображение...")
+    cv.imwrite('demo_results/0_original.jpg', test_image)
+    show_result('0. Исходное изображение', test_image)
+    
+    print("\n1. Изменение разрешения...")
     resized = resize_image(test_image, 600, 400)
     cv.imwrite('demo_results/1_resize.jpg', resized)
+    show_result('1. Изменение разрешения (600x400)', resized, test_image)
     
-    # 2. Эффект сепии
-    print("2. Эффект сепии...")
+    print("\n2. Эффект сепии...")
     sepia = sepia_filter(test_image)
     cv.imwrite('demo_results/2_sepia.jpg', sepia)
+    show_result('2. Эффект сепии', sepia, test_image)
     
-    # 3. Эффект виньетки
-    print("3. Эффект виньетки...")
+    print("\n3. Эффект виньетки...")
     vignette = vignette_filter(test_image, 0.7)
     cv.imwrite('demo_results/3_vignette.jpg', vignette)
+    show_result('3. Эффект виньетки (сила 0.7)', vignette, test_image)
     
-    # 4. Обычная пикселизация
-    print("4. Пикселизация области...")
+    print("\n4. Пикселизация области...")
     pixelated = pixelate_region(test_image, 50, 50, 150, 100, 15)
     cv.imwrite('demo_results/4_pixelate.jpg', pixelated)
+    show_result('4. Пикселизация области', pixelated, test_image)
     
-    # 4.1 Пикселизация с коллбэком (эффект шахматной доски)
-    print("4.1. Пикселизация с коллбэком...")
-    
-    def chess_pattern_callback(block, bx, by):
-        """Коллбэк, создающий шахматный узор на пикселизированной области."""
-        if (bx + by) % 2 == 0:
-            return block
-        else:
-            # Инвертируем цвета блока для создания шахматного эффекта
-            return 255 - block
-    
-    pixelated_with_callback = pixelate_region(test_image, 50, 50, 150, 100, 15, chess_pattern_callback)
-    cv.imwrite('demo_results/4_1_pixelate_with_callback.jpg', pixelated_with_callback)
-    
-    # 5. Прямоугольная рамка
-    print("5. Прямоугольная рамка...")
+
+    print("\n5. Прямоугольная рамка...")
     framed = add_rectangular_frame(test_image, 20, (0, 255, 0))
     cv.imwrite('demo_results/5_frame.jpg', framed)
+    show_result('5. Прямоугольная рамка (зелёная)', framed, test_image)
     
-    # 6. Декоративная рамка (волнистая)
-    print("6. Декоративная рамка (волнистая)...")
+    print("\n6. Декоративная рамка (волнистая)...")
     decorative = add_decorative_frame(test_image, "wavy", 25, (255, 0, 0))
     cv.imwrite('demo_results/6_decorative_wavy.jpg', decorative)
+    show_result('6. Декоративная рамка (волнистая)', decorative, test_image)
     
-    # 7. Декоративная рамка (узорная)
-    print("7. Декоративная рамка (узорная)...")
+    print("\n7. Декоративная рамка (узорная)...")
     decorative_pattern = add_decorative_frame(test_image, "pattern", 25, (0, 0, 255))
     cv.imwrite('demo_results/7_decorative_pattern.jpg', decorative_pattern)
+    show_result('7. Декоративная рамка (узорная)', decorative_pattern, test_image)
     
-    # 7.1. Декоративная рамка (прямая)
-    print("7.1. Декоративная рамка (прямая)...")
+    print("\n7.1. Декоративная рамка (прямая)...")
     decorative_straight = add_decorative_frame(test_image, "straight", 25, (255, 0, 255))
     cv.imwrite('demo_results/7_1_decorative_straight.jpg', decorative_straight)
+    show_result('7.1. Декоративная рамка (прямая)', decorative_straight, test_image)
     
-    # 7.2. Декоративная рамка (красная)
-    print("7.2. Декоративная рамка (красная)...")
+    print("\n7.2. Декоративная рамка (красная)...")
     decorative_red = add_decorative_frame(test_image, "red", 25, (0, 255, 255))
     cv.imwrite('demo_results/7_2_decorative_red.jpg', decorative_red)
+    show_result('7.2. Декоративная рамка (красная)', decorative_red, test_image)
     
-    # 7.3. Декоративная рамка (цветочная)
-    print("7.3. Декоративная рамка (цветочная)...")
+    print("\n7.3. Декоративная рамка (цветочная)...")
     decorative_floral = add_decorative_frame(test_image, "floral", 25, (255, 255, 0))
     cv.imwrite('demo_results/7_3_decorative_floral.jpg', decorative_floral)
+    show_result('7.3. Декоративная рамка (цветочная)', decorative_floral, test_image)
     
-    # 8. Эффект бликов
-    print("8. Эффект бликов...")
+    print("\n8. Эффект бликов...")
     flared = add_lens_flare(test_image, 200, 150, 0.8)
     cv.imwrite('demo_results/8_flare.jpg', flared)
+    show_result('8. Эффект бликов', flared, test_image)
     
-    # 9. Текстура акварельной бумаги
-    print("9. Текстура акварельной бумаги...")
+    print("\n9. Текстура акварельной бумаги...")
     watercolor = add_watercolor_texture(test_image, 0.8)
     cv.imwrite('demo_results/9_watercolor.jpg', watercolor)
+    show_result('9. Текстура акварельной бумаги', watercolor, test_image)
     
-    print("\nВсе демонстрационные изображения сохранены в папке 'demo_results/'")
-    print("Исходное изображение сохранено как 'demo_results/0_original.jpg'")
-    cv.imwrite('demo_results/0_original.jpg', test_image)
-    
-    # Показываем исходное изображение
-    cv.imshow('Исходное изображение', test_image)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    print("\n" + "=" * 60)
+    print("✓ Демонстрация завершена!")
+    print("✓ Все результаты сохранены в папке 'demo_results/'")
+    print("=" * 60)
 
 
 def show_help():
@@ -125,21 +124,21 @@ def show_help():
     python demo.py              - запустить демонстрацию всех фильтров
     python demo.py --help       - показать эту справку
 
-Демонстрация создаст папку 'demo_results' с примерами работы всех фильтров:
-- 0_original.jpg - исходное изображение
-- 1_resize.jpg - изменение разрешения
-- 2_sepia.jpg - эффект сепии
-- 3_vignette.jpg - эффект виньетки
-- 4_pixelate.jpg - пикселизация области
-- 4_1_pixelate_with_callback.jpg - пикселизация с эффектом шахматной доски (пример коллбэка)
-- 5_frame.jpg - прямоугольная рамка
-- 6_decorative_wavy.jpg - волнистая декоративная рамка
-- 7_decorative_pattern.jpg - узорная декоративная рамка
-- 7_1_decorative_straight.jpg - прямая декоративная рамка
-- 7_2_decorative_red.jpg - красная декоративная рамка
-- 7_3_decorative_floral.jpg - цветочная декоративная рамка
-- 8_flare.jpg - эффект бликов
-- 9_watercolor.jpg - текстура акварельной бумаги
+Демонстрация показывает каждый фильтр последовательно (нажмите любую клавишу для продолжения).
+Все результаты сохраняются в папку 'demo_results' с примерами работы всех фильтров:
+  0. Исходное изображение
+  1. Изменение разрешения
+  2. Эффект сепии
+  3. Эффект виньетки
+  4. Пикселизация области
+  5. Прямоугольная рамка
+  6. Декоративная рамка (волнистая)
+  7. Декоративная рамка (узорная)
+  7.1. Декоративная рамка (прямая)
+  7.2. Декоративная рамка (красная)
+  7.3. Декоративная рамка (цветочная)
+  8. Эффект бликов
+  9. Текстура акварельной бумаги
 
 Для работы с собственными изображениями используйте:
     python script.py -i <путь_к_изображению> -f <тип_фильтра> [параметры]
