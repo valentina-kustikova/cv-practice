@@ -7,15 +7,15 @@ import filters
 from labTypings import RGB, Rectangle
 
 
-def getFilterFunc(args: argparse.Namespace):
+def getFilterFunc(args: argparse.Namespace, imgHeight: int, imgWidth: int):
     if args.filterType == "resize":
         height: int | None = args.height
         width: int | None = args.width
 
         if height is None:
-            height = int(image.shape[0])
+            height = imgHeight
         if width is None:
-            width = int(image.shape[1])
+            width = imgWidth
         return partial(filters.resize, width=width, height=height)
 
     if args.filterType == "sepia":
@@ -69,7 +69,7 @@ def getFilterFunc(args: argparse.Namespace):
             return filters.addWatercolor
         else:
             return partial(filters.addWatercolor, opacity=opacity)
-    
+
     raise ValueError("Filter not found")
 
 
@@ -81,7 +81,7 @@ def main(args: argparse.Namespace):
     if image is None:
         raise ValueError(f"There is no image: {imagePath}")
 
-    filterFunc = getFilterFunc(args)
+    filterFunc = getFilterFunc(args, imgWidth=image.shape[1], imgHeight=image.shape[0])
 
     filteredImage = filterFunc(image)
 
