@@ -4,6 +4,21 @@ from lib.manager_window import OpenCVWindowManager
 from lib.change_images import *
 from lib.manager_change import *
 
+def print_manual():
+    print("\n\n\nУправление:")
+    print("Стрелка 'b'  - предыдущее изображение")
+    print("Стрелка 'n' - следующее изображение")
+    print("Нажмите 'i' - показать информацию о текущем изображении")
+    print("Нажмите 'Esc' - выход")
+
+    print("\n Фильтры:")
+    print("1 Фотоэффект сепия")
+    print("2 Фотоэффект виньетка")
+    print("3 Пикселизация заданной прямоугольной области")
+    print("4 Наложения прямоугольной одноцветной рамки")
+    print("5 Наложения фигурной одноцветной рамки")
+    print("6 Наложения эффекта бликов")
+    print("7 Наложения текстуры акварельной бумаги")
 
 if __name__ == "__main__":
     window = OpenCVWindowManager("OpenCV Image Viewer")
@@ -11,17 +26,10 @@ if __name__ == "__main__":
 
     window.load_images_from_folder("images")
 
-    print("\nУправление:")
-    print("Стрелка 'b'  - предыдущее изображение")
-    print("Стрелка 'n' - следующее изображение")
-    print("Нажмите 'i' - показать информацию о текущем изображении")
-    print("Нажмите 'Esc' - выход")
-
+    print_manual()
 
     while True:
         key = window.wait_key(60)
-
-
 
         if key == ord('d'):
             window.show_next_image()
@@ -37,20 +45,23 @@ if __name__ == "__main__":
 
         elif key == ord('1'):
             change_sepia(window)
+            print_manual()
 
         elif key == ord('2'):
             change_apply_vignette_elliptical(window)
+            print_manual()
 
         elif key == ord('4'):
             changer_add_rectangular_border(window)
-
+            print_manual()
 
         elif key == ord('6'):
             change_add_lens_flare(window)
+            print_manual()
 
         elif key == ord('7'):
             change_add_watercolor_texture(window)
-
+            print_manual()
 
         elif key == 27:
             break

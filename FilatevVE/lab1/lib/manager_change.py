@@ -5,14 +5,18 @@ def change_sepia(window):
     """
     Менеджер для функции применения фотоэффекта сепии к изображению.
     """
-    current_value = 1
+    print("\nФотоэффект сепии:")
+    print("Управление интенсивностью с помощью колесика мыши")
+    print("Выход из режима - клавиша 'Esc'")
+
+    intensity = 1
     def mouse_callback(event, x, y, flags, param):
-        nonlocal current_value
+        nonlocal intensity
         if event == cv2.EVENT_MOUSEWHEEL:
-            if flags > 0 and current_value <= 0.9:
-                current_value += 0.05
-            elif flags < 0 and current_value >= 0.1:
-                current_value -= 0.05
+            if flags > 0 and intensity <= 0.9:
+                intensity += 0.05
+            elif flags < 0 and intensity >= 0.1:
+                intensity -= 0.05
 
     cv2.setMouseCallback(window.window, mouse_callback)
 
@@ -23,7 +27,7 @@ def change_sepia(window):
             break
 
         image = window.load_current_image()
-        new_image = sepia_filter(image, current_value)
+        new_image = sepia_filter(image, intensity)
         window.add_image_with_padding(new_image)
 
     cv2.setMouseCallback(window.window_name, lambda *args: None)
@@ -34,6 +38,11 @@ def change_apply_vignette_elliptical(window):
     """
     Менеджер для функции применения фотоэффекта виньетки к изображению.
     """
+    print("\nФотоэффект виньетки:")
+    print("Управление размером виньетки с помощью колесика мыши")
+    print("Управление интенсивностью с помощью клавиш W и S")
+    print("Выход из режима - клавиша 'Esc'")
+
     current_scale = 1.5
     current_intensity = 0.7
 
@@ -46,7 +55,6 @@ def change_apply_vignette_elliptical(window):
                 current_scale -= 0.1
 
     cv2.setMouseCallback(window.window, mouse_callback)
-
 
     while True:
         key = window.wait_key(60)
@@ -68,7 +76,63 @@ def change_apply_vignette_elliptical(window):
     window.add_image_with_padding(window.load_current_image())
 
 
+def changer_add_rectangular_border(window):
+    """
+    Менеджер для функции для управления функцией, которая накладывает прямоугольную одноцветную рамку по краям изображения.
+    """
+    print("\nОдноцветная рамка:")
+    print("Управление цветом с помощью колесика мыши")
+    print("Выбор цветовой компоненты - нажатие правой кнопки мыши")
+    print("Управление толщиной рамки - клавиши W и S")
+    print("Выход из режима - клавиша 'Esc'")
+
+    color = [100, 150, 200]
+    current_channel = 0
+    border_width = 10
+
+    def mouse_callback(event, x, y, flags, param):
+        nonlocal color
+        nonlocal current_channel
+        if event == cv2.EVENT_MOUSEWHEEL:
+            if flags > 0:
+                color[current_channel] = min(color[current_channel] + 5, 255)
+            elif flags < 0:
+                color[current_channel] = max(color[current_channel] - 5, 0)
+        elif event == cv2.EVENT_LBUTTONDOWN:
+            current_channel = (current_channel + 1) % 3
+
+    cv2.setMouseCallback(window.window, mouse_callback)
+
+    while True:
+        key = window.wait_key(60)
+
+        if key == ord('w'):
+            border_width += 1
+
+        elif key == ord('s') and border_width >= 1:
+            border_width -= 1
+
+        if key == 27:
+            break
+
+        image = window.load_current_image()
+        new_image = add_rectangular_border(image, border_width, tuple(color))
+        window.add_image_with_padding(new_image)
+
+    cv2.setMouseCallback(window.window_name, lambda *args: None)
+    window.add_image_with_padding(window.load_current_image())
+
+
 def change_add_lens_flare(window):
+    """
+    Менеджер для функции наложения эффекта блика на изображение.
+    """
+    print("\nЭффект блика объектива:")
+    print("Управление интенсивностью - колесико мыши (вверх - увеличить, вниз - уменьшить)")
+    print("Позиция блика - клик левой кнопкой мыши")
+    print("Управление размером блика - клавиши W (увеличить) и S (уменьшить)")
+    print("Выход из режима - клавиша 'Esc'")
+
     flare_position = (0.5, 0.5)
     intensity = 1.0
     flare_size = 0.3
@@ -107,7 +171,15 @@ def change_add_lens_flare(window):
     cv2.setMouseCallback(window.window_name, lambda *args: None)
     window.add_image_with_padding(window.load_current_image())
 
+
 def change_add_watercolor_texture(window):
+    """
+    Менеджер для функции наложения текстуры акварельной бумаги на изображение.
+    """
+    print("\nТекстура акварельной бумаги:")
+    print("Управление интенсивностью текстуры - колесико мыши (вверх - увеличить, вниз - уменьшить)")
+    print("Выход из режима - клавиша 'Esc'")
+
     current_value = 1
     last_value = 0
 
@@ -132,44 +204,6 @@ def change_add_watercolor_texture(window):
             new_image = add_watercolor_texture(image, current_value)
             window.add_image_with_padding(new_image)
             last_value = current_value
-
-    cv2.setMouseCallback(window.window_name, lambda *args: None)
-    window.add_image_with_padding(window.load_current_image())
-
-
-def changer_add_rectangular_border(window):
-    color = [100, 150, 200]
-    current_channel = 0
-    border_width = 10
-
-    def mouse_callback(event, x, y, flags, param):
-        nonlocal color
-        nonlocal current_channel
-        if event == cv2.EVENT_MOUSEWHEEL:
-            if flags > 0:
-                color[current_channel] = min(color[current_channel] + 5, 255)
-            elif flags < 0:
-                color[current_channel] = max(color[current_channel] - 5, 0)
-        elif event == cv2.EVENT_LBUTTONDOWN:
-            current_channel = (current_channel + 1) % 3
-
-    cv2.setMouseCallback(window.window, mouse_callback)
-
-    while True:
-        key = window.wait_key(60)
-
-        if key == ord('w'):
-            border_width += 1
-
-        elif key == ord('s') and border_width >= 1:
-            border_width -= 1
-
-        if key == 27:
-            break
-
-        image = window.load_current_image()
-        new_image = add_rectangular_border(image, border_width, tuple(color))
-        window.add_image_with_padding(new_image)
 
     cv2.setMouseCallback(window.window_name, lambda *args: None)
     window.add_image_with_padding(window.load_current_image())
