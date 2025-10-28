@@ -257,6 +257,6 @@ class Filters:
         paper = np.full((h, w, 3), [220, 235, 240], dtype=np.uint8)
         noise = np.random.randint(-80, 80, (h, w, 3), dtype=np.int16)
         paper = np.clip(paper.astype(np.int16) + noise, 0, 255).astype(np.uint8)
-        result = Filters.mixing(image, 0.7, paper, 0.3)
+        result = Filters._mixing(image, 0.7, paper, 0.3)
 
         return result
