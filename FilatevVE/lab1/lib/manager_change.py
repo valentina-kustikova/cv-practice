@@ -1,3 +1,5 @@
+import os
+
 from lib.change_images import *
 
 
@@ -294,4 +296,40 @@ def pixelate_region_manager(window):
         window.add_image_with_padding(clone)
 
     cv2.setMouseCallback(window.window, lambda *args: None)
+    window.add_image_with_padding(window.load_current_image())
+
+
+
+def figure_frame_manager(window):
+    """
+    Менеджер для выбора и наложения фигурной рамки
+    """
+    print("\nРежим фигурной рамки:")
+    print("Выбор рамки - клавиши W (следующая) и S (предыдущая)")
+    print("Выход из режима - клавиша Esc")
+
+    frames_dir = 'frames'
+
+    frame_files = [f for f in os.listdir(frames_dir)
+                   if f.lower().endswith(('.png'))]
+
+    current_frame_index = 0
+
+    while True:
+        image = window.load_current_image()
+
+        current_frame_file = frame_files[current_frame_index]
+        preview = apply_figure_frame(image, current_frame_file)
+
+        window.add_image_with_padding(preview)
+
+        key = window.wait_key(60)
+
+        if key == 27:
+            break
+        elif key == ord('w'):
+            current_frame_index = (current_frame_index + 1) % len(frame_files)
+        elif key == ord('s'):
+            current_frame_index = (current_frame_index - 1) % len(frame_files)
+
     window.add_image_with_padding(window.load_current_image())

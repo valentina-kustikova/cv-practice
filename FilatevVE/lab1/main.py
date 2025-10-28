@@ -59,6 +59,10 @@ if __name__ == "__main__":
             changer_add_rectangular_border(window)
             print_manual()
 
+        elif key == ord('5'):
+            figure_frame_manager(window)
+            print_manual()
+
         elif key == ord('6'):
             change_add_lens_flare(window)
             print_manual()

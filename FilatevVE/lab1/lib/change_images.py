@@ -1,3 +1,5 @@
+import os
+
 import cv2
 import numpy as np
 
@@ -176,3 +178,31 @@ def pixelate_region(image, x1, y1, x2, y2, pixel_size=10):
     image[y1:y2, x1:x2] = pixelated
 
     return image
+
+
+def apply_figure_frame(image, frame_path):
+    """
+    Наложение фигурной рамки по краям изображения
+
+    Args:
+        image: исходное изображение
+        frame_path: путь до рамки
+    """
+    result = image.copy()
+    h, w = result.shape[:2]
+
+    frame_path = os.path.join('frames', frame_path)
+
+    if os.path.exists(frame_path):
+        frame_img = cv2.imread(frame_path, cv2.IMREAD_UNCHANGED)
+
+        if frame_img is not None:
+            frame_resized = cv2.resize(frame_img, (w, h))
+
+            frame_bgr = frame_resized[:, :, :3]
+            alpha = frame_resized[:, :, 3] / 255.0
+
+            for c in range(3):
+                result[:, :, c] = result[:, :, c] * (1 - alpha) + frame_bgr[:, :, c] * alpha
+
+    return result
