@@ -135,51 +135,6 @@ def add_watercolor_texture(image, texture_intensity=0.3):
     return np.clip(result, 0, 255).astype(np.uint8)
 
 
-def draw_green_frame(image, x1, y1, x2, y2):
-    """
-    Рисует зеленую рамку толщиной 1 пиксель по заданным координатам
-
-    Args:
-        image: исходное изображение
-        x1, y1: координаты левого верхнего угла
-        x2, y2: координаты правого нижнего угла
-    """
-    if x1 >= 0 and y1 >= 0 and x2 >= 0 and y2 >= 0 and x2 > x1 and y2 > y1:
-        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 1)
-
-    return image
-
-
-def pixelate_region(image, x1, y1, x2, y2, pixel_size=10):
-    """
-    Пикселизация заданной прямоугольной области изображения
-
-    Args:
-        image: исходное изображение
-        x1, y1: координаты левого верхнего угла области
-        x2, y2: координаты правого нижнего угла области
-        pixel_size: размер пикселя для пикселизации
-    """
-
-    if (x1 < 0 or y1 < 0 or x2 <= x1 or y2 <= y1 or
-            x2 > image.shape[1] or y2 > image.shape[0]):
-        return image
-
-    region = image[y1:y2, x1:x2]
-
-    h, w = region.shape[:2]
-
-    small_w = max(1, w // pixel_size)
-    small_h = max(1, h // pixel_size)
-    small = cv2.resize(region, (small_w, small_h), interpolation=cv2.INTER_LINEAR)
-
-    pixelated = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
-
-    image[y1:y2, x1:x2] = pixelated
-
-    return image
-
-
 def apply_figure_frame(image, frame_path):
     """
     Наложение фигурной рамки по краям изображения
@@ -206,3 +161,63 @@ def apply_figure_frame(image, frame_path):
                 result[:, :, c] = result[:, :, c] * (1 - alpha) + frame_bgr[:, :, c] * alpha
 
     return result
+
+
+
+def draw_green_frame(image, point_1, point_2):
+    """
+    Рисует зеленую рамку толщиной 1 пиксель по заданным координатам
+
+    Args:
+        image: исходное изображение
+        point_1: координаты левого верхнего угла области в нормализованных координатах (0.0-1.0)
+        point_2: координаты правого нижнего угла области в нормализованных координатах (0.0-1.0)
+    """
+    h, w = image.shape[:2]
+
+    x1 = int(point_1[0] * w)
+    y1 = int(point_1[1] * h)
+    x2 = int(point_2[0] * w)
+    y2 = int(point_2[1] * h)
+
+    if x1 >= 0 and y1 >= 0 and x2 >= 0 and y2 >= 0 and x2 > x1 and y2 > y1:
+        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 1)
+
+    return image
+
+
+def pixelate_region(image, point_1, point_2, pixel_size=10):
+    """
+    Пикселизация заданной прямоугольной области изображения
+
+    Args:
+        image: исходное изображение
+        point_1: координаты левого верхнего угла области в нормализованных координатах (0.0-1.0)
+        point_2: координаты правого нижнего угла области в нормализованных координатах (0.0-1.0)
+        pixel_size: размер пикселя для пикселизации
+    """
+
+    h, w = image.shape[:2]
+
+    x1 = int(point_1[0] * w)
+    y1 = int(point_1[1] * h)
+    x2 = int(point_2[0] * w)
+    y2 = int(point_2[1] * h)
+
+    if (x1 < 0 or y1 < 0 or x2 <= x1 or y2 <= y1 or
+            x2 > image.shape[1] or y2 > image.shape[0]):
+        return image
+
+    region = image[y1:y2, x1:x2]
+
+    h, w = region.shape[:2]
+
+    small_w = max(1, w // pixel_size)
+    small_h = max(1, h // pixel_size)
+    small = cv2.resize(region, (small_w, small_h), interpolation=cv2.INTER_LINEAR)
+
+    pixelated = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+
+    image[y1:y2, x1:x2] = pixelated
+
+    return image
