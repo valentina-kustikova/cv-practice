@@ -65,10 +65,10 @@ def add_rectangular_border(image, border_width=10, color=(0, 0, 0)):
     if border_width is None:
         border_width = int(min(h, w) / 10)
 
-    image[0:border_width] = color
+    image[:border_width] = color
     image[-border_width:] = color
-    image[border_width:-border_width, 0:border_width] = color
-    image[border_width:-border_width, -border_width:] = color
+    image[:, 0:border_width] = color
+    image[:, -border_width:] = color
 
     return image
 
