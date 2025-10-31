@@ -121,33 +121,30 @@ def add_lens_flare(image, flare_position=(0.5, 0.5), intensity=1.0, flare_size=0
     return np.clip(glared_image, 0, 255).astype(np.uint8)
 
 
-def add_watercolor_texture(image, texture_intensity=0.3):
+def add_watercolor_texture(image, texture_intensity=0.3, strength=0.9):
     """
-    Накладывает текстуру акварельной бумаги
+    Накладывает текстуру акварельной бумаги из файла
 
     Args:
         image: исходное изображение
         texture_intensity: интенсивность текстуры (0.0 - 1.0)
+        strength: сила применения текстуры (0.0 - 1.0)
     """
-    h, w = image.shape[:2]
-
-    texture = np.random.normal(0, 0.1, (h, w)).astype(np.float32)
-
-    low_freq_noise = cv2.resize(
-        np.random.normal(0, 0.05, (h // 10, w // 10)),
-        (w, h),
-        interpolation=cv2.INTER_LINEAR
-    )
-    texture += low_freq_noise
-
-    result = image.astype(np.float32)
-    texture_3d = np.stack([texture] * 3, axis=2)
-
-    result = result * (1 - texture_intensity) + (result * (1 + texture_3d)) * texture_intensity
-
-    result = cv2.GaussianBlur(result.astype(np.float32), (3, 3), 0)
-
-    return np.clip(result, 0, 255).astype(np.uint8)
+    texture_path = os.path.join('texture', 'water_paper.jpg')
+    
+    texture = cv2.imread(texture_path)
+    
+    if texture.shape[:2] != image.shape[:2]:
+        texture = cv2.resize(texture, (image.shape[1], image.shape[0]))
+    
+    texture_gray = np.mean(texture, axis=2)
+    texture_mask = 1 - (texture_gray / 255.0)
+    texture_mask = texture_mask ** (1 / strength)
+    texture_mask = texture_mask[:, :, np.newaxis]
+    
+    blended = image.astype(np.float32) * (1 - texture_mask * texture_intensity) + texture.astype(np.float32) * (texture_mask * texture_intensity)
+    
+    return np.clip(blended, 0, 255).astype(np.uint8)
 
 
 def apply_figure_frame(image, frame_path):

@@ -176,36 +176,41 @@ def change_add_lens_flare(window):
 
 def change_add_watercolor_texture(window):
     """
-    Менеджер для функции наложения текстуры акварельной бумаги на изображение.
+    Менеджер для функции наложения текстуры акварельной бумаги из файла на изображение.
     """
-    print("\nТекстура акварельной бумаги:")
+    print("\nТекстура акварельной бумаги (наложение текстуры):")
     print("Управление интенсивностью текстуры - колесико мыши (вверх - увеличить, вниз - уменьшить)")
+    print("Управление силой применения - клавиши W (увеличить) и S (уменьшить)")
     print("Выход из режима - клавиша 'Esc'")
 
-    current_value = 1
-    last_value = 0
+    texture_intensity = 0.3
+    strength = 0.9
 
     def mouse_callback(event, x, y, flags, param):
-        nonlocal current_value
+        nonlocal texture_intensity
         if event == cv2.EVENT_MOUSEWHEEL:
-            if flags > 0 and current_value <= 0.9:
-                current_value += 0.05
-            elif flags < 0 and current_value >= 0.1:
-                current_value -= 0.05
+            if flags > 0 and texture_intensity <= 0.9:
+                texture_intensity += 0.05
+            elif flags < 0 and texture_intensity >= 0.1:
+                texture_intensity -= 0.05
 
     cv2.setMouseCallback(window.window, mouse_callback)
 
     while True:
         key = window.wait_key(60)
 
-        if key == 27:
+        if key == ord('w') and strength <= 0.95:
+            strength += 0.05
+
+        elif key == ord('s') and strength >= 0.05:
+            strength -= 0.05
+
+        elif key == 27:
             break
 
-        if last_value != current_value:
-            image = window.load_current_image()
-            new_image = add_watercolor_texture(image, current_value)
-            window.add_image_with_padding(new_image)
-            last_value = current_value
+        image = window.load_current_image()
+        new_image = add_watercolor_texture(image, texture_intensity, strength)
+        window.add_image_with_padding(new_image)
 
     cv2.setMouseCallback(window.window_name, lambda *args: None)
     window.add_image_with_padding(window.load_current_image())
