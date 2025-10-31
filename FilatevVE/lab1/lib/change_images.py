@@ -75,7 +75,7 @@ def add_rectangular_border(image, border_width=10, color=(0, 0, 0)):
 
 def add_lens_flare(image, flare_position=(0.5, 0.5), intensity=1.0, flare_size=0.3):
     """
-    Функция наложения эффекта блика.
+    Накладывает текстуру блика на изображение.
 
     Args:
         image: исходное изображение
@@ -83,27 +83,42 @@ def add_lens_flare(image, flare_position=(0.5, 0.5), intensity=1.0, flare_size=0
         intensity: интенсивность эффекта (0.0 - 1.0)
         flare_size: размер блика (0.1 - 1.0)
     """
-    result = image.copy().astype(np.float32)
-    h, w = result.shape[:2]
+    glared_image = image.astype(np.float32)
+    h_img, w_img = image.shape[:2]
+    
+    center_x = int(flare_position[0] * w_img)
+    center_y = int(flare_position[1] * h_img)
+    
+    texture_path = os.path.join('texture', 'flare_texture.jpg')
+    
+    flare_texture = cv2.imread(texture_path)
 
-    main_x = int(flare_position[0] * w)
-    main_y = int(flare_position[1] * h)
+    h_glare, w_glare = flare_texture.shape[:2]
 
-    base_radius = min(w, h) // 4
-    radius = int(base_radius * flare_size)
+    scale_factor = flare_size
+    new_w = int(w_glare * scale_factor)
+    new_h = int(h_glare * scale_factor)
+    flare = cv2.resize(flare_texture, (new_w, new_h))
+    h_glare, w_glare = flare.shape[:2]
+    
+    y_start = center_y - h_glare // 2
+    y_end = y_start + h_glare
+    x_start = center_x - w_glare // 2
+    x_end = x_start + w_glare
+    
+    img_y_start = max(0, y_start)
+    img_y_end = min(h_img, y_end)
+    img_x_start = max(0, x_start)
+    img_x_end = min(w_img, x_end)
+    
+    glare_y_start = max(0, -y_start)
+    glare_y_end = h_glare - max(0, y_end - h_img)
+    glare_x_start = max(0, -x_start)
+    glare_x_end = w_glare - max(0, x_end - w_img)
+    
+    glared_image[img_y_start:img_y_end, img_x_start:img_x_end] += flare[glare_y_start:glare_y_end, glare_x_start:glare_x_end] * intensity
 
-    brightness = 0.4 * intensity
-
-    y_coords, x_coords = np.ogrid[:h, :w]
-    distance = np.sqrt((x_coords - main_x) ** 2 + (y_coords - main_y) ** 2)
-
-    flare_mask = np.exp(-(distance ** 2) / (2 * (radius ** 2)))
-    flare_mask = flare_mask * brightness
-
-    for c in range(3):
-        result[:, :, c] += flare_mask * 255
-
-    return np.clip(result, 0, 255).astype(np.uint8)
+    return np.clip(glared_image, 0, 255).astype(np.uint8)
 
 
 def add_watercolor_texture(image, texture_intensity=0.3):
