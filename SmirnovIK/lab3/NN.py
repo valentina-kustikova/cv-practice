@@ -1,9 +1,9 @@
 from tensorflow.data import Dataset
 from tensorflow.keras.applications import VGG16
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Flatten
+from tensorflow.keras.layers import Dense, Flatten
 from tensorflow.keras.models import Model, load_model
 import numpy as np
-from sklearn.metrics import accuracy_score, recall_score, classification_report
+from sklearn.metrics import accuracy_score
 from tensorflow.keras.utils import to_categorical
 class NN:
     def __init__(self, model_name=None):
@@ -35,6 +35,5 @@ class NN:
         preds = np.argmax(self.base_model.predict(data_test),axis=1)
         if test_labels is not None:
             acc = accuracy_score(test_labels, preds)
-            tpr = recall_score(test_labels, preds, average= "macro")
-            return acc, tpr, preds
+            return acc, preds
         return preds

@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from sklearn.cluster import MiniBatchKMeans, KMeans
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, recall_score, classification_report
+from sklearn.metrics import accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 import joblib
@@ -34,7 +34,6 @@ class BOW:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         keypoints, descriptors = sift.detectAndCompute(gray, None)
         img_kp = cv2.drawKeypoints(img,keypoints,None,flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        #img_kp = cv2.resize(img_kp,(1100,850))
         cv2.imshow("Дескрипторы", img_kp)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
@@ -69,8 +68,7 @@ class BOW:
         preds = self.clf.predict(X)
         if labels is not None:
             acc = accuracy_score(labels, preds)
-            tpr = recall_score(labels, preds, average= "macro")
-            return preds, acc, tpr
+            return preds, acc
         return preds
 
     def save_model(self, output_path):
