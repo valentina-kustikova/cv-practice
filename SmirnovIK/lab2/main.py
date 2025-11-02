@@ -20,7 +20,7 @@ elif args.model=="nano":
     det = NanoDetDetector.NanoDetDetector("nanodet-plus-m_416.onnx", args.conf_th, args.nms_th)
 
 detections={}
-all_tpr, all_fdr, counter = 0,0,0
+all_tp, all_fp, all_fn = 0,0,0
 for i,f in enumerate(sorted(os.listdir(args.path))):
     img=cv2.imread(f"{args.path}/{f}")
     class_names = load_class_names("classes.txt")
@@ -29,7 +29,7 @@ for i,f in enumerate(sorted(os.listdir(args.path))):
 
     gt_boxes = [(cls, box) for cls, box in gt_frame]
     detections[i]=res
-    TPR, FDR = evaluate_frame(
+    TPR, FDR, (tp, fn, fp) = evaluate_frame(
         [(gt_frame[i]["class"], gt_frame[i]["bbox"]) for i in range(len(gt_frame))],
         [(x,y,w,h,class_names[cid]) for x,y,w,h,conf,cid in res]
     )
@@ -52,8 +52,8 @@ for i,f in enumerate(sorted(os.listdir(args.path))):
             print("Пауза. Нажмите любую клавишу чтобы продолжить.")
             cv2.waitKey(0)
     elif args.mode == "metrics":
-        all_tpr += TPR
-        all_fdr += FDR
-        counter += 1
+        all_tp += tp
+        all_fn += fn
+        all_fp += fp
 
-if args.mode == "metrics": print(f"TPR={all_tpr/counter:.3f}, FDR={all_fdr/counter:.3f}")
+if args.mode == "metrics": print(f"TPR={all_tp/(all_tp + all_fn):.3f}, FDR={all_fp/(all_fp+all_tp):.3f}")

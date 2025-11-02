@@ -60,6 +60,6 @@ def evaluate_frame(gt_boxes, det_boxes, iou_thr=0.5):
     TPR = TP / (TP + FN + 1e-9)
     FDR = FP / (TP + FP + 1e-9)
 
-    return TPR, FDR
+    return TPR, FDR, (TP, FN, FP)
 
 
