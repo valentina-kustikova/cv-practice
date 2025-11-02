@@ -225,7 +225,7 @@ class CNNClassifier(BaseClassifier):
         self.model = None
         
     def create_cnn_model(self):
-        base_model = VGG16(weights='imagenet', 
+        base_model = VGG16(weights=os.path.expanduser('./weights/vgg16_weights_imagenet.h5'), 
                           include_top=False, 
                           input_shape=(self.image_size[0], self.image_size[1], 3))
         
@@ -411,7 +411,7 @@ def main():
             if not os.path.exists(args.model_dir):
                 print(f"Ошибка: директория с моделью {args.model_dir} не существует!")
                 return
-            load_model(args.model_dir)
+            classifier.load_model(args.model_dir)
         
         test_accuracy = classifier.test(args.test_file, args.data_dir)
     

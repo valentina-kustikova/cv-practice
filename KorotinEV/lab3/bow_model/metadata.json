@@ -1,6 +1,9 @@
 {
   "algorithm": "bow",
-  "n_clusters": 100,
+  "image_size": [
+    224,
+    224
+  ],
   "class_names": [
     "Архангельский собор",
     "Дворец труда",
