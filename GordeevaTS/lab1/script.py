@@ -134,13 +134,9 @@ def apply_pixelation(image, x=0, y=0, width=10, height=10, pixel_size=10):
 
 def apply_frame(image, frame_width=10, frame_color=(255, 255, 255)):
     height, width = image.shape[:2]
-    new_height = height + 2 * frame_width
-    new_width = width + 2 * frame_width
     
-    framed_image = np.full((new_height, new_width, 3), frame_color, dtype=np.uint8)
-    
-    if frame_width + height <= new_height and frame_width + width <= new_width:
-        framed_image[frame_width:frame_width+height, frame_width:frame_width+width] = image
+    framed_image = np.full((height, width, 3), frame_color, dtype=np.uint8)
+    framed_image[frame_width:height-frame_width, frame_width:width-frame_width] = image[frame_width:height-frame_width, frame_width:width- frame_width]
     
     return framed_image
 
@@ -232,7 +228,7 @@ def apply_lens_flare(image, flare_path, intensity=0.7, position=None):
     
     return np.clip(result_image, 0, 255).astype(np.uint8)
 
-def watercolor_texture(image, intensity=0.3, strength=0.9):
+def watercolor_texture(image, intensity=1.0):
     texture_path = "/Users/taagordeeva/Desktop/cv-practice/GordeevaTS/lab1/watercolor_paper.jpg"
     texture = cv2.imread(texture_path)
     if texture is None:
@@ -243,12 +239,7 @@ def watercolor_texture(image, intensity=0.3, strength=0.9):
     
     texture_gray = rgb_to_grayscale(texture)
     texture_mask = 1 - (texture_gray / 255.0)
-    
-    height, width = texture_mask.shape
-    for i in range(height):
-        for j in range(width):
-            texture_mask[i, j] = texture_mask[i, j] ** (1 / strength)
-    
+        
     texture_mask = texture_mask[:, :, np.newaxis]
     
     blended = np.zeros_like(image, dtype=np.float32)
@@ -264,18 +255,28 @@ def show_comparison(original_path, processed_image):
     original = cv2.imread(original_path)
     original_rgb = cv2.cvtColor(original, cv2.COLOR_BGR2RGB)
     processed_rgb = cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB)
-    
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
-    
-    ax1.imshow(original_rgb)
-    ax1.set_title(f'Оригинал: {original.shape[1]}x{original.shape[0]}')
+
+    h1, w1 = original.shape[:2]
+    h2, w2 = processed_image.shape[:2]
+    dpi = 100
+    fig_w = (w1 + w2) / dpi
+    fig_h = max(h1, h2) / dpi
+    fig = plt.figure(figsize=(fig_w, fig_h), dpi=dpi)
+    gs = fig.add_gridspec(1, 2, width_ratios=[w1, w2])
+    ax1 = fig.add_subplot(gs[0])
+    ax2 = fig.add_subplot(gs[1])
+
+    ax1.imshow(original_rgb, interpolation='nearest')
+    ax1.set_title(f'Оригинал: {w1}x{h1}')
     ax1.axis('off')
-    
-    ax2.imshow(processed_rgb)
-    ax2.set_title(f'Обработанный: {processed_image.shape[1]}x{processed_image.shape[0]}')
+    ax1.set_aspect('equal') 
+
+    ax2.imshow(processed_rgb, interpolation='nearest')
+    ax2.set_title(f'Обработанный: {w2}x{h2}')
     ax2.axis('off')
-    
-    plt.tight_layout()
+    ax2.set_aspect('equal')
+
+    plt.subplots_adjust(wspace=0.05, hspace=0)
     plt.show()
 
 def main():
@@ -319,10 +320,9 @@ def main():
     parser.add_argument('--flare_y', type=int, help='Y координата блика')
     
     parser.add_argument('--watercolor', action='store_true', help='Применить эффект акварельной бумаги')
-    parser.add_argument('--watercolor_intensity', type=float, default=0.3,
+    parser.add_argument('--watercolor_intensity', type=float, default=1.0,
                        help='Интенсивность акварельной текстуры (0.0 - 1.0)')
-    parser.add_argument('--watercolor_strength', type=float, default=0.9,
-                       help='Сила текстуры (0.1 - 2.0)')
+
     
     #for all
     parser.add_argument('--output', help='Путь для сохранения результата')
@@ -364,19 +364,22 @@ def main():
             result_image = apply_vignette(result_image, args.vignette_intensity)
         
         if args.pixelate:
-            if args.pixel_x is not None and args.pixel_y is not None and args.pixel_width is not None and args.pixel_height is not None:
-                print(f"Применяем пикселизацию к области ({args.pixel_x}, {args.pixel_y}, {args.pixel_width}, {args.pixel_height})...")
-                result_image = apply_pixelation(
-                    result_image, 
-                    x=args.pixel_x, 
-                    y=args.pixel_y, 
-                    width=args.pixel_width, 
-                    height=args.pixel_height, 
-                    pixel_size=args.pixel_size
-                )
-            else:
-                print("Предупреждение: для пикселизации необходимо указать все координаты --pixel_x, --pixel_y, --pixel_width, --pixel_height")
-                print("Пикселизация не применена")
+            win_title = "Higlight the area for pixelate this an click to 'Escape'."
+            roi = cv2.selectROI(win_title, image, showCrosshair=False, printNotice=False)
+            cv2.destroyWindow(win_title)
+
+            x1, y1, w1, h1 = map(int, roi)
+            if w1 <= 0 or h1 <= 0:
+                return image.copy()
+            
+            result_image = apply_pixelation(
+                result_image, 
+                x=x1, 
+                y=y1, 
+                width=w1, 
+                height=h1, 
+                pixel_size=args.pixel_size
+            )
         
         if args.frame:
             print(f"Добавляем прямоугольную рамку шириной {args.frame_width} пикселей...")
@@ -436,8 +439,7 @@ def main():
             print(f"Применяем эффект акварельной бумаги (интенсивность: {args.watercolor_intensity})...")
             result_image = watercolor_texture(
                 result_image,
-                intensity=args.watercolor_intensity,
-                strength=args.watercolor_strength
+                intensity=args.watercolor_intensity
             )
         
         if args.output and result_image is not None:
