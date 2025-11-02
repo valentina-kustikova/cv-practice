@@ -20,7 +20,7 @@ def cli_argument_parser():
     parser.add_argument('--clusters_name', choices=['KMeans', 'MiniBatch'], help='Name of clusters method', type=str, default='MiniBatch')
     parser.add_argument('--clf_name', choices=['KNN', 'SVC'],help='Nmae of clf method', type=str, default='SVC')
     parser.add_argument('--k_nearest', help='Number of neighbors in KNN', type=int, default=5)
-    parser.add_argument('--clusters', help='Number of clusters in clusterization', type=int, default=500)
+    parser.add_argument('--clusters', help='Number of clusters in clusterization', type=int, default=300)
     parser.add_argument('--batch_size', help='Batch size for KMeansMiniBatch', type=int, default=1000)
     parser.add_argument('--model_name', choices=["VGG"], help='Name of pretrained nn model', type=str, default='VGG')
     parser.add_argument('--draw_img', help='Path to image to draw descriptors on', type=str, default='data\\NNSUDataset\\01_NizhnyNovgorodKremlin\\20250227_151756.jpg')
