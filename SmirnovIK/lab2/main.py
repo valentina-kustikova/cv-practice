@@ -22,9 +22,6 @@ elif args.model=="nano":
 detections={}
 all_tpr, all_fdr, counter = 0,0,0
 for i,f in enumerate(sorted(os.listdir(args.path))):
-    # if counter < 2797:
-    #     counter += 1
-    #     continue
     img=cv2.imread(f"{args.path}/{f}")
     class_names = load_class_names("classes.txt")
     res = det.detect(img)
