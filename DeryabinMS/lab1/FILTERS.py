@@ -237,52 +237,89 @@ def add_border(image, border_width, border_color):
     return result
 
 def add_fancy_border(image, border_type, border_color):
-    """Добавление фигурной рамки"""
+    """Добавление фигурной одноцветной рамки по краям изображения"""
     h, w = image.shape[:2]
-    border_width = min(h, w) // 10
+    border_width = min(h, w) // 15  # Ширина рамки 
+    
     result = image.copy()
     
     if border_type == 'wave':
-        # Волнистая рамка
+        # Волнистая рамка с синусоидальным паттерном
         for i in range(border_width):
-            wave = border_width * (0.5 + 0.5 * np.sin(np.arange(w) * 2 * np.pi / 50))
-            mask = i < wave
-            result[i, mask] = border_color
-            result[h-1-i, mask] = border_color
+            # Верхняя граница
+            wave_top = border_width * (0.5 + 0.5 * np.sin(np.arange(w) * 2 * np.pi / 80))
+            mask_top = i < wave_top
+            result[i, mask_top] = border_color
             
-        for i in range(h):
-            wave = border_width * (0.5 + 0.5 * np.sin(np.arange(border_width) * 2 * np.pi / 50))
-            mask = np.arange(border_width) < wave
-            result[i, :border_width][mask] = border_color
-            result[i, w-border_width:w][mask] = border_color
+            # Нижняя граница
+            wave_bottom = border_width * (0.5 + 0.5 * np.sin(np.arange(w) * 2 * np.pi / 80 + np.pi))
+            mask_bottom = i < wave_bottom
+            result[h - 1 - i, mask_bottom] = border_color
+        
+        for j in range(border_width):
+            # Левая граница
+            wave_left = border_width * (0.5 + 0.5 * np.sin(np.arange(h) * 2 * np.pi / 80))
+            mask_left = j < wave_left
+            result[mask_left, j] = border_color
+            
+            # Правая граница
+            wave_right = border_width * (0.5 + 0.5 * np.sin(np.arange(h) * 2 * np.pi / 80 + np.pi))
+            mask_right = j < wave_right
+            result[mask_right, w - 1 - j] = border_color
             
     elif border_type == 'zigzag':
-        # Зигзагообразная рамка
+        # Зигзагообразная рамка с пилообразным паттерном
+        period = 40  # Период зигзага
+        
         for i in range(border_width):
-            zigzag = border_width * (0.5 + 0.5 * np.abs((np.arange(w) % 20) - 10) / 10)
-            mask = i < zigzag
-            result[i, mask] = border_color
-            result[h-1-i, mask] = border_color
-            
-        for i in range(h):
-            zigzag = border_width * (0.5 + 0.5 * np.abs((np.arange(border_width) % 20) - 10) / 10)
-            mask = np.arange(border_width) < zigzag
-            result[i, :border_width][mask] = border_color
-            result[i, w-border_width:w][mask] = border_color
-            
+            # Верхняя и нижняя границы
+            for x in range(w):
+                # Верхняя граница
+                zigzag_top = border_width * (0.5 + 0.5 * abs((x % period) - period/2) / (period/2))
+                if i < zigzag_top:
+                    result[i, x] = border_color
+                
+                # Нижняя граница
+                zigzag_bottom = border_width * (0.5 + 0.5 * abs((x % period) - period/2) / (period/2))
+                if i < zigzag_bottom:
+                    result[h - 1 - i, x] = border_color
+        
+        for j in range(border_width):
+            # Левая и правая границы
+            for y in range(h):
+                # Левая граница
+                zigzag_left = border_width * (0.5 + 0.5 * abs((y % period) - period/2) / (period/2))
+                if j < zigzag_left:
+                    result[y, j] = border_color
+                
+                # Правая граница
+                zigzag_right = border_width * (0.5 + 0.5 * abs((y % period) - period/2) / (period/2))
+                if j < zigzag_right:
+                    result[y, w - 1 - j] = border_color
+                    
     elif border_type == 'triangle':
-        # Треугольная рамка
+        # Треугольная рамка с линейным градиентом
         for i in range(border_width):
-            triangle = border_width * (1 - np.abs(np.arange(w) - w/2) / (w/2))
-            mask = i < triangle
-            result[i, mask] = border_color
-            result[h-1-i, mask] = border_color
+            # Верхняя граница - треугольный паттерн
+            triangle_top = border_width * (1 - np.abs(np.arange(w) - w/2) / (w/2))
+            mask_top = i < triangle_top
+            result[i, mask_top] = border_color
             
-        for i in range(h):
-            triangle = border_width * (1 - np.abs(np.arange(border_width) - border_width/2) / (border_width/2))
-            mask = np.arange(border_width) < triangle
-            result[i, :border_width][mask] = border_color
-            result[i, w-border_width:w][mask] = border_color
+            # Нижняя граница - треугольный паттерн
+            triangle_bottom = border_width * (1 - np.abs(np.arange(w) - w/2) / (w/2))
+            mask_bottom = i < triangle_bottom
+            result[h - 1 - i, mask_bottom] = border_color
+        
+        for j in range(border_width):
+            # Левая граница - треугольный паттерн
+            triangle_left = border_width * (1 - np.abs(np.arange(h) - h/2) / (h/2))
+            mask_left = j < triangle_left
+            result[mask_left, j] = border_color
+            
+            # Правая граница - треугольный паттерн
+            triangle_right = border_width * (1 - np.abs(np.arange(h) - h/2) / (h/2))
+            mask_right = j < triangle_right
+            result[mask_right, w - 1 - j] = border_color
     
     return result
 
