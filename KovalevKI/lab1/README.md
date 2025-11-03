@@ -6,9 +6,9 @@ resize_image(image, width=None, height=None, scale_factor=None)
 
 **Параметры**
 
-image — исходное изображение,
-width, height — новые размеры,
-scale_factor — коэффициент масштабирования.
+image — исходное изображение,  
+width, height — новые размеры,  
+scale_factor — коэффициент масштабирования.  
 
 **Алгоритм**
 
