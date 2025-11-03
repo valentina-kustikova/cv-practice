@@ -158,3 +158,18 @@
 ### False Discovery Rate (FDR)
 - Покажает, какая доля детекций является ложными срабатываниями
 - `FDR = False Positives / (True Positives + False Positives)`
+
+---
+
+## Метрики качества реализованных моделей
+**SSD Mobilenet**
+- tpr =  0.813
+- fdr = 0.023
+
+**YOLOv4**
+- tpr = 0.787
+- fdr = 0.033
+
+**Faster R-CNN**
+- tpr = 0.703
+- fdr = 0.066
