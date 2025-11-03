@@ -15,7 +15,7 @@ class VehicleDetectionApp:
         self.detection_colors = (0, 255, 0)     
         self.ground_truth_color = (255, 0, 255)
     
-    def draw_detections(self, image: np.ndarray, detections: List[Detection]) -> np.ndarray:
+    def draw_detections(self, image, detections):
         result = image.copy()
         
         for detection in detections:
@@ -52,7 +52,7 @@ class VehicleDetectionApp:
         
         return result
     
-    def draw_ground_truth(self, image: np.ndarray, ground_truth: List[Tuple[int, int, int, int]]) -> np.ndarray:
+    def draw_ground_truth(self, image, ground_truth):
         result = image.copy()
         
         for i, bbox in enumerate(ground_truth):
@@ -88,8 +88,7 @@ class VehicleDetectionApp:
         
         return result
     
-    def display_metrics(self, image: np.ndarray, tpr: float, fdr: float, 
-                       frame_tpr: float = None, frame_fdr: float = None) -> np.ndarray:
+    def display_metrics(self, image, tpr, fdr, frame_tpr = None, frame_fdr = None):
         result = image.copy()
         
         metrics_text = [

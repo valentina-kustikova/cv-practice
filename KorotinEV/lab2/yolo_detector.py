@@ -3,7 +3,7 @@ from typing import List, Tuple
 from base_struct import BaseDetector, Detection
 
 class YOLODetector(BaseDetector):
-    def postprocess(self, outputs: np.ndarray, image_shape: Tuple[int, int]) -> List[Detection]:
+    def postprocess(self, outputs, image_shape):
         detections = []
         img_height, img_width = image_shape
         
@@ -37,9 +37,7 @@ class YOLODetector(BaseDetector):
                     y2 = min(img_height - 1, y2)
                     
                     if x2 > x1 and y2 > y1:
-                        class_name = self.config.classes[class_id]
-                        
-                        detections.append(Detection(
+                            detections.append(Detection(
                             class_id=class_id,
                             class_name="car",
                             confidence=float(total_confidence),

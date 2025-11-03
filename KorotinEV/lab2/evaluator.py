@@ -3,13 +3,13 @@ from base_struct import Detection
 
 
 class DetectionEvaluator:
-    def __init__(self, target_class: str = "car"):
+    def __init__(self, target_class = "car"):
         self.target_class = target_class
         self.true_positives = 0
         self.false_positives = 0
         self.false_negatives = 0
         
-    def calculate_iou(self, box1: Tuple[int, int, int, int], box2: Tuple[int, int, int, int]) -> float:
+    def calculate_iou(self, box1, box2):
         x1_1, y1_1, x2_1, y2_1 = box1
         x1_2, y1_2, x2_2, y2_2 = box2
         
@@ -25,8 +25,7 @@ class DetectionEvaluator:
         
         return intersection_area / union_area if union_area > 0 else 0
     
-    def evaluate_frame(self, detections: List[Detection], ground_truth: List[Tuple[int, int, int, int]], 
-                      iou_threshold: float = 0.5) -> Tuple[float, float]:
+    def evaluate_frame(self, detections, ground_truth, iou_threshold = 0.5):
         frame_tp = 0
         frame_fp = 0
         frame_fn = 0
@@ -66,7 +65,7 @@ class DetectionEvaluator:
         
         return frame_tpr, frame_fdr
     
-    def get_metrics(self) -> Tuple[float, float]:
+    def get_metrics(self):
         tpr = self.true_positives / (self.true_positives + self.false_negatives) if (self.true_positives + self.false_negatives) > 0 else 0
         fdr = self.false_positives / (self.true_positives + self.false_positives) if (self.true_positives + self.false_positives) > 0 else 0
         return tpr, fdr

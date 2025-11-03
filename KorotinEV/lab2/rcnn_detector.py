@@ -4,7 +4,7 @@ from base_struct import BaseDetector, Detection
 
 
 class FasterRCNNDetector(BaseDetector):
-    def postprocess(self, outputs: np.ndarray, image_shape: Tuple[int, int]) -> List[Detection]:
+    def postprocess(self, outputs, image_shape):
         detections = []
         img_height, img_width = image_shape
 

@@ -3,11 +3,11 @@ from typing import List, Tuple, Dict
 
 
 class AnnotationLoader:
-    def __init__(self, annotation_path: str):
+    def __init__(self, annotation_path):
         self.annotation_path = annotation_path
         self.annotations = self._load_annotations()
     
-    def _load_annotations(self) -> Dict[str, List[Tuple[int, int, int, int]]]:
+    def _load_annotations(self):
         annotations = {}
         
         if not os.path.exists(self.annotation_path):
@@ -29,5 +29,5 @@ class AnnotationLoader:
         
         return annotations
     
-    def get_ground_truth(self, image_id: str) -> List[Tuple[int, int, int, int]]:
+    def get_ground_truth(self, image_id):
         return self.annotations.get(image_id, [])

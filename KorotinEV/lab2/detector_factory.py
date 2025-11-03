@@ -6,7 +6,7 @@ from rcnn_detector import FasterRCNNDetector
 
 class VehicleDetectorFactory:   
     @staticmethod
-    def get_available_models() -> Dict[str, Dict]:
+    def get_available_models():
         return {
             "yolo": {
                 "name": "YOLOv4",
@@ -26,7 +26,7 @@ class VehicleDetectorFactory:
         }
     
     @staticmethod
-    def create_detector(model_type: str, confidence_threshold: float = 0.5):
+    def create_detector(model_type, confidence_threshold = 0.5):
         models_configs = {
             "yolo": ModelConfig(
                 name="YOLOv4",

@@ -23,13 +23,13 @@ class ModelConfig:
     nms_threshold: float
 
 class BaseDetector:
-    def __init__(self, config: ModelConfig):
+    def __init__(self, config):
         self.config = config
         self.net = cv2.dnn.readNet(config.model_path, config.config_path)
         self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
         self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
         
-    def preprocess(self, image: np.ndarray) -> np.ndarray:
+    def preprocess(self, image):
         blob = cv2.dnn.blobFromImage(
             image, 
             self.config.scale_factor,
@@ -39,10 +39,10 @@ class BaseDetector:
         )
         return blob
     
-    def postprocess(self, outputs: np.ndarray, image_shape: Tuple[int, int]) -> List[Detection]:
+    def postprocess(self, outputs, image_shape):
         raise NotImplementedError("Must be implemented in subclass")
 
-    def _apply_nms(self, detections: List[Detection]) -> List[Detection]:
+    def _apply_nms(self, detections):
         if not detections:
             return []
         
@@ -70,7 +70,7 @@ class BaseDetector:
         
         return []
 
-    def detect(self, image: np.ndarray) -> List[Detection]:
+    def detect(self, image):
         blob = self.preprocess(image)
         self.net.setInput(blob)
         outputs = self.net.forward()
