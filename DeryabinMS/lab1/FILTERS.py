@@ -1,395 +1,406 @@
-import cv2 as cv
+import cv2
+import numpy as np
 import argparse
 import sys
-import numpy as np
-import math
-import random
 
 def argument_parser():
-    """Парсер командной строки для получения параметров"""
-    parser = argparse.ArgumentParser(prog='lab1 - image processing',
-                                     description="This laboratory work is devoted to basic operations on images.")
-
-    # Основные параметры
-    parser.add_argument('-i', '--image',
-                        help='Path to an image',
-                        type=str,
-                        required=True,
-                        dest='image_path')
-
-    parser.add_argument('-o', '--output',
-                        help='Output file name',
-                        type=str,
-                        default='test_out.jpg',
-                        dest='out_image_path')
-
-    parser.add_argument('-m', '--mode',
-                        help='Mode (resize, sepia, vig, pixel, border, fancy_border, lens_flare, watercolor)',
-                        type=str,
-                        required=True,
-                        dest='mode')
-
+    """Парсер аргументов командной строки"""
+    parser = argparse.ArgumentParser(description='Image processing filters')
+    parser.add_argument('-i', '--image', help='Path to input image', type=str, required=True)
+    parser.add_argument('-o', '--output', help='Path to output image', type=str, default='output.jpg')
+    parser.add_argument('-f', '--filter', help='Filter to apply',
+                        choices=['resize', 'sepia', 'vignette', 'pixelate', 'border', 'fancy_border', 'lens_flare', 'watercolor'],
+                        required=True)
+    
     # Параметры для различных фильтров
-    parser.add_argument('-c', '--coef',
-                        help='Input coefficient for resolution change',
-                        type=float,
-                        dest='coef')
-
-    parser.add_argument('-r', '--radius',
-                        help='Input radius for vignette effect',
-                        type=float,
-                        dest='radius')
-
-    parser.add_argument('-x', '--x_coord',
-                        help='X coordinate for pixelation area',
-                        type=int,
-                        dest='x')
-
-    parser.add_argument('-y', '--y_coord',
-                        help='Y coordinate for pixelation area',
-                        type=int,
-                        dest='y')
-
-    parser.add_argument('-w', '--width',
-                        help='Width for pixelation area',
-                        type=int,
-                        dest='width')
-
-    parser.add_argument('-ht', '--height',
-                        help='Height for pixelation area',
-                        type=int,
-                        dest='height')
-
-    parser.add_argument('-b', '--block',
-                        help='Input block size for pixelation effect',
-                        type=int,
-                        dest='block')
-
-    parser.add_argument('-bw', '--border_width',
-                        help='Border width for border effect',
-                        type=int,
-                        dest='border_width')
-
-    parser.add_argument('-bc', '--border_color',
-                        help='Border color as B,G,R values',
-                        type=str,
-                        dest='border_color')
-
-    parser.add_argument('-ft', '--frame_type',
-                        help='Frame type for fancy border (wave, zigzag, triangle)',
-                        type=str,
-                        dest='frame_type')
-
-    parser.add_argument('-fc', '--frame_color',
-                        help='Frame color as B,G,R values',
-                        type=str,
-                        dest='frame_color')
-
-    parser.add_argument('-fx', '--flare_x',
-                        help='X coordinate for lens flare',
-                        type=int,
-                        dest='flare_x')
-
-    parser.add_argument('-fy', '--flare_y',
-                        help='Y coordinate for lens flare',
-                        type=int,
-                        dest='flare_y')
-
+    parser.add_argument('--scale', type=float, help='Scale factor for resize')
+    parser.add_argument('--width', type=int, help='New width for resize')
+    parser.add_argument('--height', type=int, help='New height for resize')
+    
+    parser.add_argument('--sepia_intensity', type=float, default=1.0, help='Intensity for sepia filter')
+    
+    parser.add_argument('--vignette_strength', type=float, default=0.5, help='Strength for vignette')
+    parser.add_argument('--vignette_radius', type=float, default=0.8, help='Radius for vignette')
+    
+    parser.add_argument('--pixel_size', type=int, default=10, help='Pixel size for pixelation')
+    parser.add_argument('--pixel_x', type=int, help='X coordinate for pixelation area')
+    parser.add_argument('--pixel_y', type=int, help='Y coordinate for pixelation area')
+    parser.add_argument('--pixel_width', type=int, help='Width for pixelation area')
+    parser.add_argument('--pixel_height', type=int, help='Height for pixelation area')
+    
+    parser.add_argument('--border_width', type=int, default=20, help='Border width')
+    parser.add_argument('--border_color', type=str, default='0,0,0', help='Border color as R,G,B')
+    
+    parser.add_argument('--fancy_border_type', choices=['wave', 'zigzag', 'triangle'], help='Type of fancy border')
+    parser.add_argument('--fancy_border_color', type=str, default='255,0,0', help='Fancy border color as R,G,B')
+    
+    parser.add_argument('--flare_x', type=float, help='X coordinate for lens flare (0-1)')
+    parser.add_argument('--flare_y', type=float, help='Y coordinate for lens flare (0-1)')
+    parser.add_argument('--flare_intensity', type=float, default=1.0, help='Intensity for lens flare')
+    
+    parser.add_argument('--watercolor_intensity', type=float, default=0.3, help='Intensity for watercolor effect')
+    
     return parser.parse_args()
 
 def load_image(image_path):
     """Загрузка изображения"""
-    if image_path is None:
-        raise ValueError('Empty path to the image')
-    image = cv.imread(image_path)
+    image = cv2.imread(image_path)
     if image is None:
-        raise ValueError(f'Cannot load image from path: {image_path}')
+        raise ValueError(f"Cannot load image from {image_path}")
     return image
 
-def show_image_private(image, text):
-    """Вспомогательная функция для отображения изображения"""
-    window_name = text
+def show_images(original, result, filter_name):
+    """Отображение исходного и обработанного изображения"""
+    cv2.imshow('Original Image', original)
+    cv2.imshow(f'Result - {filter_name}', result)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
-    if image is not None:
-        cv.imshow(window_name, image)
+def save_image(image, output_path):
+    """Сохранение изображения"""
+    cv2.imwrite(output_path, image)
+
+# Реализации фильтров
+
+def resize_image(image, scale=None, new_width=None, new_height=None):
+    """Изменение размера изображения"""
+    h, w = image.shape[:2]
+    
+    if scale is not None:
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+    elif new_width is not None and new_height is not None:
+        new_w = new_width
+        new_h = new_height
+    elif new_width is not None:
+        new_h = int(h * new_width / w)
+        new_w = new_width
+    elif new_height is not None:
+        new_w = int(w * new_height / h)
+        new_h = new_height
     else:
-        raise ValueError('Empty image')
-
-def show_images(original_image, result_image):
-    """Отображение исходного и результирующего изображений"""
-    show_image_private(original_image, 'original image')
-    show_image_private(result_image,  'result_image')
-    cv.waitKey(0)
-    cv.destroyAllWindows()
-
-def resize(original_image, scale):
-    """Изменение разрешения изображения"""
-    if scale <= 0:
-        raise ValueError('Scale coefficient must be positive')
+        return image.copy()
     
-    height, width, number_channels = original_image.shape
-    new_height = int(height * scale)
-    new_width = int(width * scale)
-    result_image = np.zeros((new_height, new_width, number_channels), dtype=np.uint8)
-
-    for i in range(new_height):
-        for j in range(new_width):
-            result_image[i, j] = original_image[int(i/scale), int(j/scale)]
+    # Метод ближайшего соседа
+    scale_x = w / new_w
+    scale_y = h / new_h
     
-    return result_image
+    y_indices = (np.arange(new_h) * scale_y).astype(np.int32)
+    x_indices = (np.arange(new_w) * scale_x).astype(np.int32)
+    
+    y_grid, x_grid = np.meshgrid(y_indices, x_indices, indexing='ij')
+    result = image[y_grid, x_grid]
+    
+    return result
 
-def sepia_filter(original_image):
+def sepia_filter(image, intensity=1.0):
     """Фильтр сепии"""
-    height, width = original_image.shape[:2]
-    result_image = np.zeros((height, width, 3), np.uint8)
+    sepia_matrix = np.array([
+        [0.272, 0.534, 0.131],
+        [0.349, 0.686, 0.168],
+        [0.393, 0.769, 0.189]
+    ])
+    
+    # Применяем матричное преобразование
+    result = image.astype(np.float32) @ sepia_matrix.T
+    result = np.clip(result, 0, 255)
+    
+    # Смешиваем с оригиналом в зависимости от интенсивности
+    if intensity < 1.0:
+        result = image * (1 - intensity) + result * intensity
+        result = np.clip(result, 0, 255)
+    
+    return result.astype(np.uint8)
 
-    B = original_image[:, :, 0]
-    G = original_image[:, :, 1]
-    R = original_image[:, :, 2]
-
-    result_image[:, :, 0] = np.clip(0.272 * R + 0.534 * G + 0.131 * B, 0, 255)
-    result_image[:, :, 1] = np.clip(0.349 * R + 0.686 * G + 0.168 * B, 0, 255)
-    result_image[:, :, 2] = np.clip(0.393 * R + 0.769 * G + 0.189 * B, 0, 255)
-
-    return result_image
-
-def vignette_img(original_image, radius):
+def vignette_filter(image, strength=0.5, radius=0.8):
     """Эффект виньетки"""
-    rows, cols = original_image.shape[:2]
+    h, w = image.shape[:2]
     
-    # Генерация маски виньетки с использованием Гауссова ядра
-    X_resultant_kernel = cv.getGaussianKernel(cols, radius)
-    Y_resultant_kernel = cv.getGaussianKernel(rows, radius)
+    # Создаем координатные сетки
+    y, x = np.ogrid[:h, :w]
+    center_x, center_y = w // 2, h // 2
     
-    # Создание матрицы ядра
-    resultant_kernel = Y_resultant_kernel * X_resultant_kernel.T
+    # Вычисляем расстояние от центра
+    distance = np.sqrt((x - center_x)**2 + (y - center_y)**2)
     
-    # Создание маски и нормализация
-    mask = resultant_kernel / resultant_kernel.max()
+    # Нормализуем расстояние
+    max_distance = np.sqrt(center_x**2 + center_y**2)
+    normalized_distance = distance / (max_distance * radius)
     
-    result_image = np.copy(original_image)
+    # Создаем маску виньетки
+    vignette_mask = 1 - normalized_distance
+    vignette_mask = np.clip(vignette_mask, 0, 1)
+    vignette_mask = vignette_mask ** (1 / strength)
     
-    # Применение маски к каждому каналу входного изображения
-    for i in range(3):
-        result_image[:,:,i] = result_image[:,:,i] * mask
+    # Применяем маску
+    result = image.astype(np.float32) * vignette_mask[:, :, np.newaxis]
+    
+    return np.clip(result, 0, 255).astype(np.uint8)
 
-    return result_image.astype(np.uint8)
-
-def pix_filter(original_image, x, y, width, height, block_size):
-    """Пикселизация заданной области"""
-    if original_image is None:
-        raise ValueError('Empty image')
-    if width <= 0 or height <= 0:
-        raise ValueError('Invalid area dimensions')
-    if block_size <= 0:
-        raise ValueError('Block size must be positive')
+def pixelate_region(image, x, y, width, height, pixel_size):
+    """Пикселизация области"""
+    result = image.copy()
     
-    result_image = np.copy(original_image)
-    img_height, img_width = original_image.shape[:2]
+    # Ограничиваем координаты размерами изображения
+    x1 = max(0, x)
+    y1 = max(0, y)
+    x2 = min(image.shape[1], x + width)
+    y2 = min(image.shape[0], y + height)
     
-    # Проверка границ
-    x = max(0, min(x, img_width - 1))
-    y = max(0, min(y, img_height - 1))
-    width = min(width, img_width - x)
-    height = min(height, img_height - y)
-
-    for i in range(y, y + height, block_size):
-        for j in range(x, x + width, block_size):
-            # Извлечение блока
-            block_end_i = min(i + block_size, y + height)
-            block_end_j = min(j + block_size, x + width)
-            block = result_image[i:block_end_i, j:block_end_j]
+    # Обрабатываем область
+    for i in range(y1, y2, pixel_size):
+        for j in range(x1, x2, pixel_size):
+            # Определяем границы блока
+            i_end = min(i + pixel_size, y2)
+            j_end = min(j + pixel_size, x2)
             
-            if block.size == 0:
-                continue
+            # Извлекаем блок и вычисляем средний цвет
+            block = result[i:i_end, j:j_end]
+            if block.size > 0:
+                avg_color = np.mean(block, axis=(0, 1)).astype(np.uint8)
+                result[i:i_end, j:j_end] = avg_color
+    
+    return result
+
+def interactive_pixelation(image, pixel_size=10):
+    """Интерактивная пикселизация"""
+    temp_image = image.copy()
+    selected_region = None
+    
+    def mouse_callback(event, x, y, flags, param):
+        nonlocal selected_region, temp_image
+        if event == cv2.EVENT_LBUTTONDOWN:
+            selected_region = [x, y, x, y]
+        elif event == cv2.EVENT_MOUSEMOVE and flags == cv2.EVENT_FLAG_LBUTTON:
+            if selected_region:
+                selected_region[2] = x
+                selected_region[3] = y
+                temp_image = image.copy()
+                cv2.rectangle(temp_image, 
+                            (selected_region[0], selected_region[1]),
+                            (selected_region[2], selected_region[3]), 
+                            (0, 255, 0), 2)
+        elif event == cv2.EVENT_LBUTTONUP:
+            if selected_region:
+                x1, y1, x2, y2 = selected_region
+                x = min(x1, x2)
+                y = min(y1, y2)
+                width = abs(x2 - x1)
+                height = abs(y2 - y1)
                 
-            # Вычисление среднего цвета блока
-            avg_color = block.mean(axis=(0, 1)).astype(np.uint8)
-            result_image[i:block_end_i, j:block_end_j] = avg_color
+                if width > 0 and height > 0:
+                    result = pixelate_region(image, x, y, width, height, pixel_size)
+                    return result
+        return None
+    
+    cv2.imshow('Select region for pixelation (click and drag)', temp_image)
+    cv2.setMouseCallback('Select region for pixelation (click and drag)', mouse_callback)
+    
+    print("Instructions:")
+    print("- Click and drag to select region")
+    print("- Press 'q' to quit without changes")
+    print("- Press 'a' to apply pixelation")
+    
+    while True:
+        cv2.imshow('Select region for pixelation (click and drag)', temp_image)
+        key = cv2.waitKey(1) & 0xFF
+        
+        if key == ord('q'):
+            cv2.destroyAllWindows()
+            return image
+        elif key == ord('a') and selected_region:
+            x1, y1, x2, y2 = selected_region
+            x = min(x1, x2)
+            y = min(y1, y2)
+            width = abs(x2 - x1)
+            height = abs(y2 - y1)
             
-    return result_image
+            if width > 0 and height > 0:
+                result = pixelate_region(image, x, y, width, height, pixel_size)
+                cv2.destroyAllWindows()
+                return result
+    
+    cv2.destroyAllWindows()
+    return image
 
-def add_border(original_image, border_width, border_color):
+def add_border(image, border_width, border_color):
     """Добавление прямоугольной рамки"""
-    if border_width <= 0:
-        raise ValueError('Border width must be positive')
+    result = image.copy()
+    h, w = result.shape[:2]
     
-    height, width = original_image.shape[:2]
+    # Закрашиваем рамку
+    result[0:border_width, :] = border_color
+    result[h-border_width:h, :] = border_color
+    result[:, 0:border_width] = border_color
+    result[:, w-border_width:w] = border_color
     
-    # Создание изображения с рамкой
-    result_image = np.copy(original_image)
-    
-    # Закрашивание рамки
-    result_image[0:border_width, :] = border_color  # Верхняя рамка
-    result_image[height-border_width:height, :] = border_color  # Нижняя рамка
-    result_image[:, 0:border_width] = border_color  # Левая рамка
-    result_image[:, width-border_width:width] = border_color  # Правая рамка
-    
-    return result_image
+    return result
 
-def add_fancy_border(original_image, frame_type, frame_color):
+def add_fancy_border(image, border_type, border_color):
     """Добавление фигурной рамки"""
-    height, width = original_image.shape[:2]
-    border_width = min(height, width) // 10  # Ширина рамки - 10% от меньшей стороны
+    h, w = image.shape[:2]
+    border_width = min(h, w) // 10
+    result = image.copy()
     
-    result_image = np.copy(original_image)
-    
-    if frame_type == 'wave':
+    if border_type == 'wave':
         # Волнистая рамка
         for i in range(border_width):
-            for j in range(width):
-                if i < border_width * (0.5 + 0.5 * math.sin(j * 2 * math.pi / 50)):
-                    result_image[i, j] = frame_color
-                    result_image[height-1-i, j] = frame_color
-                    
-        for i in range(height):
-            for j in range(border_width):
-                if j < border_width * (0.5 + 0.5 * math.sin(i * 2 * math.pi / 50)):
-                    result_image[i, j] = frame_color
-                    result_image[i, width-1-j] = frame_color
-                    
-    elif frame_type == 'zigzag':
+            wave = border_width * (0.5 + 0.5 * np.sin(np.arange(w) * 2 * np.pi / 50))
+            mask = i < wave
+            result[i, mask] = border_color
+            result[h-1-i, mask] = border_color
+            
+        for i in range(h):
+            wave = border_width * (0.5 + 0.5 * np.sin(np.arange(border_width) * 2 * np.pi / 50))
+            mask = np.arange(border_width) < wave
+            result[i, :border_width][mask] = border_color
+            result[i, w-border_width:w][mask] = border_color
+            
+    elif border_type == 'zigzag':
         # Зигзагообразная рамка
         for i in range(border_width):
-            for j in range(width):
-                if i < border_width * (0.5 + 0.5 * abs((j % 20) - 10) / 10):
-                    result_image[i, j] = frame_color
-                    result_image[height-1-i, j] = frame_color
-                    
-        for i in range(height):
-            for j in range(border_width):
-                if j < border_width * (0.5 + 0.5 * abs((i % 20) - 10) / 10):
-                    result_image[i, j] = frame_color
-                    result_image[i, width-1-j] = frame_color
-                    
-    elif frame_type == 'triangle':
+            zigzag = border_width * (0.5 + 0.5 * np.abs((np.arange(w) % 20) - 10) / 10)
+            mask = i < zigzag
+            result[i, mask] = border_color
+            result[h-1-i, mask] = border_color
+            
+        for i in range(h):
+            zigzag = border_width * (0.5 + 0.5 * np.abs((np.arange(border_width) % 20) - 10) / 10)
+            mask = np.arange(border_width) < zigzag
+            result[i, :border_width][mask] = border_color
+            result[i, w-border_width:w][mask] = border_color
+            
+    elif border_type == 'triangle':
         # Треугольная рамка
         for i in range(border_width):
-            for j in range(width):
-                if i < border_width * (1 - abs(j - width/2) / (width/2)):
-                    result_image[i, j] = frame_color
-                    result_image[height-1-i, j] = frame_color
-                    
-        for i in range(height):
-            for j in range(border_width):
-                if j < border_width * (1 - abs(i - height/2) / (height/2)):
-                    result_image[i, j] = frame_color
-                    result_image[i, width-1-j] = frame_color
+            triangle = border_width * (1 - np.abs(np.arange(w) - w/2) / (w/2))
+            mask = i < triangle
+            result[i, mask] = border_color
+            result[h-1-i, mask] = border_color
+            
+        for i in range(h):
+            triangle = border_width * (1 - np.abs(np.arange(border_width) - border_width/2) / (border_width/2))
+            mask = np.arange(border_width) < triangle
+            result[i, :border_width][mask] = border_color
+            result[i, w-border_width:w][mask] = border_color
     
-    return result_image
+    return result
 
-def add_lens_flare(original_image, flare_x, flare_y):
+def lens_flare_effect(image, flare_x, flare_y, intensity=1.0):
     """Эффект бликов объектива"""
-    height, width = original_image.shape[:2]
-    result_image = np.copy(original_image).astype(np.float32)
+    h, w = image.shape[:2]
     
-    # Создание нескольких бликов разного размера и интенсивности
+    # Преобразуем координаты в абсолютные
+    abs_x = int(flare_x * w)
+    abs_y = int(flare_y * h)
+    
+    result = image.astype(np.float32)
+    
+    # Создаем несколько бликов
     flares = [
-        (flare_x, flare_y, 50, 1.0),  # Основной блик
-        (flare_x - 30, flare_y - 30, 30, 0.7),
-        (flare_x + 40, flare_y + 20, 25, 0.5),
-        (flare_x - 50, flare_y + 30, 20, 0.4)
+        (abs_x, abs_y, 50, 1.0),
+        (abs_x - 30, abs_y - 30, 30, 0.7),
+        (abs_x + 40, abs_y + 20, 25, 0.5)
     ]
     
-    for fx, fy, size, intensity in flares:
-        for i in range(max(0, fy-size), min(height, fy+size)):
-            for j in range(max(0, fx-size), min(width, fx+size)):
-                distance = math.sqrt((j - fx)**2 + (i - fy)**2)
-                if distance < size:
-                    # Уменьшение интенсивности к краям блика
-                    flare_strength = intensity * (1 - distance/size)
-                    
-                    # Добавление блика (увеличиваем яркость)
-                    for channel in range(3):
-                        result_image[i, j, channel] = min(
-                            255, 
-                            result_image[i, j, channel] + flare_strength * 100
-                        )
+    for fx, fy, size, flare_intensity in flares:
+        # Создаем координатные сетки
+        y, x = np.ogrid[-size:size+1, -size:size+1]
+        
+        # Создаем маску круга
+        mask = x**2 + y**2 <= size**2
+        
+        # Вычисляем позиции
+        y_pos = np.clip(fy + y, 0, h-1)
+        x_pos = np.clip(fx + x, 0, w-1)
+        
+        # Применяем блик
+        flare_value = flare_intensity * intensity * 100
+        for channel in range(3):
+            result[y_pos, x_pos, channel] += flare_value * mask
     
-    return result_image.astype(np.uint8)
+    return np.clip(result, 0, 255).astype(np.uint8)
 
-def add_watercolor_texture(original_image):
-    """Наложение текстуры акварельной бумаги"""
-    height, width = original_image.shape[:2]
-    result_image = np.copy(original_image).astype(np.float32)
+def watercolor_effect(image, intensity=0.3):
+    """Эффект акварельной бумаги"""
+    h, w = image.shape[:2]
     
-    # Создание текстуры акварельной бумаги (зернистость)
-    texture = np.random.normal(0, 15, (height, width, 3))
+    # Создаем текстуру зернистости
+    texture = np.random.normal(0, 20, (h, w, 3))
     
-    # Применение текстуры
-    result_image = result_image + texture
+    # Добавляем текстуру к изображению
+    result = image.astype(np.float32) + texture * intensity
     
-    # Легкое размытие для имитации акварели
-    temp_image = result_image.copy()
-    for i in range(1, height-1):
-        for j in range(1, width-1):
-            for channel in range(3):
-                # Простое размытие
-                result_image[i, j, channel] = np.mean(temp_image[i-1:i+2, j-1:j+2, channel])
+    # Простое размытие для имитации акварели
+    temp = result.copy()
+    for i in range(1, h-1):
+        for j in range(1, w-1):
+            result[i, j] = np.mean(temp[i-1:i+2, j-1:j+2], axis=(0, 1))
     
-    return np.clip(result_image, 0, 255).astype(np.uint8)
+    return np.clip(result, 0, 255).astype(np.uint8)
 
 def parse_color(color_str):
-    """Парсинг строки цвета в формате B,G,R"""
-    if color_str is None:
-        return [0, 0, 0]  # Черный по умолчанию
-    
+    """Парсинг строки цвета"""
     try:
-        b, g, r = map(int, color_str.split(','))
-        return [b, g, r]
+        r, g, b = map(int, color_str.split(','))
+        return [b, g, r]  # OpenCV использует BGR
     except:
-        raise ValueError('Color must be in format B,G,R')
+        raise ValueError(f"Invalid color format: {color_str}. Use R,G,B")
 
 def main():
     args = argument_parser()
-    original_image = load_image(args.image_path)
-    result_image = None
     
-    if args.mode == 'resize':
-        if args.coef is None:
-            raise ValueError('Coefficient is required for resize mode')
-        result_image = resize(original_image, args.coef)
+    try:
+        # Загрузка изображения
+        image = load_image(args.image)
+        result = None
         
-    elif args.mode == 'sepia':
-        result_image = sepia_filter(original_image)
+        # Применение выбранного фильтра
+        if args.filter == 'resize':
+            result = resize_image(image, args.scale, args.width, args.height)
+            
+        elif args.filter == 'sepia':
+            result = sepia_filter(image, args.sepia_intensity)
+            
+        elif args.filter == 'vignette':
+            result = vignette_filter(image, args.vignette_strength, args.vignette_radius)
+            
+        elif args.filter == 'pixelate':
+            if args.pixel_x is not None and args.pixel_y is not None and args.pixel_width is not None and args.pixel_height is not None:
+                # Пикселизация по заданным координатам
+                result = pixelate_region(image, args.pixel_x, args.pixel_y, 
+                                       args.pixel_width, args.pixel_height, 
+                                       args.pixel_size)
+            else:
+                # Интерактивная пикселизация
+                result = interactive_pixelation(image, args.pixel_size)
+                
+        elif args.filter == 'border':
+            border_color = parse_color(args.border_color)
+            result = add_border(image, args.border_width, border_color)
+            
+        elif args.filter == 'fancy_border':
+            border_color = parse_color(args.fancy_border_color)
+            result = add_fancy_border(image, args.fancy_border_type, border_color)
+            
+        elif args.filter == 'lens_flare':
+            if args.flare_x is None or args.flare_y is None:
+                # По умолчанию в правом верхнем углу
+                result = lens_flare_effect(image, 0.8, 0.2, args.flare_intensity)
+            else:
+                result = lens_flare_effect(image, args.flare_x, args.flare_y, args.flare_intensity)
+                
+        elif args.filter == 'watercolor':
+            result = watercolor_effect(image, args.watercolor_intensity)
         
-    elif args.mode == 'vig':
-        if args.radius is None:
-            raise ValueError('Radius is required for vignette mode')
-        result_image = vignette_img(original_image, args.radius)
+        # Отображение и сохранение результата
+        show_images(image, result, args.filter)
+        save_image(result, args.output)
+        print(f"Result saved to {args.output}")
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
-    elif args.mode == 'pixel':
-        if args.x is None or args.y is None or args.width is None or args.height is None or args.block is None:
-            raise ValueError('All coordinates and block size are required for pixel mode')
-        result_image = pix_filter(original_image, args.x, args.y, args.width, args.height, args.block)
-
-    elif args.mode == 'border':
-        if args.border_width is None:
-            raise ValueError('Border width is required for border mode')
-        border_color = parse_color(args.border_color)
-        result_image = add_border(original_image, args.border_width, border_color)
-
-    elif args.mode == 'fancy_border':
-        if args.frame_type is None:
-            raise ValueError('Frame type is required for fancy_border mode')
-        frame_color = parse_color(args.frame_color)
-        result_image = add_fancy_border(original_image, args.frame_type, frame_color)
-
-    elif args.mode == 'lens_flare':
-        if args.flare_x is None or args.flare_y is None:
-            raise ValueError('Flare coordinates are required for lens_flare mode')
-        result_image = add_lens_flare(original_image, args.flare_x, args.flare_y)
-
-    elif args.mode == 'watercolor':
-        result_image = add_watercolor_texture(original_image)
-
-    else:
-        raise ValueError(f'Unknown mode: {args.mode}')
-
-    show_images(original_image, result_image)
-    
-    # Сохранение результата
-    cv.imwrite(args.out_image_path, result_image)
-
-if __name__ == '__main__':
-    sys.exit(main() or 0)
+if __name__ == "__main__":
+    main()
