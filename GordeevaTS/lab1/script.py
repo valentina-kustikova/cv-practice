@@ -289,17 +289,13 @@ def main():
     
     parser.add_argument('--sepia', action='store_true', help='Применить эффект сепии')
     parser.add_argument('--sepia_intensity', type=float, default=1.0, 
-                       help='Интенсивность эффекта сепии (0.0 - 2.0)')
+                       help='Интенсивность эффекта сепии (0.0 - 1.0)')
     
     parser.add_argument('--vignette', action='store_true', help='Применить эффект виньетки')
     parser.add_argument('--vignette_intensity', type=float, default=0.8,
                        help='Интенсивность виньетки (0.0 - 1.0)')
     
     parser.add_argument('--pixelate', action='store_true', help='Применить пикселизацию')
-    parser.add_argument('--pixel_x', type=int, help='X координата области пикселизации')
-    parser.add_argument('--pixel_y', type=int, help='Y координата области пикселизации')
-    parser.add_argument('--pixel_width', type=int, help='Ширина области пикселизации')
-    parser.add_argument('--pixel_height', type=int, help='Высота области пикселизации')
     parser.add_argument('--pixel_size', type=int, default=10,
                        help='Размер пикселя (чем больше, тем более пиксельно)')
     
