@@ -3,7 +3,6 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import os
-import math
 
 def resize_image(image_path, width=None, height=None, scale=None, output_path=None):
     image = cv2.imread(image_path)
@@ -32,35 +31,17 @@ def resize_image(image_path, width=None, height=None, scale=None, output_path=No
     
     print(f"Новый размер: {new_width}x{new_height}")
     
-    resized_image = np.zeros((new_height, new_width, 3), dtype=image.dtype)
+    x_indices = np.linspace(0, original_width - 1, new_width).astype(int)
+    y_indices = np.linspace(0, original_height - 1, new_height).astype(int)
     
-    for i in range(new_height):
-        for j in range(new_width):
-            src_i = int((i / new_height) * original_height)
-            src_j = int((j / new_width) * original_width)
-            src_i = min(src_i, original_height - 1)
-            src_j = min(src_j, original_width - 1)
-            resized_image[i, j] = image[src_i, src_j]
+    x_grid, y_grid = np.meshgrid(x_indices, y_indices)
+    resized_image = image[y_grid, x_grid]
     
     if output_path:
         cv2.imwrite(output_path, resized_image)
         print(f"Результат сохранен в: {output_path}")
     
     return resized_image
-
-def manual_resize(image, new_width, new_height):
-    original_height, original_width = image.shape[:2]
-    resized = np.zeros((new_height, new_width, 3), dtype=image.dtype)
-    
-    for i in range(new_height):
-        for j in range(new_width):
-            src_i = int((i / new_height) * original_height)
-            src_j = int((j / new_width) * original_width)
-            src_i = min(src_i, original_height - 1)
-            src_j = min(src_j, original_width - 1)
-            resized[i, j] = image[src_i, src_j]
-    
-    return resized
 
 def apply_sepia(image, intensity=1.0):
     sepia_matrix = np.array([
@@ -70,22 +51,16 @@ def apply_sepia(image, intensity=1.0):
     ])
     
     sepia_matrix = sepia_matrix * intensity
-    height, width = image.shape[:2]
-    sepia_image = np.zeros_like(image, dtype=np.float32)
+    image_float = image.astype(np.float32)
+
+    pixels = image_float.reshape(-1, 3)
+    sepia_pixels = np.dot(pixels, sepia_matrix.T)
     
-    for i in range(height):
-        for j in range(width):
-            pixel = image[i, j].astype(np.float32)
-            new_pixel = np.dot(sepia_matrix, pixel)
-            sepia_image[i, j] = np.clip(new_pixel, 0, 255)
-    sepia_image = sepia_image.astype(np.uint8)
+    sepia_image = sepia_pixels.reshape(image.shape)
+    sepia_image = np.clip(sepia_image, 0, 255).astype(np.uint8)
     
     if intensity < 1.0:
-        result = np.zeros_like(image, dtype=np.float32)
-        for i in range(height):
-            for j in range(width):
-                result[i, j] = (sepia_image[i, j] * intensity + 
-                               image[i, j] * (1.0 - intensity))
+        result = sepia_image.astype(np.float32) * intensity + image_float * (1.0 - intensity)
         sepia_image = np.clip(result, 0, 255).astype(np.uint8)
     
     return sepia_image
@@ -93,23 +68,17 @@ def apply_sepia(image, intensity=1.0):
 def apply_vignette(image, intensity=0.8):
     height, width = image.shape[:2]
     
-    center_x, center_y = width // 2, height // 2
-    max_distance = math.sqrt(center_x**2 + center_y**2)
-    mask = np.zeros((height, width), dtype=np.float32)
+    x = np.linspace(-1, 1, width)
+    y = np.linspace(-1, 1, height)
+    x_grid, y_grid = np.meshgrid(x, y)
+    radius = np.sqrt(x_grid**2 + y_grid**2)
     
-    for i in range(height):
-        for j in range(width):
-            distance = math.sqrt((j - center_x)**2 + (i - center_y)**2)
-            normalized_distance = distance / max_distance
-            mask[i, j] = 1.0 - normalized_distance * intensity
-    vignette_image = image.copy().astype(np.float32)
+    mask = 1.0 - radius * intensity
+    mask = np.clip(mask, 0, 1)
     
-    for i in range(height):
-        for j in range(width):
-            for c in range(3):
-                vignette_image[i, j, c] = vignette_image[i, j, c] * mask[i, j]
+    vignette_image = image.astype(np.float32) * mask[:, :, np.newaxis]
     vignette_image = np.clip(vignette_image, 0, 255).astype(np.uint8)
-
+    
     return vignette_image
 
 def apply_pixelation(image, x=0, y=0, width=10, height=10, pixel_size=10):
@@ -125,10 +94,21 @@ def apply_pixelation(image, x=0, y=0, width=10, height=10, pixel_size=10):
     
     small_width = max(1, width // pixel_size)
     small_height = max(1, height // pixel_size)
-    small_region = manual_resize(region, small_width, small_height)
+
+    temp_input = "temp_region_input.jpg"
+    temp_output = "temp_region_output.jpg"
+    cv2.imwrite(temp_input, region)
     
-    pixelated_region = manual_resize(small_region, width, height)
+    small_region = resize_image(temp_input, width=small_width, height=small_height)
+    cv2.imwrite(temp_input, small_region)
+    pixelated_region = resize_image(temp_input, width=width, height=height)
+    pixelated_image[y:y+height, x:x+width] = pixelated_region
     
+    if os.path.exists(temp_input):
+        os.remove(temp_input)
+    if os.path.exists(temp_output):
+        os.remove(temp_output)
+
     pixelated_image[y:y+height, x:x+width] = pixelated_region
     return pixelated_image
 
@@ -146,51 +126,25 @@ def apply_figure_frame(image, frame_path):
         raise ValueError(f"Не удалось загрузить рамку: {frame_path}")
     
     if frame.shape[:2] != image.shape[:2]:
-        frame = manual_resize(frame, image.shape[1], image.shape[0])
-
+        # Просто используем cv2.resize вместо вашей функции
+        frame = cv2.resize(frame, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR)
+    
     result = image.copy().astype(np.float32)
     
-    for i in range(image.shape[0]):
-        for j in range(image.shape[1]):
-            brightness = np.mean(frame[i, j]) / 255.0
-            if brightness > 0.9: 
-                alpha = 0.0
-            else:  
-                alpha = 1.0
-            for c in range(3):
-                result[i, j, c] = (image[i, j, c] * (1 - alpha) + 
-                                  frame[i, j, c] * alpha)
+    brightness = np.mean(frame, axis=2) / 255.0    
+    alpha_mask = (brightness <= 0.9).astype(np.float32)    
+    result = (image.astype(np.float32) * (1 - alpha_mask[:, :, np.newaxis]) + 
+              frame.astype(np.float32) * alpha_mask[:, :, np.newaxis])
     
     return np.clip(result, 0, 255).astype(np.uint8)
-
-def rgb_to_grayscale(image):
-    height, width = image.shape[:2]
-    gray = np.zeros((height, width), dtype=np.uint8)
-    
-    for i in range(height):
-        for j in range(width):
-            gray_value = (0.299 * image[i, j, 2] + 
-                         0.587 * image[i, j, 1] + 
-                         0.114 * image[i, j, 0])
-            gray[i, j] = int(gray_value)
-    
-    return gray
 
 def apply_lens_flare(image, flare_path, intensity=0.7, position=None):
     flare = cv2.imread(flare_path)
     if flare is None:
         raise ValueError(f"Не удалось загрузить блик: {flare_path}")
     
-    flare_alpha = np.zeros((flare.shape[0], flare.shape[1]), dtype=np.float32)
-    
-    for i in range(flare.shape[0]):
-        for j in range(flare.shape[1]):
-            brightness = np.mean(flare[i, j]) / 255.0
-            if brightness > 0.1: 
-                flare_alpha[i, j] = brightness * intensity
-            else:
-                flare_alpha[i, j] = 0
-    
+    flare_brightness = np.mean(flare, axis=2) / 255.0
+    flare_alpha = np.where(flare_brightness > 0.1, flare_brightness * intensity, 0)
     flare_height, flare_width = flare.shape[:2]
     img_height, img_width = image.shape[:2]
     
@@ -203,28 +157,26 @@ def apply_lens_flare(image, flare_path, intensity=0.7, position=None):
     pos_x = max(0, min(pos_x, img_width - flare_width))
     pos_y = max(0, min(pos_y, img_height - flare_height))
     
-    result_image = image.copy().astype(np.float32)
+    result_image = image.copy().astype(np.float32)    
+    flare_end_y = min(pos_y + flare_height, img_height)
+    flare_end_x = min(pos_x + flare_width, img_width)
+    flare_region_height = flare_end_y - pos_y
+    flare_region_width = flare_end_x - pos_x
     
-    for i in range(flare_height):
-        for j in range(flare_width):
-            img_i = pos_y + i
-            img_j = pos_x + j
-            
-            if img_i >= img_height or img_j >= img_width:
-                continue
-                
-            alpha = flare_alpha[i, j]
-            
-            if alpha < 0.01:
-                continue
-            
-            for c in range(3):
-                background = result_image[img_i, img_j, c]
-                foreground = flare[i, j, c]
-                    
-                screen_val = 255 - (255 - background) * (255 - foreground) / 255
-                result_image[img_i, img_j, c] = background * (1 - alpha) + screen_val * alpha
-
+    if flare_region_height <= 0 or flare_region_width <= 0:
+        return image
+    
+    flare_cropped = flare[:flare_region_height, :flare_region_width]
+    flare_alpha_cropped = flare_alpha[:flare_region_height, :flare_region_width]
+    image_region = result_image[pos_y:flare_end_y, pos_x:flare_end_x]    
+    background = image_region
+    foreground = flare_cropped.astype(np.float32)
+    
+    screen_val = 255 - (255 - background) * (255 - foreground) / 255
+    
+    alpha_expanded = flare_alpha_cropped[:, :, np.newaxis]
+    blended_region = background * (1 - alpha_expanded) + screen_val * alpha_expanded    
+    result_image[pos_y:flare_end_y, pos_x:flare_end_x] = blended_region
     
     return np.clip(result_image, 0, 255).astype(np.uint8)
 
@@ -235,19 +187,16 @@ def watercolor_texture(image, intensity=1.0):
         raise ValueError(f"Не удалось загрузить текстуру: {texture_path}")
     
     if texture.shape[:2] != image.shape[:2]:
-        texture = manual_resize(texture, image.shape[1], image.shape[0])
+        temp_path = "/tmp/temp_texture.jpg"
+        cv2.imwrite(temp_path, texture)
+        texture = resize_image(temp_path, width=image.shape[1], height=image.shape[0])
     
-    texture_gray = rgb_to_grayscale(texture)
-    texture_mask = 1 - (texture_gray / 255.0)
-        
-    texture_mask = texture_mask[:, :, np.newaxis]
+    texture_gray = 0.299 * texture[:, :, 2] + 0.587 * texture[:, :, 1] + 0.114 * texture[:, :, 0]
+    texture_mask = 1 - (texture_gray / 255.0)    
+    texture_mask = texture_mask[:, :, np.newaxis] * intensity
     
-    blended = np.zeros_like(image, dtype=np.float32)
-    for i in range(image.shape[0]):
-        for j in range(image.shape[1]):
-            for c in range(3):
-                blended[i, j, c] = (image[i, j, c] * (1 - texture_mask[i, j, 0] * intensity) + 
-                                  texture[i, j, c] * (texture_mask[i, j, 0] * intensity))
+    blended = (image.astype(np.float32) * (1 - texture_mask) + 
+               texture.astype(np.float32) * texture_mask)
     
     return np.clip(blended, 0, 255).astype(np.uint8)
 
@@ -279,7 +228,7 @@ def show_comparison(original_path, processed_image):
     plt.subplots_adjust(wspace=0.05, hspace=0)
     plt.show()
 
-def main():
+def parse_arguments():
     parser = argparse.ArgumentParser(description='Обработка изображений')
     parser.add_argument('image_path', help='Путь к исходному изображению')
     
@@ -318,23 +267,45 @@ def main():
     parser.add_argument('--watercolor', action='store_true', help='Применить эффект акварельной бумаги')
     parser.add_argument('--watercolor_intensity', type=float, default=1.0,
                        help='Интенсивность акварельной текстуры (0.0 - 1.0)')
-
     
-    #for all
+    # For all
     parser.add_argument('--output', help='Путь для сохранения результата')
     parser.add_argument('--show', action='store_true', help='Показать сравнение изображений')
     
-    args = parser.parse_args()
-    
+    return parser.parse_args()
+
+def validate_arguments(args):
     if not os.path.exists(args.image_path):
-        print(f"Ошибка: файл {args.image_path} не существует")
-        return
+        raise FileNotFoundError(f"Файл {args.image_path} не существует")
     
+    if args.figure_frame and not args.frame_path:
+        raise ValueError("Для фигурной рамки необходимо указать --frame_path")
+    
+    if args.figure_frame and args.frame_path and not os.path.exists(args.frame_path):
+        raise FileNotFoundError(f"Файл с рамкой {args.frame_path} не существует")
+    
+    if args.lens_flare and not args.flare_path:
+        raise ValueError("Для эффекта бликов необходимо указать --flare_path")
+    
+    if args.lens_flare and args.flare_path and not os.path.exists(args.flare_path):
+        raise FileNotFoundError(f"Файл с бликом {args.flare_path} не существует")
+    
+    # Проверка диапазонов интенсивностей
+    for intensity_name in ['sepia_intensity', 'vignette_intensity', 'flare_intensity', 'watercolor_intensity']:
+        intensity = getattr(args, intensity_name)
+        if not 0.0 <= intensity <= 1.0:
+            raise ValueError(f"Интенсивность {intensity_name} должна быть в диапазоне 0.0 - 1.0")
+    
+    return True
+
+def main():
     try:
+        args = parse_arguments()        
+        validate_arguments(args)
+        
         image = cv2.imread(args.image_path)
         if image is None:
-            raise ValueError(f"Не удалось загрузить изображение: {args.image_path}")
-        
+            raise ValueError(f"Не удалось загрузить изображение: {args.image_path}")        
         result_image = image.copy()
         
         if args.width is not None or args.height is not None or args.scale is not None:
@@ -360,22 +331,20 @@ def main():
             result_image = apply_vignette(result_image, args.vignette_intensity)
         
         if args.pixelate:
-            win_title = "Higlight the area for pixelate this an click to 'Escape'."
+            win_title = "Highlight the area for pixelate this and click to 'Escape'."
             roi = cv2.selectROI(win_title, image, showCrosshair=False, printNotice=False)
             cv2.destroyWindow(win_title)
 
             x1, y1, w1, h1 = map(int, roi)
-            if w1 <= 0 or h1 <= 0:
-                return image.copy()
-            
-            result_image = apply_pixelation(
-                result_image, 
-                x=x1, 
-                y=y1, 
-                width=w1, 
-                height=h1, 
-                pixel_size=args.pixel_size
-            )
+            if w1 > 0 and h1 > 0:
+                result_image = apply_pixelation(
+                    result_image, 
+                    x=x1, 
+                    y=y1, 
+                    width=w1, 
+                    height=h1, 
+                    pixel_size=args.pixel_size
+                )
         
         if args.frame:
             print(f"Добавляем прямоугольную рамку шириной {args.frame_width} пикселей...")
@@ -383,7 +352,7 @@ def main():
                 frame_color = tuple(int(x) for x in args.frame_color.split(','))
                 if len(frame_color) != 3:
                     raise ValueError
-                frame_color = (frame_color[2], frame_color[1], frame_color[0])
+                frame_color = (frame_color[2], frame_color[1], frame_color[0])  # BGR
             except:
                 print("Неверный формат цвета, используем белый по умолчанию")
                 frame_color = (255, 255, 255)
@@ -395,31 +364,11 @@ def main():
             )
         
         if args.figure_frame:
-            if not args.frame_path:
-                print("Ошибка: для фигурной рамки необходимо указать --frame_path")
-                return
-            
-            if not os.path.exists(args.frame_path):
-                print(f"Ошибка: файл с рамкой {args.frame_path} не существует")
-                return
-            
             print(f"Добавляем фигурную рамку из файла {args.frame_path}...")
-            result_image = apply_figure_frame(
-                result_image, 
-                frame_path=args.frame_path
-            )
+            result_image = apply_figure_frame(result_image, args.frame_path)
         
         if args.lens_flare:
-            if not args.flare_path:
-                print("Ошибка: для эффекта бликов необходимо указать --flare_path")
-                return
-            
-            if not os.path.exists(args.flare_path):
-                print(f"Ошибка: файл с бликом {args.flare_path} не существует")
-                return
-            
             print(f"Добавляем эффект бликов из файла {args.flare_path}...")
-            
             position = None
             if args.flare_x is not None and args.flare_y is not None:
                 position = (args.flare_x, args.flare_y)
@@ -433,10 +382,7 @@ def main():
         
         if args.watercolor:
             print(f"Применяем эффект акварельной бумаги (интенсивность: {args.watercolor_intensity})...")
-            result_image = watercolor_texture(
-                result_image,
-                intensity=args.watercolor_intensity
-            )
+            result_image = watercolor_texture(result_image, args.watercolor_intensity)
         
         if args.output and result_image is not None:
             cv2.imwrite(args.output, result_image)
@@ -447,6 +393,9 @@ def main():
             
     except Exception as e:
         print(f"Ошибка: {e}")
+        return 1
+    
+    return 0
 
 if __name__ == "__main__":
-    main()
+    exit(main())
