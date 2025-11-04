@@ -1,45 +1,43 @@
+#shaped_border
 import numpy as np
 
-
 def apply_shaped_border(image, frame_type='wave'):
+    h, w = image.shape[:2]
+    thickness = 15
+    mask = np.zeros((h, w), dtype=np.uint8)
 
-    def add_figure_frame(img, color=(0, 255, 0), thickness=30, frame_type='wave'):
-        h, w = img.shape[:2]
-        mask = np.zeros((h, w), dtype=np.uint8)
+    x = np.arange(w)
 
-        if frame_type == 'wave':
-            h, w = img.shape[:2]
-            mask = np.zeros((h, w), dtype=np.uint8)
-            x = np.arange(w)
-            if frame_type == 'wave':
-                y = (np.sin(x / 20) * 10 + thickness).astype(np.int32)
-                for i in range(w):
-                    mask[:y[i], i] = 1
-                    mask[-y[i]:, i] = 1
-            mask[:, :thickness] = 1
-            mask[:, -thickness:] = 1
-            frame = img.copy()
-            frame[mask > 0] = color
-            return frame
+    if frame_type == 'wave':
+        # Верхняя и нижняя волнистые границы
+        y_top = (np.sin(x / 20) * 10 + thickness).astype(np.int32)
+        y_bottom = (np.sin(x / 20) * 10 + thickness).astype(np.int32)
 
-        elif frame_type == 'zigzag':
-            x = np.arange(w)
-            y = (np.abs((x % (thickness)) - thickness // 2) * 3 + thickness // 2).astype(np.int32)
-            for i in range(w):
-                mask[:y[i], i] = 1
-                mask[-y[i]:, i] = 1
+        for i in range(w):
+            mask[:y_top[i], i] = 1
+            mask[h - y_bottom[i]:, i] = 1
 
-        # Боковые границы
-        mask[:, :thickness] = 1
-        mask[:, -thickness:] = 1
+    elif frame_type == 'zigzag':
+        # Верхняя и нижняя зигзагообразные границы
+        y_top = (np.abs((x % (thickness * 2)) - thickness) * 2 + thickness // 2).astype(np.int32)
+        y_bottom = (np.abs((x % (thickness * 2)) - thickness) * 2 + thickness // 2).astype(np.int32)
 
-        frame = img.copy()
-        frame[mask > 0] = color
-        return frame
+        for i in range(w):
+            mask[:y_top[i], i] = 1
+            mask[h - y_bottom[i]:, i] = 1
+
+    # Боковые границы
+    mask[:, :thickness] = 1
+    mask[:, -thickness:] = 1
+
+    # Применяем цвет рамки
+    frame = image.copy()
     colors = {
-        'wave': (0, 255, 255),
-        'zigzag': (0, 0, 255)
+        'wave': (0, 255, 255),  # Желтый
+        'zigzag': (0, 0, 255)  # Красный
     }
 
     color = colors.get(frame_type, (0, 255, 0))
-    return add_figure_frame(image, color=color, thickness=15, frame_type=frame_type)
+    frame[mask > 0] = color
+
+    return frame

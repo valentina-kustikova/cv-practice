@@ -1,3 +1,4 @@
+#simple_border
 import numpy as np
 
 def apply_simple_border(image, border_width=20):

@@ -1,5 +1,5 @@
+#pixelation
 import numpy as np
-
 
 def apply_pixelation(image, region):
 
