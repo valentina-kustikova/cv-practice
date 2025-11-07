@@ -44,9 +44,9 @@ def iou(boxA, boxB):
 def evaluate_frame(gt_boxes, det_boxes, iou_thr=0.5):
     gt_matched = set()
     det_matched = set()
-
+    det_boxes = sorted(det_boxes, key=lambda d: d[4], reverse=True)
     for gi, (gt_class, gt_box) in enumerate(gt_boxes):
-        for di, (x,y,w,h,det_class) in enumerate(det_boxes):
+        for di, (x,y,w,h,conf,det_class) in enumerate(det_boxes):
             if det_class.lower() == gt_class.lower():
                 if iou(gt_box, (x,y,w,h)) >= iou_thr:
                     gt_matched.add(gi)
@@ -57,9 +57,4 @@ def evaluate_frame(gt_boxes, det_boxes, iou_thr=0.5):
     FP = len(det_boxes) - len(det_matched)
     FN = len(gt_boxes) - len(gt_matched)
 
-    TPR = TP / (TP + FN + 1e-9)
-    FDR = FP / (TP + FP + 1e-9)
-
-    return TPR, FDR, (TP, FN, FP)
-
-
+    return  TP, FN, FP

@@ -9,7 +9,10 @@ class MobileNetDetector(BaseDetector):
         self.net.setInputSize(600, 600)
         self.conf_th = conf_th
         self.nms_th = nms_th
-
+    def preprocess(self, img):
+        return img
+    def postprocess(self, outputs):
+        return outputs
     def detect(self, img):
         classIds, confs, boxes = self.net.detect(
             img,

@@ -1,24 +1,22 @@
-# detectors.py
-import cv2
-import numpy as np
-import os
+from abc import ABC, abstractmethod
 
-class BaseDetector:
+class BaseDetector(ABC):
     def __init__(self, model_path, input_size):
         self.model_path = model_path
         self.input_size = input_size
         self.net = None
 
-
+    @abstractmethod
     def preprocess(self, img):
-        raise NotImplementedError
+        pass
 
     def forward(self, blob):
         self.net.setInput(blob)
         return self.net.forward()
 
+    @abstractmethod
     def postprocess(self, outputs, img):
-        raise NotImplementedError
+        pass
 
     def detect(self, img):
         blob = self.preprocess(img)
