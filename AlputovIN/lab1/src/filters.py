@@ -176,6 +176,9 @@ def lens_flare(image, center_x=None, center_y=None, intensity=0.8):
 	flare_strength_3d = flare_strength[:, :, np.newaxis]
 	result = np.minimum(255, result + flare_strength_3d * 200)
 	num_artifacts = 3
+	"""
+	Для создания маленьких артефактов, добавляет яркость только к одному цветовому каналу, чтобы они были цветными.
+	"""
 	for k in range(num_artifacts):
 		artifact_x = center_x - (center_x - w / 2) * (k + 1) / (num_artifacts + 1)
 		artifact_y = center_y - (center_y - h / 2) * (k + 1) / (num_artifacts + 1)
@@ -194,8 +197,8 @@ def watercolor_texture(img, strength=0.3):
 	"""
 	out = img.astype(np.float32)
 	h, w = img.shape[:2]
-	noise = np.random.normal(loc=128, scale=40, size=(h, w)).astype(np.float32)
-	noise = cv2.GaussianBlur(noise, (9, 9), 0)
+	noise = np.random.normal(loc=128, scale=40, size=(h, w)).astype(np.float32) ###Создает массив случайных чисел, который выглядит как черно-белый шум.
+	noise = cv2.GaussianBlur(noise, (9, 9), 0)###Размывает шум для создания более мягкой текстуры.
 	noise_3d = noise[..., np.newaxis]
-	out = out * (1 - strength) + noise_3d * strength
+	out = out * (1 - strength) + noise_3d * strength###взвешенное среднее
 	return np.clip(out, 0, 255).astype(np.uint8)

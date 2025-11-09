@@ -8,10 +8,10 @@ from filters import *
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Image filters demo')
-    parser.add_argument('image', help='Имя файла изображения (без пути)')
-    parser.add_argument('filter', help='Тип фильтра', choices=[
+    parser.add_argument('image', help='Image filename (without path)')
+    parser.add_argument('filter', help='Filter type', choices=[
         'resize', 'sepia', 'vignette', 'pixelate', 'rect_border', 'shape_border', 'lens_flare', 'watercolor'])
-    parser.add_argument('--params', nargs='+', help='Параметры фильтра', default=None)
+    parser.add_argument('--params', nargs='+', help='Filter parameters', default=None)
     return parser.parse_args()
 
 def main():
@@ -19,13 +19,13 @@ def main():
     image_path = os.path.join(os.path.dirname(__file__), '../images', args.image)
     img = cv2.imread(image_path)
     if img is None:
-        print(f'Ошибка загрузки изображения! Проверьте путь и формат файла: {image_path}')
-        print('Файл существует:', os.path.exists(image_path))
-        print('Текущая директория:', os.getcwd())
+        print(f'Error loading image! Check the path and file format: {image_path}')
+        print('File exists:', os.path.exists(image_path))
+        print('Current directory:', os.getcwd())
         sys.exit(1)
     result = None
-    # --- Выбор фильтра ---
     if args.filter == 'resize':
+        h_orig, w_orig = img.shape[:2]
         if args.params:
             if args.params[0] == 'scale' and len(args.params) == 2:
                 scale_factor = float(args.params[1])
@@ -37,11 +37,14 @@ def main():
                 w = int(args.params[0])
                 result = resize_image(img, width=w)
             else:
-                print('Укажите ширину и высоту или scale!')
+                print('Please specify width and height or scale!')
                 sys.exit(1)
         else:
-            print('Укажите параметры: ширину и высоту или scale!')
+            print('Please specify parameters: width and height or scale!')
             sys.exit(1)
+        h_new, w_new = result.shape[:2]
+        print(f'Original resolution: {w_orig}x{h_orig}')
+        print(f'New resolution: {w_new}x{h_new}')
     elif args.filter == 'sepia':
         result = sepia(img)
     elif args.filter == 'vignette':
@@ -99,14 +102,12 @@ def main():
         strength = float(args.params[0]) if args.params else 0.3
         result = watercolor_texture(img, strength)
     else:
-        print('Неизвестный фильтр!')
+        print('Unknown filter!')
         sys.exit(1)
-    # --- Отображение ---
-    # Объединение изображений для показа в одном окне
+
     h1, w1 = img.shape[:2]
     h2, w2 = result.shape[:2]
     max_h = max(h1, h2)
-    # Приведение к одной высоте, если нужно
     if h1 != max_h:
         img_disp = cv2.resize(img, (w1 * max_h // h1, max_h))
     else:
@@ -127,6 +128,6 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as e:
-        print('Произошла ошибка:', e)
+        print('An error occurred:', e)
         import traceback
         traceback.print_exc()
