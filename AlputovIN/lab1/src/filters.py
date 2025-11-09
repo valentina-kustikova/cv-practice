@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 
@@ -150,55 +151,47 @@ def add_shape_border(img, color=(255, 0, 0), thickness=10, shape='circle'):
     out[mask == 0] = color
     return out
 
-def lens_flare(image, center_x=None, center_y=None, intensity=0.8):
+def lens_flare(image, intensity=0.8):
 	"""
-	Наложение эффекта бликов объектива камеры
+	Наложение эффекта бликов объектива камеры с использованием готовой текстуры.
 	Args:
 		image: входное изображение
-		center_x: x-координата центра блика
-		center_y: y-координата центра блика
 		intensity: интенсивность блика (0.0 - 1.0)
 	Returns:
 		изображение с эффектом бликов
 	"""
 	h, w = image.shape[:2]
-	result = image.astype(np.float32)
-	if center_x is None:
-		center_x = w * 0.7
-	if center_y is None:
-		center_y = h * 0.3
-	y_coords, x_coords = np.ogrid[:h, :w]
-	radius_main = min(w, h) // 4
-	distance = np.sqrt((x_coords - center_x)**2 + (y_coords - center_y)**2)
-	mask_main = distance < radius_main
-	flare_strength = np.zeros((h, w))
-	flare_strength[mask_main] = (1.0 - distance[mask_main] / radius_main) * intensity
-	flare_strength_3d = flare_strength[:, :, np.newaxis]
-	result = np.minimum(255, result + flare_strength_3d * 200)
-	num_artifacts = 3
-	"""
-	Для создания маленьких артефактов, добавляет яркость только к одному цветовому каналу, чтобы они были цветными.
-	"""
-	for k in range(num_artifacts):
-		artifact_x = center_x - (center_x - w / 2) * (k + 1) / (num_artifacts + 1)
-		artifact_y = center_y - (center_y - h / 2) * (k + 1) / (num_artifacts + 1)
-		artifact_radius = radius_main // (k + 3)
-		distance_artifact = np.sqrt((x_coords - artifact_x)**2 + (y_coords - artifact_y)**2)
-		mask_artifact = distance_artifact < artifact_radius
-		artifact_strength = np.zeros((h, w))
-		artifact_strength[mask_artifact] = (1.0 - distance_artifact[mask_artifact] / artifact_radius) * intensity * 0.3
-		channel = k % 3
-		result[:, :, channel] = np.minimum(255, result[:, :, channel] + artifact_strength * 150)
-	return result.astype(np.uint8)
+	blik_path = os.path.join(os.path.dirname(__file__), '../images', 'blik.png')
+	blik = cv2.imread(blik_path, cv2.IMREAD_UNCHANGED)
+	if blik is None:
+		raise FileNotFoundError(f'Текстура блика не найдена: {blik_path}')
+	blik = cv2.resize(blik, (w, h), interpolation=cv2.INTER_LINEAR)
+	if blik.shape[2] == 4:
+		alpha = blik[:, :, 3] / 255.0
+		blik_rgb = blik[:, :, :3].astype(np.float32)
+		img_f = image.astype(np.float32)
+		for c in range(3):
+			img_f[:, :, c] = img_f[:, :, c] * (1 - alpha * intensity) + blik_rgb[:, :, c] * (alpha * intensity)
+		result = np.clip(img_f, 0, 255).astype(np.uint8)
+	else:
+		blik_rgb = blik.astype(np.float32)
+		img_f = image.astype(np.float32)
+		result = img_f * (1 - intensity) + blik_rgb * intensity
+		result = np.clip(result, 0, 255).astype(np.uint8)
+	return result
 
 def watercolor_texture(img, strength=0.3):
 	"""
-	Эффект текстуры акварельной бумаги.
+	Эффект текстуры акварельной бумаги: на выбранное пользователем изображение накладывается текстура bumaga.png.
 	"""
-	out = img.astype(np.float32)
 	h, w = img.shape[:2]
-	noise = np.random.normal(loc=128, scale=40, size=(h, w)).astype(np.float32) ###Создает массив случайных чисел, который выглядит как черно-белый шум.
-	noise = cv2.GaussianBlur(noise, (9, 9), 0)###Размывает шум для создания более мягкой текстуры.
-	noise_3d = noise[..., np.newaxis]
-	out = out * (1 - strength) + noise_3d * strength###взвешенное среднее
+	texture_path = os.path.join(os.path.dirname(__file__), '../images', 'bumaga.png')
+	texture = cv2.imread(texture_path, cv2.IMREAD_COLOR)
+	if texture is None:
+		raise FileNotFoundError(f'Текстура акварельной бумаги не найдена: {texture_path}')
+	texture = cv2.resize(texture, (w, h), interpolation=cv2.INTER_LINEAR)
+	img_f = img.astype(np.float32)
+	texture_f = texture.astype(np.float32)
+	# Эффект наложения: взвешенное среднее
+	out = img_f * (1 - strength) + texture_f * strength
 	return np.clip(out, 0, 255).astype(np.uint8)
