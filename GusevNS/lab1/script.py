@@ -24,20 +24,20 @@ def resize_image(image, width, height):
     # Какие СТОЛБЦЫ
     src_x = ((np.arange(width) / width) * w).astype(int)
     
-    if len(image.shape) == 3:
-        resized = np.zeros((height, width, image.shape[2]), dtype=image.dtype)
-    else:
-        resized = np.zeros((height, width), dtype=image.dtype)
-    
-    for i in range(height):
-        for j in range(width):
-            resized[i, j] = image[src_y[i], src_x[j]]
+    # if len(image.shape) == 3:
+    #     resized = np.zeros((height, width, image.shape[2]), dtype=image.dtype)
+    # else:
+    #     resized = np.zeros((height, width), dtype=image.dtype)
+    # 
+    # for i in range(height):
+    #     for j in range(width):
+    #         resized[i, j] = image[src_y[i], src_x[j]]
     
     # Создаем сетки координат. По сути из src_x,y делаем двумерную сетку координат
-    #Y, X = np.meshgrid(src_y, src_x, indexing='ij')
+    Y, X = np.meshgrid(src_y, src_x, indexing='ij')
     
     # Создаем новое изображение
-    #resized = image[Y, X]
+    resized = image[Y, X]
     
     return resized
 
@@ -136,6 +136,73 @@ def pixelate_region(image, x, y, width, height, pixel_size=10):
     return pixelated
 
 
+def interactive_pixelate(image, pixel_size=15):
+    """
+    Интерактивная пикселизация области с помощью мыши (с коллбэками).
+    
+    Args:
+        image: исходное изображение
+        pixel_size: размер пикселя для пикселизации
+    
+    Returns:
+        изображение с пикселизированной областью
+    """
+    rect_start = None
+    rect_end = None
+    drawing = False
+    result_image = image.copy()
+    
+    def mouse_callback(event, x, y, flags, param):
+        nonlocal rect_start, rect_end, drawing, result_image
+        
+        if event == cv.EVENT_LBUTTONDOWN:
+            drawing = True
+            rect_start = (x, y)
+            rect_end = (x, y)
+        
+        elif event == cv.EVENT_MOUSEMOVE:
+            if drawing:
+                rect_end = (x, y)
+        
+        elif event == cv.EVENT_LBUTTONUP:
+            drawing = False
+            rect_end = (x, y)
+            
+            # Вычисляем параметры для пикселизации
+            x1 = min(rect_start[0], rect_end[0])
+            y1 = min(rect_start[1], rect_end[1])
+            x2 = max(rect_start[0], rect_end[0])
+            y2 = max(rect_start[1], rect_end[1])
+            width = x2 - x1
+            height = y2 - y1
+            
+            # Применяем пикселизацию
+            if width > 0 and height > 0:
+                result_image = pixelate_region(image, x1, y1, width, height, pixel_size)
+    
+    print("   >> Выберите область для пикселизации мышью. Нажмите ESC для завершения...")
+    
+    window_name = 'Выберите область (нажмите ESC)'
+    cv.namedWindow(window_name)
+    cv.setMouseCallback(window_name, mouse_callback)
+    
+    while True:
+        display_image = result_image.copy()
+        
+        # Рисуем прямоугольник выделения
+        if rect_start and rect_end:
+            cv.rectangle(display_image, rect_start, rect_end, (0, 255, 0), 2)
+        
+        cv.imshow(window_name, display_image)
+        
+        key = cv.waitKey(1) & 0xFF
+        if key == 27:  # ескейп
+            break
+    
+    cv.destroyAllWindows()
+    return result_image
+
+
 def add_rectangular_frame(image, frame_width, color=(0, 0, 0)):
     """
     Функция наложения прямоугольной одноцветной рамки заданной ширины по краям изображения.
@@ -175,25 +242,35 @@ def add_decorative_frame(image, frame_type="wavy", frame_width=20, color=(0, 0, 
     Returns:
         изображение с фигурной рамкой
     """
-    # Загружаем текстуру рамки
+    # Загружаем текстуру рамки с альфа-каналом
     frame_types = ["wavy", "pattern", "straight", "red", "floral"]
     frame_index = frame_types.index(frame_type) if frame_type in frame_types else 0
     
     frame_path = f"textures/frame{frame_index}.jpg"
-    frame = cv.imread(frame_path)
+    frame = cv.imread(frame_path, cv.IMREAD_UNCHANGED)
     
     h, w = image.shape[:2]
     
     # Изменяем размер рамки под размер изображения
     frame = resize_image(frame, w, h)
     
-    # Вычисляем насколько пиксель отличается от белого
-    color_diff = np.sqrt(np.sum((frame.astype(np.float32) - 255) ** 2, axis=2))
-    # Если отличается больше чем на 30, то этот пиксель будет белым (False) + 3 канал
-    frame_mask = (color_diff > 30)[:, :, np.newaxis]
+    # Проверяем наличие альфа-канала
+    if len(frame.shape) == 3 and frame.shape[2] == 4:
+        # Используем альфа-канал для смешивания
+        alpha = frame[:, :, 3:4] / 255.0
+        frame_rgb = frame[:, :, :3]
+        result = image * (1 - alpha) + frame_rgb * alpha
+    else:
+        # Без альфа-канала - старый способ (маска)
+        # Вычисляем насколько пиксель отличается от белого
+        color_diff = np.sqrt(np.sum((frame.astype(np.float32) - 255) ** 2, axis=2))
+        # Если отличается больше чем на 30, то этот пиксель будет белым (False) + 3 канал
+        frame_mask = (color_diff > 30)[:, :, np.newaxis]
+        
+        # Где рамка, то ставим рамку, где нет, то ставим исходное изображение
+        result = image * ~frame_mask + frame * frame_mask
     
-    # Где рамка, то ставим рамку, где нет, то ставим исходное изображение
-    return (image * ~frame_mask + frame * frame_mask).astype(np.uint8)
+    return result.astype(np.uint8)
 
 
 def add_lens_flare(image, flare_x, flare_y, intensity=0.8):
@@ -208,8 +285,8 @@ def add_lens_flare(image, flare_x, flare_y, intensity=0.8):
     Returns:
         изображение с эффектом блика
     """
-    # Загружаем текстуру блика
-    glare = cv.imread("textures/glare.jpg")
+    # Загружаем текстуру блика с альфа-каналом
+    glare = cv.imread("textures/glare.jpg", cv.IMREAD_UNCHANGED)
     
     h_img, w_img = image.shape[:2]
     
@@ -238,7 +315,18 @@ def add_lens_flare(image, flare_x, flare_y, intensity=0.8):
     # Применяем блик к изображению
     flared = image.astype(np.float32).copy()
     glare_region = glare[glare_y_start:glare_y_end, glare_x_start:glare_x_end]
-    flared[img_y_start:img_y_end, img_x_start:img_x_end] += glare_region * intensity
+    
+    # Проверяем наличие альфа-канала
+    if glare_region.shape[2] == 4:
+        # Используем альфа-канал для смешивания
+        alpha = (glare_region[:, :, 3:4] / 255.0) * intensity
+        glare_rgb = glare_region[:, :, :3]
+        flared[img_y_start:img_y_end, img_x_start:img_x_end] = \
+            flared[img_y_start:img_y_end, img_x_start:img_x_end] * (1 - alpha) + glare_rgb * alpha
+    else:
+        # Без альфа-канала - старый способ
+        flared[img_y_start:img_y_end, img_x_start:img_x_end] += glare_region * intensity
+    
     # Нормализуем + приведение типа
     return np.clip(flared, 0, 255).astype(np.uint8)
 
@@ -254,22 +342,33 @@ def add_watercolor_texture(image, texture_strength=0.3):
     Returns:
         изображение с текстурой акварельной бумаги
     """
-    # Загружаем текстуру акварельной бумаги
-    texture = cv.imread("textures/watercolor_paper.jpg")
+    # Загружаем текстуру акварельной бумаги с альфа-каналом
+    texture = cv.imread("textures/watercolor_paper.jpg", cv.IMREAD_UNCHANGED)
     
     h, w = image.shape[:2]
     
     # Изменяем размер текстуры под размер изображения
     texture = resize_image(texture, w, h)
     
-    # Среднее по трём каналам. Как яркость текстуры
-    texture_gray = np.mean(texture, axis=2)
-    # Нормализация 0-1 + инверсия + степень силы текстуры
-    texture_mask = (1 - texture_gray / 255.0) ** (1 / texture_strength)
-    texture_mask = texture_mask[:, :, np.newaxis]
-    
-    # Применяем текстуру к изображению
-    blended = image * (1 - texture_mask * texture_strength) + texture * (texture_mask * texture_strength)
+    # Проверяем наличие альфа-канала
+    if len(texture.shape) == 3 and texture.shape[2] == 4:
+        # Используем альфа-канал для смешивания
+        alpha = (texture[:, :, 3:4] / 255.0) * texture_strength
+        texture_rgb = texture[:, :, :3]
+        blended = image * (1 - alpha) + texture_rgb * alpha
+    else:
+        # Без альфа-канала - старый способ
+        if len(texture.shape) == 2:
+            texture = cv.cvtColor(texture, cv.COLOR_GRAY2BGR)
+        
+        # Среднее по трём каналам. Как яркость текстуры
+        texture_gray = np.mean(texture, axis=2)
+        # Нормализация 0-1 + инверсия + степень силы текстуры
+        texture_mask = (1 - texture_gray / 255.0) ** (1 / texture_strength)
+        texture_mask = texture_mask[:, :, np.newaxis]
+        
+        # Применяем текстуру к изображению
+        blended = image * (1 - texture_mask * texture_strength) + texture * (texture_mask * texture_strength)
     
     return blended.astype(np.uint8)
 
