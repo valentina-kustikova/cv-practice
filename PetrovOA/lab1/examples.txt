@@ -40,7 +40,7 @@ python main.py capybara.jpeg decorative_frame --frame-style zigzag --frame-width
 python main.py capybara.jpeg lens_flare --intensity 0.8
 
 # 13. Блики объектива (в конкретной точке)
-python main.py capybara.jpeg lens_flare --center-x 400 --center-y 300 --intensity 1.0
+python main.py capybara.jpeg lens_flare --intensity 1.0
 
 # 14. Текстура акварельной бумаги
 python main.py capybara.jpeg watercolor --intensity 0.4

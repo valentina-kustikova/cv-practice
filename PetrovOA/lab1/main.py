@@ -306,69 +306,62 @@ def add_decorative_frame(image, frame_width=20, color=(0, 0, 0), frame_type='rou
 
 def add_lens_flare(image, center_x=None, center_y=None, intensity=0.8):
     """
-    Наложение эффекта бликов объектива камеры
+    Наложение эффекта бликов объектива камеры с использованием готовой текстуры
     
     Args:
         image: входное изображение
-        center_x: x-координата центра блика
-        center_y: y-координата центра блика
+        center_x: не используется (для совместимости)
+        center_y: не используется (для совместимости)
         intensity: интенсивность блика (0.0 - 1.0)
     
     Returns:
         изображение с эффектом бликов
     """
+    import os
+    
     h, w = image.shape[:2]
-    result = image.astype(np.float32)
     
-    # Если координаты не заданы, используем значения по умолчанию
-    if center_x is None:
-        center_x = w * 0.7
-    if center_y is None:
-        center_y = h * 0.3
+    # Загружаем текстуру блика с альфа-каналом
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    blik_path = os.path.join(script_dir, 'blik.png')
     
-    # Создаем сетки координат
-    y_coords, x_coords = np.ogrid[:h, :w]
+    if not os.path.exists(blik_path):
+        print(f"Предупреждение: текстура блика не найдена: {blik_path}")
+        return image
     
-    # Основной блик
-    radius_main = min(w, h) // 4
+    blik = cv2.imread(blik_path, cv2.IMREAD_UNCHANGED)
+    if blik is None:
+        print(f"Предупреждение: не удалось загрузить текстуру блика: {blik_path}")
+        return image
     
-    # Вычисляем расстояние от центра для всех пикселей
-    distance = np.sqrt((x_coords - center_x)**2 + (y_coords - center_y)**2)
+    # Подгоняем размер текстуры под размер изображения
+    blik = cv2.resize(blik, (w, h), interpolation=cv2.INTER_LINEAR)
     
-    # Маска основного блика
-    mask_main = distance < radius_main
-    flare_strength = np.zeros((h, w))
-    flare_strength[mask_main] = (1.0 - distance[mask_main] / radius_main) * intensity
-    
-    # Добавляем основной блик ко всем каналам
-    flare_strength_3d = flare_strength[:, :, np.newaxis]
-    result = np.minimum(255, result + flare_strength_3d * 200)
-    
-    # Дополнительные блики (артефакты)
-    num_artifacts = 3
-    for k in range(num_artifacts):
-        artifact_x = center_x - (center_x - w / 2) * (k + 1) / (num_artifacts + 1)
-        artifact_y = center_y - (center_y - h / 2) * (k + 1) / (num_artifacts + 1)
-        artifact_radius = radius_main // (k + 3)
+    # Проверяем наличие альфа-канала
+    if blik.shape[2] == 4:
+        # Извлекаем альфа-канал и нормализуем
+        alpha = blik[:, :, 3] / 255.0
+        blik_rgb = blik[:, :, :3].astype(np.float32)
+        img_f = image.astype(np.float32)
         
-        # Вычисляем расстояние до артефакта
-        distance_artifact = np.sqrt((x_coords - artifact_x)**2 + (y_coords - artifact_y)**2)
+        # Смешиваем изображения с учетом альфа-канала
+        for c in range(3):
+            img_f[:, :, c] = img_f[:, :, c] * (1 - alpha * intensity) + blik_rgb[:, :, c] * (alpha * intensity)
         
-        # Маска артефакта
-        mask_artifact = distance_artifact < artifact_radius
-        artifact_strength = np.zeros((h, w))
-        artifact_strength[mask_artifact] = (1.0 - distance_artifact[mask_artifact] / artifact_radius) * intensity * 0.3
-        
-        # Добавляем цветной артефакт к определенному каналу
-        channel = k % 3
-        result[:, :, channel] = np.minimum(255, result[:, :, channel] + artifact_strength * 150)
+        result = np.clip(img_f, 0, 255).astype(np.uint8)
+    else:
+        # Если альфа-канала нет, используем простое смешивание
+        blik_rgb = blik.astype(np.float32)
+        img_f = image.astype(np.float32)
+        result = img_f * (1 - intensity) + blik_rgb * intensity
+        result = np.clip(result, 0, 255).astype(np.uint8)
     
-    return result.astype(np.uint8)
+    return result
 
 
 def add_watercolor_texture(image, intensity=0.3):
     """
-    Наложение текстуры акварельной бумаги
+    Наложение текстуры акварельной бумаги из файла
     
     Args:
         image: входное изображение
@@ -377,34 +370,34 @@ def add_watercolor_texture(image, intensity=0.3):
     Returns:
         изображение с текстурой акварельной бумаги
     """
+    import os
+    
+    # Загружаем текстуру акварельной бумаги
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    paper_path = os.path.join(script_dir, 'paper.png')
+    
+    if not os.path.exists(paper_path):
+        print(f"Предупреждение: текстура бумаги не найдена: {paper_path}")
+        return image
+    
+    paper_texture = cv2.imread(paper_path)
+    if paper_texture is None:
+        print(f"Предупреждение: не удалось загрузить текстуру бумаги: {paper_path}")
+        return image
+    
     h, w = image.shape[:2]
     
-    # Генерация шума для имитации текстуры бумаги
-    np.random.seed(42)  # Для воспроизводимости
+    # Подгоняем размер текстуры под размер изображения
+    paper_resized = cv2.resize(paper_texture, (w, h), interpolation=cv2.INTER_LINEAR)
     
-    # Создаем мелкозернистый шум
-    # Создаем шум меньшего размера и расширяем его
-    small_h, small_w = (h + 1) // 2, (w + 1) // 2
-    fine_noise = np.random.uniform(-30, 30, (small_h, small_w)).astype(np.float32)
+    # Конвертируем изображения в float32 для точных вычислений
+    result = image.astype(np.float32)
+    paper_float = paper_resized.astype(np.float32)
     
-    # Расширяем мелкий шум до полного размера (каждое значение повторяется в блоке 2x2)
-    fine_texture = np.repeat(np.repeat(fine_noise, 2, axis=0), 2, axis=1)[:h, :w]
+    # Складываем изображение с текстурой с учетом интенсивности
+    result = result + paper_float * intensity
     
-    # Создаем крупнозернистый шум (волокна бумаги)
-    large_h, large_w = (h + 9) // 10, (w + 9) // 10
-    coarse_noise = np.random.uniform(-20, 20, (large_h, large_w)).astype(np.float32)
-    
-    # Расширяем крупный шум до полного размера
-    coarse_texture = np.repeat(np.repeat(coarse_noise, 10, axis=0), 10, axis=1)[:h, :w]
-    
-    # Комбинируем текстуры
-    texture = fine_texture + coarse_texture
-    
-    # Добавляем размерность для каналов
-    texture_3d = texture[:, :, np.newaxis]
-    
-    # Применяем текстуру к изображению
-    result = image.astype(np.float32) + texture_3d * intensity
+    # Обрезаем значения до диапазона [0, 255]
     result = np.clip(result, 0, 255)
     
     return result.astype(np.uint8)
