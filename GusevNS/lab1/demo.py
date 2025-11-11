@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from script import (
     resize_image, sepia_filter, vignette_filter, pixelate_region,
     add_rectangular_frame, add_decorative_frame, add_lens_flare,
-    add_watercolor_texture
+    add_watercolor_texture, interactive_pixelate
 )
 
 def show_result(title, image, original=None):
@@ -63,8 +63,8 @@ def demo_all_filters():
     cv.imwrite('demo_results/3_vignette.jpg', vignette)
     show_result('3. Эффект виньетки (сила 0.7)', vignette, test_image)
     
-    print("\n4. Пикселизация области...")
-    pixelated = pixelate_region(test_image, 50, 50, 150, 100, 15)
+    print("\n4. Пикселизация области (интерактивно)...")
+    pixelated = interactive_pixelate(test_image)
     cv.imwrite('demo_results/4_pixelate.jpg', pixelated)
     show_result('4. Пикселизация области', pixelated, test_image)
     
