@@ -24,15 +24,6 @@ def resize_image(image, width, height):
     # Какие СТОЛБЦЫ
     src_x = ((np.arange(width) / width) * w).astype(int)
     
-    # if len(image.shape) == 3:
-    #     resized = np.zeros((height, width, image.shape[2]), dtype=image.dtype)
-    # else:
-    #     resized = np.zeros((height, width), dtype=image.dtype)
-    # 
-    # for i in range(height):
-    #     for j in range(width):
-    #         resized[i, j] = image[src_y[i], src_x[j]]
-    
     # Создаем сетки координат. По сути из src_x,y делаем двумерную сетку координат
     Y, X = np.meshgrid(src_y, src_x, indexing='ij')
     
