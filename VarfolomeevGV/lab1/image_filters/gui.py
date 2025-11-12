@@ -249,7 +249,7 @@ class FilterWindow(QMainWindow):
 
     def init_ui(self):
         """Initialize UI"""
-        self.setWindowTitle("lab1 - base matrix filters")
+        self.setWindowTitle("Лаб1 OpenCV фильтры")
         self.setGeometry(100, 100, 1200, 700)
 
         central_widget = QWidget()
@@ -299,7 +299,7 @@ class FilterWindow(QMainWindow):
         control_panel = QWidget()
         control_layout = QVBoxLayout(control_panel)
 
-        file_group = QGroupBox("Files")
+        file_group = QGroupBox("Файлы")
         file_layout = QVBoxLayout()
 
         self.load_button = QPushButton("Загрузить изображение")
@@ -323,7 +323,7 @@ class FilterWindow(QMainWindow):
         file_layout.addWidget(self.open_processed_button)
         file_group.setLayout(file_layout)
 
-        filter_group = QGroupBox("Filters")
+        filter_group = QGroupBox("Фильтры")
         filter_layout = QVBoxLayout()
 
         self.filter_combo = QComboBox()
@@ -342,10 +342,10 @@ class FilterWindow(QMainWindow):
         ])
         self.filter_combo.currentIndexChanged.connect(self.on_filter_changed)
 
-        filter_layout.addWidget(QLabel("Select filter:"))
+        filter_layout.addWidget(QLabel("Выберите фильтр:"))
         filter_layout.addWidget(self.filter_combo)
 
-        self.params_group = QGroupBox("Filter Parameters")
+        self.params_group = QGroupBox("Параметры фильтра")
         self.params_layout = QVBoxLayout()
         self.params_group.setLayout(self.params_layout)
         self.params_group.setVisible(False)
@@ -353,7 +353,7 @@ class FilterWindow(QMainWindow):
         filter_layout.addWidget(self.params_group)
         filter_group.setLayout(filter_layout)
 
-        self.apply_button = QPushButton("Apply Filter")
+        self.apply_button = QPushButton("Применить фильтр")
         self.apply_button.clicked.connect(self.apply_filter)
         self.apply_button.setEnabled(False)
 
@@ -361,7 +361,7 @@ class FilterWindow(QMainWindow):
         control_layout.addWidget(filter_group)
         control_layout.addWidget(self.apply_button)
 
-        self.overlay_button = QPushButton("Load Overlay")
+        self.overlay_button = QPushButton("Загрузить текстуру")
         self.overlay_button.clicked.connect(self.load_overlay_image)
         self.overlay_preview = QLabel("Нет\nоверлея")
         self.overlay_preview.setAlignment(Qt.AlignCenter)
@@ -392,7 +392,7 @@ class FilterWindow(QMainWindow):
         """Loads image from file"""
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Select Image",
+            "Выбор изображения",
             "",
             "Images (*.png *.jpg *.jpeg);;All Files (*)"
         )
@@ -414,7 +414,7 @@ class FilterWindow(QMainWindow):
                 self.processed_temp_path = None
                 self.open_processed_button.setEnabled(False)
             else:
-                QMessageBox.warning(self, "Error", "Failed to load image")
+                QMessageBox.warning(self, "Ошибка", "Не удалось загрузить изображение")
 
     def save_image(self):
         """Saves processed image"""
@@ -424,14 +424,14 @@ class FilterWindow(QMainWindow):
 
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            "Save Image",
+            "Сохранение изображения",
             "",
             "PNG Files (*.png);;JPEG Files (*.jpg);;All Files (*)"
         )
 
         if file_path:
             cv2.imwrite(file_path, image)
-            QMessageBox.information(self, "Success", "Image saved")
+            QMessageBox.information(self, "Готово", "Изображение сохранено")
             self.processed_temp_path = Path(file_path)
             self.open_processed_button.setEnabled(True)
 
@@ -439,7 +439,7 @@ class FilterWindow(QMainWindow):
         """Loads external overlay image"""
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Select Overlay Image",
+            "Выбор текстуры",
             "",
             "Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All Files (*)"
         )
@@ -449,7 +449,7 @@ class FilterWindow(QMainWindow):
 
         overlay = cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
         if overlay is None:
-            QMessageBox.warning(self, "Error", "Failed to load overlay image")
+            QMessageBox.warning(self, "Ошибка", "Не удалось загрузить текстуру")
             return
 
         self.overlay_image = overlay
@@ -519,11 +519,11 @@ class FilterWindow(QMainWindow):
             return
 
         if self.current_filter == "frame_curvy":
-            self.overlay_button.setText("Load Frame")
+            self.overlay_button.setText("Загрузить рамку")
         elif self.current_filter == "glare":
-            self.overlay_button.setText("Load Glare")
+            self.overlay_button.setText("Загрузить блик")
         else:
-            self.overlay_button.setText("Load Overlay")
+            self.overlay_button.setText("Загрузить текстуру")
 
         if self.overlay_image is None:
             self.overlay_preview.setText(self._get_overlay_placeholder_text())
@@ -534,7 +534,7 @@ class FilterWindow(QMainWindow):
         if self.current_filter == "frame_curvy":
             return "Нет\nрамки"
         elif self.current_filter == "glare":
-            return  "Нет\n блика"
+            return "Нет\nблика"
         else:
             return "Нет\nоверлея"
 
@@ -583,23 +583,23 @@ class FilterWindow(QMainWindow):
         self.params_group.setVisible(True)
 
         if self.current_filter == "Nearest Neighbour Interpolation":
-            self.add_slider_param("scale_factor", "Scale", 1, 5, 2)
+            self.add_slider_param("scale_factor", "Масштаб", 1, 5, 2)
 
         elif self.current_filter == "Bilinear interpolation":
-            self.add_slider_param("scale_factor", "Scale:", 1, 5, 2)
+            self.add_slider_param("scale_factor", "Масштаб:", 1, 5, 2)
 
         elif self.current_filter == "Linear resize":
-            self.add_spinbox_param("new_width", "Width (px):", 1, 10000, 512)
-            self.add_spinbox_param("new_height", "Height (px):", 1, 10000, 512)
+            self.add_spinbox_param("new_width", "Ширина (px):", 1, 10000, 512)
+            self.add_spinbox_param("new_height", "Высота (px):", 1, 10000, 512)
             self._update_resize_defaults(force=True)
 
         elif self.current_filter == "vignette":
-            self.add_slider_param("intensity", "Intensity:", 0, 100, 70)
-            self.add_slider_param("radius", "Radius:", 0, 100, 50)
+            self.add_slider_param("intensity", "Интенсивность (%):", 0, 100, 70)
+            self.add_slider_param("radius", "Радиус (%):", 0, 100, 50)
             center_layout = QHBoxLayout()
-            self.vignette_pick_button = QPushButton("Pick center")
+            self.vignette_pick_button = QPushButton("Указать центр")
             self.vignette_pick_button.clicked.connect(self.activate_vignette_center_pick)
-            self.vignette_center_label = QLabel("Center: n/a")
+            self.vignette_center_label = QLabel("Центр: n/a")
             center_layout.addWidget(self.vignette_pick_button)
             center_layout.addWidget(self.vignette_center_label)
             center_layout.addStretch()
@@ -609,13 +609,13 @@ class FilterWindow(QMainWindow):
         elif self.current_filter == "pixelation":
             self.add_slider_param("x", "X:", 0, 1000, 0)
             self.add_slider_param("y", "Y:", 0, 1000, 0)
-            self.add_slider_param("width", "Width:", 10, 500, 100)
-            self.add_slider_param("height", "Height:", 10, 500, 100)
-            self.add_slider_param("pixel_size", "Pixel size:", 5, 50, 10)
+            self.add_slider_param("width", "Ширина:", 10, 500, 100)
+            self.add_slider_param("height", "Высота:", 10, 500, 100)
+            self.add_slider_param("pixel_size", "Размер блока:", 5, 50, 10)
             region_layout = QHBoxLayout()
-            self.pixelation_pick_button = QPushButton("Pick area")
+            self.pixelation_pick_button = QPushButton("Указать регион")
             self.pixelation_pick_button.clicked.connect(self.activate_pixelation_pick)
-            self.pixelation_region_label = QLabel("Area: n/a")
+            self.pixelation_region_label = QLabel("Регион: n/a")
             region_layout.addWidget(self.pixelation_pick_button)
             region_layout.addWidget(self.pixelation_region_label)
             region_layout.addStretch()
@@ -623,24 +623,24 @@ class FilterWindow(QMainWindow):
             self._update_pixelation_region_label()
 
         elif self.current_filter == "frame_simple":
-            self.add_spinbox_param("frame_width", "Thickness (px):", 0, 255, 10)
-            self.add_rgb_param("frame_color", "Color:", (0, 0, 0))
+            self.add_spinbox_param("frame_width", "Толщина (px):", 0, 255, 10)
+            self.add_rgb_param("frame_color", "Цвет:", (0, 0, 0))
 
         elif self.current_filter == "frame_curvy":
-            self.add_spinbox_param("frame_width", "Thickness (px):", 0, 255, 10)
-            self.add_rgb_param("frame_color", "Color:", (0, 0, 0))
+            self.add_spinbox_param("frame_width", "Толщина (px):", 0, 255, 10)
+            self.add_rgb_param("frame_color", "Цвет:", (0, 0, 0))
             self._add_frame_overlay_toggle()
 
         elif self.current_filter == "glare":
-            self.add_slider_param("center_x", "Center X:", 0, 1000, 0)
-            self.add_slider_param("center_y", "Center Y:", 0, 1000, 0)
-            self.add_slider_param("radius", "Radius:", 10, 500, 100)
-            self.add_slider_param("intensity", "Intensity:", 0, 100, 50)
-            self.add_slider_param("overlay_scale", "Texture scale (%):", 10, 200, 100)
+            self.add_slider_param("center_x", "Центр X:", 0, 1000, 0)
+            self.add_slider_param("center_y", "Центр Y:", 0, 1000, 0)
+            self.add_slider_param("radius", "Радиус (px):", 10, 500, 100)
+            self.add_slider_param("intensity", "Интенсивность (%):", 0, 100, 50)
+            self.add_slider_param("overlay_scale", "Масштаб текстуры (%):", 10, 200, 100)
             self.filter_params["center_x"] = None
             self.filter_params["center_y"] = None
             center_layout = QHBoxLayout()
-            self.glare_pick_button = QPushButton("Pick center")
+            self.glare_pick_button = QPushButton("Указать центр")
             self.glare_pick_button.clicked.connect(self.activate_glare_center_pick)
             self.glare_center_label = QLabel("Center: n/a")
             center_layout.addWidget(self.glare_pick_button)
@@ -650,7 +650,7 @@ class FilterWindow(QMainWindow):
             self._update_glare_center_label()
 
         elif self.current_filter == "watercolor_texture":
-            self.add_slider_param("texture_intensity", "Intensity:", 0, 100, 30)
+            self.add_slider_param("texture_intensity", "Интенсивность (%):", 0, 100, 30)
 
         elif self.current_filter == "overlay_alpha":
             info_label = QLabel(
@@ -807,7 +807,7 @@ class FilterWindow(QMainWindow):
 
     def _is_overlay_allowed(self) -> bool:
         """Returns whether overlay controls should be visible for current filter"""
-        return self.current_filter in {"frame_curvy", "glare", "watercolor_texture"}
+        return self.current_filter in {"frame_curvy", "glare", "watercolor_texture", "overlay_alpha"}
 
     def _update_overlay_visibility(self):
         """Shows or hides overlay controls depending on current filter"""
@@ -847,7 +847,7 @@ class FilterWindow(QMainWindow):
         if self.use_overlay_for_frame and self.overlay_image is None:
             QMessageBox.information(
                 self,
-                "Frame overlay",
+                "Внешняя рамка",
                 "Загрузите PNG с альфа-каналом, который будет использоваться как рамка."
             )
             if self.frame_overlay_checkbox is not None:
@@ -944,21 +944,21 @@ class FilterWindow(QMainWindow):
         if self.current_filter == "overlay_alpha" and self.overlay_image is None:
             QMessageBox.information(
                 self,
-                "Overlay",
+                "Наложение",
                 "Загрузите внешнее изображение с альфа-каналом, чтобы выполнить наложение."
             )
             return
         if self.current_filter in {"frame_simple", "frame_curvy"} and self.use_overlay_for_frame and self.overlay_image is None:
             QMessageBox.information(
                 self,
-                "Frame overlay",
+                "Внешняя рамка",
                 "Для кастомной рамки загрузите PNG с альфа-каналом или отключите внешний источник."
             )
             return
         if self.current_filter == "watercolor_texture" and self.overlay_image is None:
             QMessageBox.information(
                 self,
-                "Watercolor texture",
+                "Текстура акварели",
                 "Для текстуры акварельной бумаги загрузите изображение (PNG с альфа-каналом)."
             )
             return
@@ -972,7 +972,7 @@ class FilterWindow(QMainWindow):
             self.save_button.setEnabled(True)
             self.open_processed_button.setEnabled(True)
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error applying filter: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", f"Не удалось применить фильтр: {e}")
 
     def _apply_filter_to_image(self, image: np.ndarray) -> np.ndarray:
         """Applies filter to image"""
@@ -1097,32 +1097,32 @@ class FilterWindow(QMainWindow):
     def activate_vignette_center_pick(self):
         """Enables vignette center picking mode"""
         if self.original_viewer.get_original_image() is None:
-            QMessageBox.information(self, "Info", "Load an image before picking the vignette center.")
+            QMessageBox.information(self, "Подсказка", "Загрузите изображение перед выбором центра.")
             return
         self._pending_pixelation_point = None
         self._set_pick_mode("vignette")
         if self.vignette_center_label is not None:
-            self.vignette_center_label.setText("Center: select a point...")
+            self.vignette_center_label.setText("Центр: Укажите точку...")
 
     def activate_pixelation_pick(self):
         """Enables rectangular pixelation picking mode"""
         if self.original_viewer.get_original_image() is None:
-            QMessageBox.information(self, "Info", "Load an image before picking the region.")
+            QMessageBox.information(self, "Подсказка", "Загрузите изображение перед выбором региона.")
             return
         self._pending_pixelation_point = None
         self._set_pick_mode("pixelation")
         if self.pixelation_region_label is not None:
-            self.pixelation_region_label.setText("Area: select top-left...")
+            self.pixelation_region_label.setText("Регион: Выберите веохнюю левую точку...")
 
     def activate_glare_center_pick(self):
         """Enables glare center picking mode"""
         if self.original_viewer.get_original_image() is None:
-            QMessageBox.information(self, "Info", "Load an image before picking the glare center.")
+            QMessageBox.information(self, "Подсказка", "Загрузите изображение перед тем, как выбрать центр")
             return
         self._pending_pixelation_point = None
         self._set_pick_mode("glare")
         if self.glare_center_label is not None:
-            self.glare_center_label.setText("Center: select a point...")
+            self.glare_center_label.setText("Центр: Укажите точку...")
 
     def _set_pick_mode(self, mode: Optional[str]):
         """Sets current pick mode"""
@@ -1163,7 +1163,7 @@ class FilterWindow(QMainWindow):
             if self._pending_pixelation_point is None:
                 self._pending_pixelation_point = (x, y)
                 if self.pixelation_region_label is not None:
-                    self.pixelation_region_label.setText(f"Area: ({x}, {y}) → …")
+                    self.pixelation_region_label.setText(f"Регион: ({x}, {y}) → …")
             else:
                 x0, y0 = self._pending_pixelation_point
                 x1, y1 = x, y
@@ -1191,7 +1191,7 @@ class FilterWindow(QMainWindow):
             self.filter_params["center_x"] = None
             self.filter_params["center_y"] = None
             if self.vignette_center_label is not None:
-                self.vignette_center_label.setText("Center: n/a")
+                self.vignette_center_label.setText("Центр: n/a")
             if self.vignette_pick_button is not None:
                 self.vignette_pick_button.setEnabled(False)
             return
@@ -1212,7 +1212,7 @@ class FilterWindow(QMainWindow):
         self.filter_params["center_y"] = cy
 
         if self.vignette_center_label is not None:
-            self.vignette_center_label.setText(f"Center: {cx}, {cy}")
+            self.vignette_center_label.setText(f"Центр: {cx}, {cy}")
         if self.vignette_pick_button is not None:
             self.vignette_pick_button.setEnabled(True)
 
@@ -1226,7 +1226,7 @@ class FilterWindow(QMainWindow):
 
         image = self.original_viewer.get_original_image()
         if image is None:
-            self.pixelation_region_label.setText("Area: n/a")
+            self.pixelation_region_label.setText("Регион: n/a")
             if self.pixelation_pick_button is not None:
                 self.pixelation_pick_button.setEnabled(False)
             return
@@ -1240,7 +1240,7 @@ class FilterWindow(QMainWindow):
         height = self.filter_params.get("height")
 
         if None in (x, y, width, height):
-            self.pixelation_region_label.setText("Area: n/a")
+            self.pixelation_region_label.setText("Регион: n/a")
         else:
             image_h, image_w = image.shape[:2]
             clamped_x = int(np.clip(x, 0, image_w - 1))
@@ -1259,7 +1259,7 @@ class FilterWindow(QMainWindow):
             self._set_param_value("height", clamped_height)
 
             self.pixelation_region_label.setText(
-                f"Area: ({clamped_x}, {clamped_y}) → ({bottom_right_x}, {bottom_right_y})"
+                f"Регион: ({clamped_x}, {clamped_y}) → ({bottom_right_x}, {bottom_right_y})"
             )
 
     def _update_glare_center_label(self):
@@ -1272,7 +1272,7 @@ class FilterWindow(QMainWindow):
 
         image = self.original_viewer.get_original_image()
         if image is None:
-            self.glare_center_label.setText("Center: n/a")
+            self.glare_center_label.setText("Центр: n/a")
             if self.glare_pick_button is not None:
                 self.glare_pick_button.setEnabled(False)
             return
@@ -1292,7 +1292,7 @@ class FilterWindow(QMainWindow):
         cy = int(np.clip(cy, 0, height - 1))
         self._set_param_value("center_x", cx)
         self._set_param_value("center_y", cy)
-        self.glare_center_label.setText(f"Center: {cx}, {cy}")
+        self.glare_center_label.setText(f"Центр: {cx}, {cy}")
 
     def _save_temp_processed(self, image: np.ndarray):
         """Saves processed image to a temporary location for external viewing"""
@@ -1302,9 +1302,9 @@ class FilterWindow(QMainWindow):
             if cv2.imwrite(str(temp_path), image):
                 self.processed_temp_path = temp_path
             else:
-                QMessageBox.warning(self, "Error", "Failed to save processed image for external viewing.")
+                QMessageBox.warning(self, "Ошибка", "Не удалось сохранить обработанное изображение для просмотра.")
         except Exception as exc:
-            QMessageBox.warning(self, "Error", f"Failed to prepare processed image: {exc}")
+            QMessageBox.warning(self, "Ошибка", f"Не удалось подготовить обработанное изображение: {exc}")
 
     def open_original_external(self):
         """Opens the original image in the default image viewer"""
@@ -1323,10 +1323,10 @@ class FilterWindow(QMainWindow):
                     target_path = temp_path
                     self.original_image_path = temp_path
                 else:
-                    QMessageBox.warning(self, "Error", "Failed to save original image for external viewing.")
+                    QMessageBox.warning(self, "Ошибка", "Не удалось сохранить оригинал для внешнего просмотра.")
                     return
             except Exception as exc:
-                QMessageBox.warning(self, "Error", f"Failed to prepare original image: {exc}")
+                QMessageBox.warning(self, "Ошибка", f"Не удалось подготовить оригинал: {exc}")
                 return
 
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(target_path)))
