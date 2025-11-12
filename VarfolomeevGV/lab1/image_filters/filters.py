@@ -7,6 +7,9 @@ from math import floor
 from typing import Tuple, Optional
 
 
+# TODO: Check all functions and methods for using restricted cv2 functions and replace them.
+# TODO: Move apply_overlay* functionlity into methods or move it to separate module.
+
 class ImageFilter:
     """Base class for image filters"""
 
@@ -96,7 +99,7 @@ class ImageFilter:
 
     @staticmethod
     def apply_overlay(image: np.ndarray, overlay: Optional[np.ndarray]) -> np.ndarray:
-        """Overlays external image using its alpha channel when available"""
+        """Overlays external image using its alpha channel when available (used in frame_curvy and glare filters)"""
         if image is None:
             raise ValueError("Input image must not be None")
         if overlay is None:
@@ -299,11 +302,14 @@ class ImageFilter:
         h, w = image.shape[:2]
         pixel_size = max(1, int(pixel_size))
 
+        # Допуская плохие входные данные, приводим координаты к допустимым диапазонам.
         x = max(0, min(w - 1, int(x)))
         y = max(0, min(h - 1, int(y)))
         width = max(1, int(width))
         height = max(1, int(height))
 
+        # Гарантия того, что правая и нижняя границы не выходят за пределы изображения
+        # а также регион содержит минимум один пиксель.
         x_end = max(x + 1, min(w, x + width))
         y_end = max(y + 1, min(h, y + height))
 
@@ -320,29 +326,30 @@ class ImageFilter:
         block_h = roi_h / down_h
         block_w = roi_w / down_w
 
-        for i in range(down_h):
+        for i in range(down_h):    # усредняем блоки для понижения разрешения
             for j in range(down_w):
                 y_start = int(round(i * block_h))
-                y_end = int(round((i + 1) * block_h))
+                y_block_end = int(round((i + 1) * block_h))
                 x_start = int(round(j * block_w))
-                x_end = int(round((j + 1) * block_w))
+                x_block_end = int(round((j + 1) * block_w))
 
-                y_end = min(y_end, roi_h)
-                x_end = min(x_end, roi_w)
-                if y_end <= y_start:
-                    y_end = min(y_start + 1, roi_h)
-                if x_end <= x_start:
-                    x_end = min(x_start + 1, roi_w)
+                y_block_end = min(y_block_end, roi_h)
+                x_block_end = min(x_block_end, roi_w)
+                if y_block_end <= y_start:
+                    y_block_end = min(y_start + 1, roi_h)
+                if x_block_end <= x_start:
+                    x_block_end = min(x_start + 1, roi_w)
                 y_start = max(0, min(y_start, roi_h - 1))
                 x_start = max(0, min(x_start, roi_w - 1))
 
-                block = roi[y_start:y_end, x_start:x_end]
+                block = roi[y_start:y_block_end, x_start:x_block_end]
                 if block.size == 0:
                     continue
                 reduced[i, j] = block.mean(axis=(0, 1))
 
+        # zeros_like, чтобы поддерживать BGR и Grayscale.
         pixelated = np.zeros_like(roi)
-        for i in range(roi_h):
+        for i in range(roi_h):    # растягиваем усреднённые блоки обратно
             for j in range(roi_w):
                 src_i = int(i / block_h)
                 src_j = int(j / block_w)
