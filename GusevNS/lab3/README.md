@@ -64,6 +64,10 @@ python lab3.py --mode test --algorithm nn
 #### Тестирование Bag of Words модели
 ```bash
 python lab3.py --mode test --algorithm bow
+
+python lab3.py --mode test --algorithm bow --bow_descriptor sift --bow_clusters 100
+
+python lab3.py --mode test --algorithm bow --bow_descriptor orb --bow_clusters 50
 ```
 
 #### Тестирование нейронной сети

@@ -58,7 +58,7 @@ class BagOfWordsClassifier(ImageClassifier):
         self.kmeans = None
         self.svm = None
         
-        # Выбор дескриптора
+        # Выбор дескриптора. 128 чисел на "точку"
         if descriptor_type == 'sift':
             self.detector = cv2.SIFT_create()
         elif descriptor_type == 'orb':
@@ -70,29 +70,29 @@ class BagOfWordsClassifier(ImageClassifier):
         """Извлечение дескрипторов из изображений"""
         all_descriptors = []
         for img in images:
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            kp, desc = self.detector.detectAndCompute(gray, None)
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # В серый. Один канал, для скорости
+            kp, desc = self.detector.detectAndCompute(gray, None) # Находит точки и вычисляет дескрипторы
             if desc is not None:
                 all_descriptors.append(desc)
         return all_descriptors
     
+    # Для каждого дескриптора определяет самый подходящий кластер (паттерн)
     def build_histogram(self, descriptors):
         """Построение гистограммы визуальных слов"""
         if descriptors is None or len(descriptors) == 0:
             return np.zeros(self.n_clusters)
         
         if self.descriptor_type == 'orb':
-            # ORB дескрипторы - бинарные, используем Hamming расстояние
+            # ORB дескрипторы - бинарные, используем float
             descriptors = descriptors.astype(np.float32)
         
-        predictions = self.kmeans.predict(descriptors)
+        predictions = self.kmeans.predict(descriptors) # (5,12,5,1,1,...) на какой кластер похож каждый дескриптор
         histogram = np.zeros(self.n_clusters)
         for pred in predictions:
-            histogram[pred] += 1
-        # Нормализация
+            histogram[pred] += 1 # Считаем сколько раз каждый кластер встречается
         if histogram.sum() > 0:
-            histogram = histogram / histogram.sum()
-        return histogram
+            histogram = histogram / histogram.sum() # Нормализуем, чтобы сумма была 1
+        return histogram 
     
     def train(self, train_images, train_labels):
         """Обучение классификатора"""
@@ -116,12 +116,11 @@ class BagOfWordsClassifier(ImageClassifier):
                 hist = self.build_histogram(desc)
                 train_features.append(hist)
         
-        train_features = np.array(train_features)
-        
+        train_features = np.array(train_features) # Массив гистограмм 100*100 для каждого изображения        
         # Обучение SVM
         print("Обучение SVM классификатора...")
-        self.svm = SVC(kernel='rbf', C=10, gamma='scale', random_state=42)
-        self.svm.fit(train_features, train_labels)
+        self.svm = SVC(kernel='rbf', C=10, gamma='scale', random_state=42) # Примерные настройки
+        self.svm.fit(train_features, train_labels) # Обучаем на гистограммах и метках классов
         print("Обучение завершено!")
     
     def predict(self, test_images):
@@ -162,25 +161,25 @@ class NeuralNetworkClassifier(ImageClassifier):
     """Классификатор на основе нейронной сети с transfer learning"""
     def __init__(self, data_path, img_size=224, epochs=20, batch_size=16):
         if not TF_AVAILABLE:
-            raise ImportError("TensorFlow не установлен. Установите: pip install tensorflow")
+            raise ImportError("TensorFlow не установлен: pip install tensorflow")
         super().__init__(data_path)
         self.img_size = img_size
-        self.epochs = epochs
-        self.batch_size = batch_size
+        self.epochs = epochs # Сколько раз пройти по всем изображениям
+        self.batch_size = batch_size # Сколько изображений обработать за раз
         self.model = None
         
     def preprocess_images(self, images, labels=None):
         """Предобработка изображений для нейронной сети"""
         processed = []
         for img in images:
-            img_resized = cv2.resize(img, (self.img_size, self.img_size))
+            img_resized = cv2.resize(img, (self.img_size, self.img_size)) # Уменьшаем до 224*224
             img_rgb = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB)
-            img_array = img_to_array(img_rgb) / 255.0
+            img_array = img_to_array(img_rgb) / 255.0 # Нормализуем 0-1
             processed.append(img_array)
-        X = np.array(processed)
+        X = np.array(processed) # Массив 224*224*3
         if labels is not None:
-            y = to_categorical(labels, num_classes=len(self.class_names))
-            return X, y
+            y = to_categorical(labels, num_classes=len(self.class_names)) # Бинарное представляение для классов
+            return X, y # Массив 224*224*3 и массив бинарных представлений для классов
         return X
     
     def build_model(self):
