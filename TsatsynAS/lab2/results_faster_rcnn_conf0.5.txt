@@ -1,0 +1,7 @@
+=== Vehicle Detection Results ===
+Model: faster_rcnn
+Confidence threshold: 0.5
+Processed frames: 3456
+Average TPR: 0.715
+Average FDR: 0.172
+Quality Score: 7.15/10
