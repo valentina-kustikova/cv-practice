@@ -1,0 +1,7 @@
+=== Vehicle Detection Results ===
+Model: yolo
+Confidence threshold: 0.5
+Processed frames: 3456
+Average TPR: 0.927
+Average FDR: 0.287
+Quality Score: 9.27/10
