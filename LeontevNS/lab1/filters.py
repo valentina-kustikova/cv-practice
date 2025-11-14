@@ -186,7 +186,67 @@ def pixelate_region(image, center_x, center_y, region_width, region_height, pixe
     
     return result
 
+def interactive_pixelation(image, pixel_size=10):
+    temp_image = image.copy()
+    cur_image = image.copy()
+    selected_region = None
 
+    def mouse_callback(event, x, y, flags, param):
+        nonlocal selected_region, temp_image, cur_image
+        if event == cv2.EVENT_LBUTTONDOWN:
+            selected_region = [x, y, x, y]
+        elif event == cv2.EVENT_MOUSEMOVE and flags == cv2.EVENT_FLAG_LBUTTON:
+            if selected_region:
+                selected_region[2] = x
+                selected_region[3] = y
+                temp_image = cur_image.copy()
+                cv2.rectangle(temp_image, 
+                            (selected_region[0], selected_region[1]),
+                            (selected_region[2], selected_region[3]), 
+                            (256, 128, 128), 2)
+        elif event == cv2.EVENT_LBUTTONUP:
+            if selected_region:
+                x1, y1, x2, y2 = selected_region
+                x = (x1 + x2) // 2
+                y = (y1 + y2) // 2
+                width = abs(x2 - x1)
+                height = abs(y2 - y1)
+
+                if width > 0 and height > 0:
+                    result = pixelate_region(cur_image, x, y, width, height, pixel_size)
+                    cur_image = result
+                    temp_image = result
+        return None
+
+    cv2.imshow('Interactive Pixelation', temp_image)
+    cv2.setMouseCallback('Interactive Pixelation', mouse_callback)
+
+    print("Instructions:")
+    print("1) Click and drag to select region")
+    print("2) Press 'q' to quit without changes")
+    print("3) Press 'a' to save pixelation result")
+
+    while True:
+        cv2.imshow('Interactive Pixelation', temp_image)
+        key = cv2.waitKey(1) & 0xFF
+
+        if key == ord('q'):
+            cv2.destroyAllWindows()
+            return image
+        elif key == ord('a') and selected_region:
+            x1, y1, x2, y2 = selected_region
+            x = (x1 + x2) // 2
+            y = (y1 + y2) // 2
+            width = abs(x2 - x1)
+            height = abs(y2 - y1)
+
+            if width > 0 and height > 0:
+                result = pixelate_region(cur_image, x, y, width, height, pixel_size)
+                cv2.destroyAllWindows()
+                return result
+
+    cv2.destroyAllWindows()
+    return image
 
 def apply_filter(image, filter_function, **kwargs):
     return filter_function(image, **kwargs)
@@ -318,14 +378,6 @@ def parser():
                 print("Glare center Y: ")
                 args.center_y = get(args.center_y, int)
             case "pixelate":
-                print("Center X: ")
-                args.center_x = get(args.center_x, int)
-                print("Center Y: ")
-                args.center_y = get(args.center_y, int)
-                print("Region width: ")
-                args.new_width = get(args.new_width, int)
-                print("Region height: ")
-                args.new_height = get(args.new_height, int)
                 print("Pixel size: ")
                 args.pixel_size = get(args.pixel_size, int)
             case _:
@@ -425,15 +477,12 @@ def main():
     elif args.filter_type == 'pixelate':
         filtered_image = apply_filter(
         original_image, 
-        pixelate_region,
-        center_x=args.center_x,
-        center_y=args.center_y,
-        region_width=args.new_width, 
-        region_height=args.new_height, 
+        interactive_pixelation,
         pixel_size=args.pixel_size
         )
 
-    display_images(original_image, filtered_image)
+    if (args.filter_type != 'resize'):
+        display_images(original_image, filtered_image)
     
     save_path = "filtered_" + os.path.basename(args.image_path)
     cv2.imwrite(save_path, filtered_image)
