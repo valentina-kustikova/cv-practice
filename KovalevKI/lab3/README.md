@@ -6,7 +6,7 @@
 
 # Описание модулей
 
-## Utils/dataset_loader.py
+## utils/dataset_loader.py
 
 parse_class_from_path(path: str) -> int
 
