@@ -21,8 +21,8 @@ def get_model(args):
         det = NanoDetDetector.NanoDetDetector("models\\nanodet-plus-m_416.onnx", args.conf_th, args.nms_th)
     return det
 def main():
-    gt = read_annotations(args.gt_path)
     args=cli_argument_parser()
+    gt = read_annotations(args.gt_path)
     det = get_model(args)
 
     detections={}
