@@ -6,11 +6,12 @@ CLASS_DIRS = {
     "08_PalaceOfLabor": "PalaceOfLabor",
 }
 
+
 def label_of(rel):
-        for part in Path(rel).parts:
-            if part in CLASS_DIRS:
-                return CLASS_DIRS[part]
-        return Path(rel).parent.name
+    for part in Path(rel).parts:
+        if part in CLASS_DIRS:
+            return CLASS_DIRS[part]
+    return Path(rel).parent.name
 
 
 def get_train_test(data_root: str, train_txt: str):
@@ -30,6 +31,7 @@ def get_train_test(data_root: str, train_txt: str):
 
     test_rels = sorted(all_rels - train_rels)
 
-    train_items = [(str(root / rel), label_of(rel)) for rel in sorted(train_rels)]
-    test_items  = [(str(root / rel), label_of(rel)) for rel in test_rels]
+    train_items = [(str(root / rel), label_of(rel))
+                   for rel in sorted(train_rels)]
+    test_items = [(str(root / rel), label_of(rel)) for rel in test_rels]
     return train_items, test_items
