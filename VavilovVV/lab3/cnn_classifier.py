@@ -1,5 +1,3 @@
-# cnn_classifier.py
-
 import logging
 import argparse
 import cv2
@@ -20,10 +18,6 @@ log = logging.getLogger()
 
 
 class ImageDataset(Dataset):
-    """
-    Пользовательский Dataset для загрузки изображений в PyTorch.
-    """
-
     def __init__(self, image_paths: List[str], labels: List[int], transform=None):
         self.image_paths = image_paths
         self.labels = labels
@@ -58,10 +52,6 @@ class ImageDataset(Dataset):
 
 
 class CnnClassifier(BaseClassifier):
-    """
-    Классификатор изображений на основе сверточной нейронной сети (CNN).
-    """
-
     def __init__(self, args: argparse.Namespace):
         super().__init__(args)
         self.nn_model_path = self.model_save_dir / "nn_model.pth"
@@ -208,4 +198,5 @@ class CnnClassifier(BaseClassifier):
         log.info(f"--- NN Результаты Теста ---\n"
                  f"Accuracy: {acc:.4f}\n"
                  f"{report}\n"
+
                  f"---------------------------")
