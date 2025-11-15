@@ -26,6 +26,7 @@ class TPRCalculator:
     def __init__(self, threshold = 0.5):
         self.true_positives = 0
         self.false_negatives = 0
+        self.false_positives = 0
         self.threshold = threshold
     def calculate_from_boxes(self, box1, box2):
         # Let classes be equal
@@ -44,18 +45,20 @@ class TPRCalculator:
 
         return intersection_area / union_area if union_area > 0 else 0
 
-    def append_to_tp_fn(self, value, class1, class2):
+    def append_to_tp(self, value, class1, class2):
         if (value >= self.threshold and class1 == class2):
             self.true_positives += 1
-            return True
-        elif (value >= self.threshold and class1 != class2):
-            self.false_negatives += 1
             return True
         return False
 
     def get_tpr(self):
         if (self.true_positives != 0 or self.false_negatives != 0):
             return self.true_positives / (self.true_positives + self.false_negatives)
+        return 0
+
+    def get_fdr(self):
+        if (self.true_positives != 0 or self.false_positives != 0):
+            return self.false_positives / (self.true_positives + self.false_positives)
         return 0
 
 classes = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
@@ -93,12 +96,42 @@ def get_tpr_on_frame(preds, frameid, tprcalc, letterbox_scale):
                     y2 = box1[1] + box1[3]
                     box1 = np.array([x1, y1, x2, y2])
                     box2 = np.array([data[2], data[3], data[4], data[5]]).astype(np.int32)
-                    if tprcalc.append_to_tp_fn(tprcalc.calculate_from_boxes(box1, box2), classes[int(pred[5])], className):
+                    if tprcalc.append_to_tp(tprcalc.calculate_from_boxes(box1, box2), classes[int(pred[5])], className):
                         flag2 = True
                 if not flag2:
                     tprcalc.false_negatives += 1
             if (frameid != int(data[0]) and flag):
                 break
+
+def get_fdr_on_frame(preds, frameid, fdrcalc, letterbox_scale):
+    flag = False
+    flag2 = False
+    lines = []
+    with open('mov03478.txt', 'r') as file:
+        content = file.readlines()
+        for i in range(len(content)):
+            data = content[i].split(sep=' ')
+            data[-1] = data[-1][:-1]
+            if (frameid == int(data[0])):
+                lines.append(data)
+                flag = True
+            if (frameid != int(data[0]) and flag):
+                break
+    for pred in preds:
+        flag2 = False
+        box1 = unletterbox(pred[:4], letterbox_scale).astype(np.int32)
+        x1 = box1[0]
+        x2 = box1[0] + box1[2]
+        y1 = box1[1]
+        y2 = box1[1] + box1[3]
+        box1 = np.array([x1, y1, x2, y2])
+        for data in lines:
+            className = data[1].lower()
+            box2 = np.array([data[2], data[3], data[4], data[5]]).astype(np.int32)
+            if fdrcalc.append_to_tp(fdrcalc.calculate_from_boxes(box1, box2), className, classes[int(pred[5])]):
+                flag2 = True
+        if not flag2:
+            fdrcalc.false_positives += 1
 
 def get_tpr_on_frame_nano(preds, frameid, tprcalc, imgshape, letterbox_scale):
     flag = False
@@ -115,12 +148,37 @@ def get_tpr_on_frame_nano(preds, frameid, tprcalc, imgshape, letterbox_scale):
                 for pred in preds:
                     box1 = unletterbox_nano(pred[:4], imgshape, letterbox_scale).astype(np.int32)
                     box2 = np.array([data[2], data[3], data[4], data[5]]).astype(np.int32)
-                    if tprcalc.append_to_tp_fn(tprcalc.calculate_from_boxes(box1, box2), classes[int(pred[5])], className):
+                    if tprcalc.append_to_tp(tprcalc.calculate_from_boxes(box1, box2), classes[int(pred[5])], className):
                         flag2 = True
                 if not flag2:
                     tprcalc.false_negatives += 1
             if (frameid != int(data[0]) and flag):
                 break
+
+def get_fdr_on_frame_nano(preds, frameid, fdrcalc, imgshape, letterbox_scale):
+    flag = False
+    flag2 = False
+    lines = []
+    with open('mov03478.txt', 'r') as file:
+        content = file.readlines()
+        for i in range(len(content)):
+            data = content[i].split(sep=' ')
+            data[-1] = data[-1][:-1]
+            if (frameid == int(data[0])):
+                lines.append(data)
+                flag = True
+            if (frameid != int(data[0]) and flag):
+                break
+    for pred in preds:
+        flag2 = False
+        box1 = unletterbox_nano(pred[:4], imgshape, letterbox_scale).astype(np.int32)
+        for data in lines:
+            className = data[1].lower()
+            box2 = np.array([data[2], data[3], data[4], data[5]]).astype(np.int32)
+            if fdrcalc.append_to_tp(fdrcalc.calculate_from_boxes(box1, box2), className, classes[int(pred[5])]):
+                flag2 = True
+        if not flag2:
+            fdrcalc.false_positives += 1
 
 async def letterbox_nano(srcimg, target_size=(416, 416)):
     img = srcimg.copy()
@@ -262,6 +320,8 @@ async def main():
                         help='Enter object threshold')
     parser.add_argument('--nano', '-n', action='store_true', help='Should we use nano, false -> yolo')
     parser.add_argument('--start', '-s', default=0, type=int, help='Starting frame')
+    parser.add_argument('--batch', '-b', default=50, type=int, help='Batch size')
+    parser.add_argument('--threshold', '-t', default=0.5, type=float, help='Threshold for TP evaluation')
     args = parser.parse_args()
 
     backend_id = backend_target_pairs[args.backend_target][0]
@@ -285,12 +345,14 @@ async def main():
     tm_est.reset()
     tm.reset()
     files = glob.glob(f"{args.input}/*.jpg")
-    step = 50
+    step = args.batch
     eps = 0.5
     timer_est = 0
     thread = None
-    tpr_calc = TPRCalculator(0.5)
-    tpr_calc_f = TPRCalculator(0.5)
+    tpr_calc = TPRCalculator(args.threshold)
+    tpr_calc_f = TPRCalculator(args.threshold)
+    fdr_calc = TPRCalculator(args.threshold)
+    fdr_calc_f = TPRCalculator(args.threshold)
     for count_batch in range(args.start, len(files), step):
         tm.reset()
         tm_est.reset()
@@ -324,17 +386,24 @@ async def main():
             for index, file in enumerate(image):
                 get_tpr_on_frame_nano(preds[index], index+count_batch, tpr_calc, file.shape[:2], letterbox_scale[index])
                 get_tpr_on_frame_nano(preds[index], index+count_batch, tpr_calc_f, file.shape[:2], letterbox_scale[index])
+                get_fdr_on_frame_nano(preds[index], index+count_batch, fdr_calc, file.shape[:2], letterbox_scale[index])
+                get_fdr_on_frame_nano(preds[index], index+count_batch, fdr_calc_f, file.shape[:2], letterbox_scale[index])
                 img[index] = await vis_nano(preds[index], file, letterbox_scale[index])
         else:
             for index, file in enumerate(image):
                 get_tpr_on_frame(preds[index], index+count_batch, tpr_calc, letterbox_scale[index])
                 get_tpr_on_frame(preds[index], index+count_batch, tpr_calc_f, letterbox_scale[index])
+                get_fdr_on_frame(preds[index], index+count_batch, fdr_calc, letterbox_scale[index])
+                get_fdr_on_frame(preds[index], index+count_batch, fdr_calc_f, letterbox_scale[index])
                 img[index] = await vis(preds[index], file, letterbox_scale[index])
         tm_est.stop()
         timer_est += tm_est.getTimeMilli()
         print(f'TPR For all frames: {tpr_calc.get_tpr()}')
         print(f'TPR For these {step} frames: {tpr_calc_f.get_tpr()}')
-        tpr_calc_f = TPRCalculator(0.5)
+        print(f'FDR For all frames: {fdr_calc.get_fdr()}')
+        print(f'FDR For these {step} frames: {fdr_calc_f.get_fdr()}')
+        tpr_calc_f = TPRCalculator(args.threshold)
+        fdr_calc_f = TPRCalculator(args.threshold)
         if thread != None:
             thread.join()
         thread = threading.Thread(target=show_func, args=(f"Image batch [{count_batch+1}-{end}]", img, int(((eps+1)*timer_est/(iter+1))//step),))
