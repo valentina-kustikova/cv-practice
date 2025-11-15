@@ -6,7 +6,7 @@
 
 # Описание модулей
 
-##utils/dataset_loader.py
+## utils/dataset_loader.py
 
 parse_class_from_path(path: str) -> int
 
@@ -34,7 +34,7 @@ load_split_lists(train_file: str, data_root: str) -> Tuple[List[str], List[str],
  - Формирует тестовую выборку как разность: все изображения \ тренировочные
  - Выводит статистику: число изображений в train/test, распределение по классам
 
-##Класс BoVWClassifier
+## Класс BoVWClassifier
 
 __init__(self, n_clusters: int = 100, detector_name: str = 'SIFT')
 
@@ -111,7 +111,7 @@ visualize_keypoints(self, image_path: str, save_to: str = "keypoints.jpg", max_p
  - Добавляет текстовую подпись с именем детектора и числом точек
  - Сохраняет результат 
  
-##Класс LandmarkDataset(Dataset)
+## Класс LandmarkDataset(Dataset)
 
 __init__(self, image_paths: List[str], labels: List[int], transform=None)
 
@@ -128,7 +128,7 @@ __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]
  - Применяет transform
  - Возвращает (тензор, метка)
 
-##Класс CNNClassifier
+## Класс CNNClassifier
 
 __init__(self, model_name: str = 'resnet18', num_classes: int = 3, device=None)
 Инициализация модели.
@@ -174,7 +174,7 @@ predict(self, image_paths: List[str], batch_size: int = 32) -> List[int]
  - В режиме no_grad получает предсказания
  - Возвращает список меток
 
-##train.py
+## train.py
 
 main()
 Точка входа приложения.
