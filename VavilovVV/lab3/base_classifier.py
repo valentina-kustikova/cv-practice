@@ -1,5 +1,3 @@
-# base_classifier.py
-
 import logging
 import argparse
 from pathlib import Path
@@ -10,10 +8,6 @@ log = logging.getLogger()
 
 
 class BaseClassifier(ABC):
-    """
-    Абстрактный базовый класс для классификаторов изображений.
-    """
-
     def __init__(self, args: argparse.Namespace):
         self.args = args
         self.data_dir = Path(args.data_dir)
@@ -27,9 +21,6 @@ class BaseClassifier(ABC):
         self.model_save_dir.mkdir(exist_ok=True)
 
     def load_data(self, file_path: Path) -> Tuple[List[str], List[int]]:
-        """
-        Загружает пути к изображениям и их метки из указанного файла.
-        """
         image_paths = []
         labels = []
 
@@ -93,4 +84,5 @@ class BaseClassifier(ABC):
         """
         Абстрактный метод для загрузки модели.
         """
+
         pass
