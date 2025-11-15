@@ -1,5 +1,3 @@
-# bow_classifier.py
-
 import logging
 import argparse
 import cv2
@@ -18,9 +16,6 @@ log = logging.getLogger()
 
 
 class BowClassifier(BaseClassifier):
-    """
-    Классификатор изображений, использующий подход Bag of Words (BoW).
-    """
 
     def __init__(self, args: argparse.Namespace):
         super().__init__(args)
@@ -228,4 +223,5 @@ class BowClassifier(BaseClassifier):
             class_name = self.classes[label]
             save_path = vis_dir / f"{class_name}_{self.args.detector}_keypoints.jpg"
             cv2.imwrite(str(save_path), img_with_kp)
+
             log.info(f"Сохранено: {save_path}")
