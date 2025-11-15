@@ -221,13 +221,8 @@ def unletterbox_nano(bbox, original_image_shape, letterbox_scale):
 
     return ret.astype(np.int32)
 
-async def vis_nano(preds, res_img, letterbox_scale, fps=None):
+async def vis_nano(preds, res_img, letterbox_scale):
     ret = res_img.copy()
-
-    # draw FPS
-    if fps is not None:
-        fps_label = "FPS: %.2f" % fps
-        cv.putText(ret, fps_label, (10, 25), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
     # draw bboxes and labels
     for pred in preds:
@@ -264,12 +259,8 @@ async def letterbox(srcimg, target_size=(640, 640)):
 def unletterbox(bbox, letterbox_scale):
     return bbox / letterbox_scale
 
-async def vis(dets, srcimg, letterbox_scale, fps=None):
+async def vis(dets, srcimg, letterbox_scale):
     res_img = srcimg.copy()
-
-    if fps is not None:
-        fps_label = "FPS: %.2f" % fps
-        cv.putText(res_img, fps_label, (10, 25), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
     for det in dets:
         box = unletterbox(det[:4], letterbox_scale).astype(np.int32)
