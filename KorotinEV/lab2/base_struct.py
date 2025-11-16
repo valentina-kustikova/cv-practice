@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
+from abc import ABC, abstractmethod
 
 @dataclass
 class Detection:
@@ -22,7 +23,7 @@ class ModelConfig:
     confidence_threshold: float
     nms_threshold: float
 
-class BaseDetector:
+class BaseDetector(ABC):
     def __init__(self, config):
         self.config = config
         self.net = cv2.dnn.readNet(config.model_path, config.config_path)
@@ -38,9 +39,10 @@ class BaseDetector:
             crop=False
         )
         return blob
-    
+
+    @abstractmethod
     def postprocess(self, outputs, image_shape):
-        raise NotImplementedError("Must be implemented in subclass")
+        pass
 
     def _apply_nms(self, detections):
         if not detections:
