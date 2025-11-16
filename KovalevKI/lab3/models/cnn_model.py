@@ -38,15 +38,13 @@ class CNNClassifier:
         self.model_name = model_name
         self.num_classes = num_classes
 
-        print(f"→ Загрузка предобученной модели '{model_name}' из models/{model_name}.pth ...")
+        print(f"Загрузка предобученной модели '{model_name}' из models/{model_name}.pth ...")
         self.model = self._load_pretrained_model()
         self.model.to(self.device)
         print("Модель загружена")
 
     def _load_pretrained_model(self):
         model_path = os.path.join("models", f"{self.model_name}.pth")
-
-        print(f"→ Загружаем веса из: {model_path}")
 
         if self.model_name == 'resnet18':
             model = models.resnet18(weights=None)
@@ -106,7 +104,7 @@ class CNNClassifier:
 
             if val_loader:
                 val_acc = self._evaluate_loader(val_loader)
-                print(f"    → Val Acc: {val_acc:.4f}")
+                print(f"Val Acc: {val_acc:.4f}")
             scheduler.step()
 
         print("Дообучение завершено.")
@@ -147,7 +145,7 @@ class CNNClassifier:
             'model_name': self.model_name,
             'num_classes': self.num_classes
         }, path)
-        print(f"Модель сохранена в: {path}")
+        print("Модель сохранена в: ", path)
 
     @classmethod
     def load(cls, path: str, device=None):

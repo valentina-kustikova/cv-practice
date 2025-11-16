@@ -67,48 +67,41 @@ class BoVWClassifier:
         return all_descriptors, per_img_desc
         
     def visualize_keypoints(self, image_path: str, save_to: str = "keypoints.jpg", max_points: int = 1000000):
-        try:
-            img = cv2.imread(image_path)
-            if img is None:
-                raise FileNotFoundError(f"Не удалось загрузить изображение: {image_path}")
+        img = cv2.imread(image_path)
+        if img is None:
+            raise FileNotFoundError(f"Не удалось загрузить изображение: {image_path}")
 
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            kp, _ = self.detector.detectAndCompute(gray, None)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        kp, _ = self.detector.detectAndCompute(gray, None)
 
-            if not kp:
-                print("⚠️  Ключевые точки не найдены.")
-                return
+        kp = kp[:max_points]
 
-            kp = kp[:max_points]
+        img_kp = cv2.drawKeypoints(
+            img, kp,
+            outImage=None,
+            color=(0, 255, 0),
+            flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
+        )
 
-            img_kp = cv2.drawKeypoints(
-                img, kp,
-                outImage=None,
-                color=(0, 255, 0),
-                flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
-            )
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        cv2.putText(img_kp, f"{self.detector_name} keypoints: {len(kp)}", 
+                    (10, 30), font, 0.8, (0, 0, 255), 2)
 
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            cv2.putText(img_kp, f"{self.detector_name} keypoints: {len(kp)}", 
-                        (10, 30), font, 0.8, (0, 0, 255), 2)
-
-            cv2.imwrite(save_to, img_kp)
-            print(f"Ключевые точки сохранены: {os.path.abspath(save_to)}")
-
+        cv2.imwrite(save_to, img_kp)
+        print(f"Ключевые точки сохранены: {os.path.abspath(save_to)}")
+            
+    
     def fit(self, image_paths: List[str], labels: List[int]):
-        print(f"→ BoVW: извлечение дескрипторов ({len(image_paths)} изображений)...")
+        print(f"BoVW: извлечение дескрипторов ({len(image_paths)} изображений)...")
         all_desc, _ = self._extract_features(image_paths)
-        print(f"→ Всего дескрипторов: {len(all_desc)}")
+        print(f"Всего дескрипторов: {len(all_desc)}")
 
-        if len(all_desc) == 0:
-            raise RuntimeError("Не удалось извлечь ни одного дескриптора!")
-
-        print(f"→ BoVW: обучение KMeans (n_clusters={self.n_clusters})...")
+        print(f"BoVW: обучение KMeans (n_clusters={self.n_clusters})...")
         self.kmeans.fit(all_desc)
 
-        print("→ BoVW: построение гистограмм...")
+        print("BoVW: построение гистограмм...")
         X_hist = self._images_to_histograms(image_paths)
-        print(f"→ BoVW: обучение SVM на {X_hist.shape} признаках...")
+        print(f"BoVW: обучение SVM на {X_hist.shape} признаках...")
         self.classifier.fit(X_hist, labels)
         self.is_fitted = True
         print("BoVW обучен.")
