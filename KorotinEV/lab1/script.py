@@ -108,7 +108,7 @@ def add_figure_frame(image, frame_number=0, threshold = 30.0):
     if frame.shape != image.shape:
     	frame = resize_image(frame, width=w, height=h)
 
-    background_color_array = np.array([[255, 255, 255], [255, 255, 255], [255, 255, 255], [255, 255, 255]])
+    background_color_array = np.array([[255, 255, 255], [255, 255, 255], [255, 255, 255], [245, 245, 245], [255, 255, 255]])
     background_color = background_color_array[frame_number]
 
     color_diff = np.sqrt(np.sum((frame.astype(np.float32) - background_color.astype(np.float32)) ** 2, axis=2))
