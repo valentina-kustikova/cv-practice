@@ -52,7 +52,7 @@
 - Показывает, какая доля реальных объектов была правильно детектирована:
 - `TPR = True Positives / (True Positives + False Negatives)`
 
-### False Discovery Rate (FDR)  
+### False Detection Rate (FDR)  
 - Показывает, какая доля детекций является ложными срабатываниями:
 - `FDR = False Positives / (True Positives + False Positives)`
 
