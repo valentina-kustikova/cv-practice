@@ -234,10 +234,15 @@ main()
 ## BoVW + SIFT:
 
 Train: 91 (69%)
+
 Test: 40  (31%)
+
 Распределение по классам (train):
+
  - NizhnyNovgorodKremlin: 48
+ 
  - ArkhangelskCathedral: 22
+ 
  - PalaceOfLabor: 21
 
 Точность (accuracy): 0.9750
@@ -252,10 +257,15 @@ Confusion matrix:
 ## BoVW + ORB:
 
 Train: 104 (79%)
+
 Test: 27  (21%)
+
 Распределение по классам (train):
+
   NizhnyNovgorodKremlin: 53
+  
   ArkhangelskCathedral: 24
+  
   PalaceOfLabor: 27
 
 Точность (accuracy): 0.9259
@@ -270,11 +280,17 @@ Confusion matrix:
 ## BoVW + SVM:
 
 Всего изображений:  131
+
 Train: 104 (79%)
+
 Test: 27  (21%)
+
 Распределение по классам (train):
+
   NizhnyNovgorodKremlin: 53
+  
   ArkhangelskCathedral: 24
+  
   PalaceOfLabor: 27
 
 Точность (accuracy): 0.9630
@@ -289,10 +305,15 @@ Confusion matrix:
 ## CNN: mobilenet_v2
 
 Train: 104 (79%)
+
 Test: 27  (21%)
+
 Распределение по классам (train):
+
  - NizhnyNovgorodKremlin: 53
+ 
  - ArkhangelskCathedral: 24
+ 
  - PalaceOfLabor: 27
 
 Точность (accuracy): 1.0000 (100.00%)
@@ -307,11 +328,17 @@ Confusion matrix:
 ## CNN: resnet18
 
 Всего изображений:  131
+
 Train: 104 (79%)
+
 Test: 27  (21%)
+
 Распределение по классам (train):
+
   NizhnyNovgorodKremlin: 53
+  
   ArkhangelskCathedral: 24
+  
   PalaceOfLabor: 27
 
 Точность (accuracy): 1.0000 (100.00%)
