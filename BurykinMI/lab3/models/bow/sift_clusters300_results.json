@@ -1,10 +1,10 @@
 {
     "summary": {
         "accuracy": 0.9545,
+        "total_test_samples": 88,
         "algorithm": "bow",
         "detector": "sift",
-        "n_clusters": 300,
-        "total_test_samples": 88
+        "n_clusters": 300
     },
     "per_class_metrics": {
         "cathedral": {
