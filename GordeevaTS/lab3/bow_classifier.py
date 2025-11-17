@@ -18,14 +18,8 @@ class BOWClassifier:
         self.is_trained = False
         
     def _create_detector(self):
-        if self.detector_type == 'SIFT':
-            return cv2.SIFT_create()
-        elif self.detector_type == 'ORB':
-            return cv2.ORB_create()
-        elif self.detector_type == 'AKAZE':
-            return cv2.AKAZE_create()
-        else:
-            return cv2.SIFT_create()
+        return cv2.SIFT_create()
+
     
     def extract_features(self, image):
         try:
