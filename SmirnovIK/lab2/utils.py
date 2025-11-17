@@ -41,20 +41,26 @@ def iou(boxA, boxB):
     areaB = boxB[2]*boxB[3]
     union = areaA + areaB - inter
     return inter / (union + 1e-9)
+
 def evaluate_frame(gt_boxes, det_boxes, iou_thr=0.5):
-    gt_matched = set()
-    det_matched = set()
     det_boxes = sorted(det_boxes, key=lambda d: d[4], reverse=True)
-    for gi, (gt_class, gt_box) in enumerate(gt_boxes):
-        for di, (x,y,w,h,conf,det_class) in enumerate(det_boxes):
-            if det_class.lower() == gt_class.lower():
-                if iou(gt_box, (x,y,w,h)) >= iou_thr:
-                    gt_matched.add(gi)
-                    det_matched.add(di)
-                    break
-
-    TP = len(gt_matched)
-    FP = len(det_boxes) - len(det_matched)
-    FN = len(gt_boxes) - len(gt_matched)
-
-    return  TP, FN, FP
+    TP = 0
+    used = [False] * len(det_boxes)
+    for gt_class, gt_box in gt_boxes:
+        best_match = -1
+        best_iou = 0
+        for di, (x, y, w, h, conf, det_class) in enumerate(det_boxes):
+            if used[di]:
+                continue 
+            if det_class.lower() != gt_class.lower():
+                continue
+            current_iou = iou(gt_box, (x, y, w, h))
+            if current_iou >= iou_thr and current_iou > best_iou:
+                best_iou = current_iou
+                best_match = di
+        if best_match != -1:
+            TP += 1
+            used[best_match] = True
+    FP = used.count(False)
+    FN = len(gt_boxes) - TP
+    return TP, FN, FP
