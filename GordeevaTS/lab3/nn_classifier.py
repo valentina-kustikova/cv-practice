@@ -112,20 +112,6 @@ class NNClassifier:
                 max_depth=10,
                 random_state=42
             )
-        elif self.classifier_type == 'SVM':
-            return SVC(
-                kernel='rbf',
-                C=1.0,
-                probability=True,
-                random_state=42
-            )
-        elif self.classifier_type == 'KNN':
-            return KNeighborsClassifier(
-                n_neighbors=5,
-                weights='distance'
-            )
-        else:
-            return RandomForestClassifier()
     
     def train(self, images, labels):
         print("Извлечение признаков...")
