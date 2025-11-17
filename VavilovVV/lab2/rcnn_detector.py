@@ -1,6 +1,5 @@
 from detector_base import BaseDetector, Detection
 
-
 class FasterRCNNDetector(BaseDetector):
     def postprocess(self, outputs, image_shape):
         detections = []
@@ -10,12 +9,8 @@ class FasterRCNNDetector(BaseDetector):
             confidence = float(detection[2])
             class_id = int(detection[1])
 
-            # **ГЛАВНОЕ ИСПРАВЛЕНИЕ:**
-            # 1. Проверяем, есть ли class_id в НАШЕМ списке целевых ID
-            # 2. Сравниваем с порогом
             if class_id in self.target_class_ids and confidence > self.config.confidence_threshold:
 
-                # 2. Получаем имя класса из конфига
                 class_name = self.config.classes[class_id]
 
                 x1 = int(detection[3] * img_width)
@@ -26,7 +21,7 @@ class FasterRCNNDetector(BaseDetector):
                 if x2 > x1 and y2 > y1:
                     detections.append(Detection(
                         class_id=class_id,
-                        class_name=class_name,  # Используем настоящее имя
+                        class_name=class_name,
                         confidence=confidence,
                         bbox=(x1, y1, x2, y2)
                     ))
