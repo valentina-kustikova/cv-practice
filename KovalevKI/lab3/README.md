@@ -243,7 +243,7 @@ Test: 40  (31%)
 Точность (accuracy): 0.9750
 
 Confusion matrix:
-| NizhnyNovgorodKremlin | ArkhangelskCathedral | PalaceOfLabor |
+|  | NizhnyNovgorodKremlin | ArkhangelskCathedral | PalaceOfLabor |
 |---|---|---|---|
 | NizhnyNovgorodKremlin | 21 | 0 | 0 |
 | ArkhangelskCathedral | 0 | 5 | 0 |
@@ -261,7 +261,7 @@ Test: 27  (21%)
 Точность (accuracy): 0.9259
 
 Confusion matrix:
-| NizhnyNovgorodKremlin | ArkhangelskCathedral | PalaceOfLabor |
+|  | NizhnyNovgorodKremlin | ArkhangelskCathedral | PalaceOfLabor |
 |---|---|---|---|
 | NizhnyNovgorodKremlin | 15 | 0 | 1 |
 | ArkhangelskCathedral | 0 | 3 | 0 |
@@ -280,7 +280,7 @@ Test: 27  (21%)
 Точность (accuracy): 0.9630
 
 Confusion matrix:
-| NizhnyNovgorodKremlin | ArkhangelskCathedral | PalaceOfLabor |
+|  | NizhnyNovgorodKremlin | ArkhangelskCathedral | PalaceOfLabor |
 |---|---|---|---|
 | NizhnyNovgorodKremlin | 16 | 0 | 0 |
 | ArkhangelskCathedral | 1 | 2 | 0 |
@@ -298,7 +298,7 @@ Test: 27  (21%)
 Точность (accuracy): 1.0000 (100.00%)
 
 Confusion matrix:
-| NizhnyNovgorodKremlin | ArkhangelskCathedral | PalaceOfLabor |
+|  | NizhnyNovgorodKremlin | ArkhangelskCathedral | PalaceOfLabor |
 |---|---|---|---|
 | NizhnyNovgorodKremlin | 16 | 0 | 0 |
 | ArkhangelskCathedral | 0 | 3 | 0 |
@@ -317,7 +317,7 @@ Test: 27  (21%)
 Точность (accuracy): 1.0000 (100.00%)
 
 Confusion matrix:
-| NizhnyNovgorodKremlin | ArkhangelskCathedral | PalaceOfLabor |
+|  | NizhnyNovgorodKremlin | ArkhangelskCathedral | PalaceOfLabor |
 |---|---|---|---|
 | NizhnyNovgorodKremlin | 16 | 0 | 0 |
 | ArkhangelskCathedral | 0 | 3 | 0 |
