@@ -62,7 +62,6 @@ class DetectionEvaluator:
         frame_fp = 0
         gt_used = [False] * len(ground_truth)
 
-        # Sort detections by confidence descending
         detections = sorted(
             [d for d in detections if d.class_name.lower() == self.target_class],
             key=lambda x: x.confidence,
@@ -107,38 +106,30 @@ class DetectionEvaluator:
 
 
 CLASS_COLORS = {
-    "car": (0, 255, 0),  # Зеленый
-    "truck": (0, 0, 255),  # Красный
-    "bus": (255, 0, 0),  # Синий
-    "motorcycle": (0, 255, 255),  # Желтый
-    "person": (255, 0, 255),  # Пурпурный
-    "bicycle": (255, 255, 0),  # Бирюзовый
+    "car": (0, 255, 0),
+    "truck": (0, 0, 255),
+    "bus": (255, 0, 0),
+    "motorcycle": (0, 255, 255),
+    "person": (255, 0, 255),
+    "bicycle": (255, 255, 0),
 }
-DEFAULT_COLOR = (255, 255, 255)  # Белый для остальных
-
+DEFAULT_COLOR = (255, 255, 255)
 
 def draw_detections(image, detections: List[Detection]):
-    """
-    Рисует рамки детекций на изображении, используя разные цвета для каждого класса.
-    """
     result = image.copy()
     for detection in detections:
         x1, y1, x2, y2 = detection.bbox
         class_name_lower = detection.class_name.lower()
         label = f"{class_name_lower}: {detection.confidence:.3f}"
 
-        # **ИСПРАВЛЕНИЕ:** Получаем цвет из словаря
         color = CLASS_COLORS.get(class_name_lower, DEFAULT_COLOR)
 
-        # Рисуем прямоугольник
         cv2.rectangle(result, (x1, y1), (x2, y2), color, 2)
 
-        # Рисуем фон для текста
         (text_width, text_height), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
         cv2.rectangle(result, (x1, y1 - text_height - baseline - 5), (x1 + text_width, y1), color, -1)
 
-        # Рисуем текст
-        cv2.putText(result, label, (x1, y1 - baseline - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)  # Черный текст
+        cv2.putText(result, label, (x1, y1 - baseline - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
 
     return result
 
@@ -160,17 +151,14 @@ def draw_ground_truth(image, ground_truth: List[Tuple[int, int, int, int]], colo
     return result
 
 def _draw_rounded_rectangle(img, pt1, pt2, color, thickness, radius=10):
-    """Рисует скруглённый прямоугольник (вспомогательная функция)."""
     x1, y1 = pt1
     x2, y2 = pt2
 
-    # Основные линии
     cv2.line(img, (x1 + radius, y1), (x2 - radius, y1), color, thickness)
     cv2.line(img, (x1 + radius, y2), (x2 - radius, y2), color, thickness)
     cv2.line(img, (x1, y1 + radius), (x1, y2 - radius), color, thickness)
     cv2.line(img, (x2, y1 + radius), (x2, y2 - radius), color, thickness)
 
-    # Угловые дуги
     cv2.ellipse(img, (x1 + radius, y1 + radius), (radius, radius), 180, 0, 90, color, thickness)
     cv2.ellipse(img, (x2 - radius, y1 + radius), (radius, radius), 270, 0, 90, color, thickness)
     cv2.ellipse(img, (x1 + radius, y2 - radius), (radius, radius), 90, 0, 90, color, thickness)
@@ -195,7 +183,6 @@ def display_metrics(
     result = image.copy()
     h, w = image.shape[:2]
 
-    # Подготавливаем текст
     lines = ["Metrics:"]
     lines.append(f"TPR: {tpr:.3f}")
     lines.append(f"FDR: {fdr:.3f}")
@@ -203,7 +190,6 @@ def display_metrics(
         lines.append(f"Frame TPR: {frame_tpr:.3f}")
         lines.append(f"Frame FDR: {frame_fdr:.3f}")
 
-    # Настройки шрифта
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 0.65
     font_thickness = 1
@@ -212,7 +198,6 @@ def display_metrics(
     box_width = text_width + 30
     box_height = len(lines) * line_height + 15
 
-    # Определяем позицию панели
     if position == "top-right":
         x1, y1 = w - box_width - margin, margin
     elif position == "top-left":
@@ -225,17 +210,14 @@ def display_metrics(
         raise ValueError("position must be one of: 'top-left', 'top-right', 'bottom-left', 'bottom-right'")
     x2, y2 = x1 + box_width, y1 + box_height
 
-    # Создаём полупрозрачную подложку
     overlay = result.copy()
-    cv2.rectangle(overlay, (x1, y1), (x2, y2), (20, 20, 30), -1)  # тёмно-серо-синяя подложка
+    cv2.rectangle(overlay, (x1, y1), (x2, y2), (20, 20, 30), -1)
     cv2.addWeighted(overlay, bg_alpha, result, 1 - bg_alpha, 0, result)
 
-    # Рисуем границу (опционально)
     _draw_rounded_rectangle(result, (x1, y1), (x2, y2), (80, 160, 255), 1, radius=8)
 
-    # Выводим текст с тенью
     for i, line in enumerate(lines):
-        if i == 0:  # Заголовок — жирнее/ярче
+        if i == 0:
             _put_text_with_shadow(
                 result, line,
                 (x1 + 15, y1 + 25 + i * line_height),
@@ -247,4 +229,5 @@ def display_metrics(
                 (x1 + 15, y1 + 25 + i * line_height),
                 font, font_scale, (240, 255, 240), font_thickness
             )
+
     return result
