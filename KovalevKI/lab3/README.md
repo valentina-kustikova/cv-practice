@@ -187,3 +187,106 @@ main()
 	 + bovw: создаёт BoVWClassifier, вызывает fit/predict
 	 + cnn: создаёт CNNClassifier, вызывает fit/predict
  - Выводит точность на тестовой выборке
+ 
+ 
+# РЕЗУЛЬТАТЫ ЭКСПЕРИМЕНТОВ
+
+**Примечание**
+Здесь и далее - результат работы алгоритмов на параметрах, максимизирующих значение accuracy
+
+## BoVW + SIFT:
+
+Train: 91 (69%)
+Test: 40  (31%)
+Распределение по классам (train):
+ - NizhnyNovgorodKremlin: 48
+ - ArkhangelskCathedral: 22
+ - PalaceOfLabor: 21
+
+Точность (accuracy): 0.9750
+
+Confusion matrix:
+                     NizhnyNovgorodKremlin  ArkhangelskCathedral  PalaceOfLabor
+NizhnyNovgorodKremlin      21                        0                        0
+ArkhangelskCathedral       0                        5                        0
+PalaceOfLabor              1                        0                       13
+
+## BoVW + ORB:
+
+Train: 104 (79%)
+Test: 27  (21%)
+Распределение по классам (train):
+  NizhnyNovgorodKremlin: 53
+  ArkhangelskCathedral: 24
+  PalaceOfLabor: 27
+
+Точность (accuracy): 0.9259
+
+Confusion matrix:
+                     NizhnyNovgorodKremlin  ArkhangelskCathedral  PalaceOfLabor
+NizhnyNovgorodKremlin      15                        0                        1
+ArkhangelskCathedral       0                        3                        0
+PalaceOfLabor              1                        0                        7
+
+## BoVW + SVM:
+
+Всего изображений:  131
+Train: 104 (79%)
+Test: 27  (21%)
+Распределение по классам (train):
+  NizhnyNovgorodKremlin: 53
+  ArkhangelskCathedral: 24
+  PalaceOfLabor: 27
+
+Точность (accuracy): 0.9630
+
+Confusion matrix:
+                     NizhnyNovgorodKremlin  ArkhangelskCathedral  PalaceOfLabor
+NizhnyNovgorodKremlin      16                        0                        0
+ArkhangelskCathedral       1                        2                        0
+PalaceOfLabor              0                        0                        8
+
+## CNN: mobilenet_v2
+
+Train: 104 (79%)
+Test: 27  (21%)
+Распределение по классам (train):
+ - NizhnyNovgorodKremlin: 53
+ - ArkhangelskCathedral: 24
+ - PalaceOfLabor: 27
+
+Точность (accuracy): 1.0000 (100.00%)
+
+Confusion matrix:
+                     NizhnyNovgorodKremlin  ArkhangelskCathedral  PalaceOfLabor
+NizhnyNovgorodKremlin      16                        0                        0
+ArkhangelskCathedral       0                        3                        0
+PalaceOfLabor              0                        0                        8
+
+## CNN: resnet18
+
+Всего изображений:  131
+Train: 104 (79%)
+Test: 27  (21%)
+Распределение по классам (train):
+  NizhnyNovgorodKremlin: 53
+  ArkhangelskCathedral: 24
+  PalaceOfLabor: 27
+
+Точность (accuracy): 1.0000 (100.00%)
+
+Confusion matrix:
+                     NizhnyNovgorodKremlin  ArkhangelskCathedral  PalaceOfLabor
+NizhnyNovgorodKremlin      16                        0                        0
+ArkhangelskCathedral       0                        3                        0
+PalaceOfLabor              0                        0                        8
+
+# Итог
+
+| метод  | BoVW + SIFT | BoVW + ORB | BoVW + SVM | CNN: mobilenet_v2 | CNN: resnet18 |
+|--------|-------------|------------|------------|-------------------|---------------|
+|параметры| n_clusters = 75 | n_clusters = 110  | n_clusters = 110 | epochs=6 batch_size=8 lr=1e-4 | epochs=6 batch_size=8 lr=1e-4|
+|accuracy|0.9750 | 0.9259 | 0.9630 | 1.0000 | 1.0000 |
+
+## Вывод
+Нейросетевые классификаторы показывают себя лучше, чем метод BoVW. Они обеспечивают точность до 100%
