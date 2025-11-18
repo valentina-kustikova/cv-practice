@@ -34,8 +34,8 @@ def argument_parser():
     parser.add_argument('--fancy_border_type', choices=['wave', 'zigzag', 'triangle'], help='Type of fancy border')
     parser.add_argument('--fancy_border_color', type=str, default='255,0,0', help='Fancy border color as R,G,B')
     
-    parser.add_argument('--flare_x', type=float, help='X coordinate for lens flare (0-1)')
-    parser.add_argument('--flare_y', type=float, help='Y coordinate for lens flare (0-1)')
+    parser.add_argument('--flare_x', type=float, default=0.8, help='X coordinate for lens flare (0-1)')
+    parser.add_argument('--flare_y', type=float, default=0.2, help='Y coordinate for lens flare (0-1)')
     parser.add_argument('--flare_intensity', type=float, default=1.0, help='Intensity for lens flare')
     
     parser.add_argument('--watercolor_intensity', type=float, default=0.3, help='Intensity for watercolor effect')
@@ -324,57 +324,69 @@ def add_fancy_border(image, border_type, border_color):
     return result
 
 def lens_flare_effect(image, flare_x, flare_y, intensity=1.0):
-    """Эффект бликов объектива"""
+    """Эффект бликов"""
+    # Загружаем текстуру
+    flare_texture = cv2.imread("src/glare.jpg")
+        
     h, w = image.shape[:2]
-    
-    # Преобразуем координаты в абсолютные
+        
+    # Преобразуем координаты
     abs_x = int(flare_x * w)
     abs_y = int(flare_y * h)
-    
+        
+    # Масштабируем текстуру
+    flare_size = min(h, w) // 4 
+    flare_resized = resize_image(flare_texture, width=flare_size, height=flare_size)
+        
     result = image.astype(np.float32)
-    
-    # Создаем несколько бликов
-    flares = [
-        (abs_x, abs_y, 50, 1.0),
-        (abs_x - 30, abs_y - 30, 30, 0.7),
-        (abs_x + 40, abs_y + 20, 25, 0.5)
-    ]
-    
-    for fx, fy, size, flare_intensity in flares:
-        # Создаем координатные сетки
-        y, x = np.ogrid[-size:size+1, -size:size+1]
+    flare_img = flare_resized.astype(np.float32)
         
-        # Создаем маску круга
-        mask = x**2 + y**2 <= size**2
+    # Позиционируем блик
+    flare_h, flare_w = flare_img.shape[:2]
+    y_start = max(0, abs_y - flare_h // 2)
+    y_end = min(h, abs_y + flare_h // 2)
+    x_start = max(0, abs_x - flare_w // 2)
+    x_end = min(w, abs_x + flare_w // 2)
         
-        # Вычисляем позиции
-        y_pos = np.clip(fy + y, 0, h-1)
-        x_pos = np.clip(fx + x, 0, w-1)
+    # Обрезаем блик
+    flare_y_start = max(0, - (abs_y - flare_h // 2))
+    flare_y_end = flare_h - max(0, (abs_y + flare_h // 2) - h)
+    flare_x_start = max(0, - (abs_x - flare_w // 2))
+    flare_x_end = flare_w - max(0, (abs_x + flare_w // 2) - w)
         
-        # Применяем блик
-        flare_value = flare_intensity * intensity * 100
-        for channel in range(3):
-            result[y_pos, x_pos, channel] += flare_value * mask
-    
+    # Накладываем блик
+    flare_region = flare_img[flare_y_start:flare_y_end, flare_x_start:flare_x_end]
+    result[y_start:y_end, x_start:x_end] += flare_region * intensity
+        
     return np.clip(result, 0, 255).astype(np.uint8)
 
 def watercolor_effect(image, intensity=0.3):
     """Эффект акварельной бумаги"""
+    # Загружаем текстуру
+    texture = cv2.imread("src/watercolor_paper.jpg")
+        
     h, w = image.shape[:2]
-    
-    # Создаем текстуру зернистости
-    texture = np.random.normal(0, 20, (h, w, 3))
-    
-    # Добавляем текстуру к изображению
-    result = image.astype(np.float32) + texture * intensity
-    
-    # Простое размытие для имитации акварели
-    temp = result.copy()
-    for i in range(1, h-1):
-        for j in range(1, w-1):
-            result[i, j] = np.mean(temp[i-1:i+2, j-1:j+2], axis=(0, 1))
-    
-    return np.clip(result, 0, 255).astype(np.uint8)
+        
+    # Масштабируем текстуру
+    if texture.shape[:2] != (h, w):
+        texture = resize_image(texture, width=w, height=h)
+        
+    # Преобразуем в float 
+    img_float = image.astype(np.float32)
+    texture_float = texture.astype(np.float32)
+        
+    # Создаем маску 
+    texture_gray = np.mean(texture_float, axis=2)
+    texture_mask = 1 - (texture_gray / 255.0)
+        
+    # Усиливаем маску
+    texture_mask = texture_mask ** (1 / max(0.1, intensity))
+    texture_mask = texture_mask[:, :, np.newaxis]
+        
+    # Смешиваем 
+    blended = img_float * (1 - texture_mask * intensity) + texture_float * (texture_mask * intensity)
+        
+    return np.clip(blended, 0, 255).astype(np.uint8)
 
 def parse_color(color_str):
     """Парсинг строки цвета"""
@@ -421,12 +433,8 @@ def main():
             result = add_fancy_border(image, args.fancy_border_type, border_color)
             
         elif args.filter == 'lens_flare':
-            if args.flare_x is None or args.flare_y is None:
-                # По умолчанию в правом верхнем углу
-                result = lens_flare_effect(image, 0.8, 0.2, args.flare_intensity)
-            else:
-                result = lens_flare_effect(image, args.flare_x, args.flare_y, args.flare_intensity)
-                
+            result = lens_flare_effect(image, args.flare_x, args.flare_y, args.flare_intensity)
+    
         elif args.filter == 'watercolor':
             result = watercolor_effect(image, args.watercolor_intensity)
         
