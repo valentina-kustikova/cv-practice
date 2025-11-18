@@ -24,7 +24,6 @@ def load_dataset(data_dir: str, train_txt: str):
         for source in ['ExtDataset', 'NNSUDataset']:
             folder = data_dir / source / class_name
             if folder.exists():
-                # ИСПРАВЛЕНИЕ: list() для генераторов
                 for img_path in list(folder.glob('*.jpg')) + list(folder.glob('*.jpeg')) + list(folder.glob('*.png')):
                     rel_path = img_path.relative_to(data_dir).as_posix()
                     if rel_path in train_paths:

@@ -68,7 +68,7 @@ class BoWClassifier:
     def predict(self, test_data):
         print(f"\nТест BoW [{self.detector.name}]")
         hists, y_true = [], []
-        for path, label in tqdm(test_data, desc="Предсказание"):
+        for path, label in tqdm(test_data, desc="Загрузка"):
             des, _ = self.extract_features(path)
             hist = np.zeros(self.k)
             if des is not None:

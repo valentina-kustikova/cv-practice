@@ -52,12 +52,11 @@ def visualize_keypoints(detector_type="sift"):
         for p in kp:
             x = p.pt[0] * scale
             y = p.pt[1] * scale
-            size = p.size * scale * 1.4  # ещё чуть крупнее — идеально видно
+            size = p.size * scale * 1.4
             kp_scaled.append(cv2.KeyPoint(x=x, y=y, size=size,
                                           angle=p.angle, response=p.response,
                                           octave=p.octave, class_id=p.class_id))
 
-        # Классический OpenCV-стиль — самый красивый!
         vis = cv2.drawKeypoints(
             small.copy(),
             kp_scaled,
@@ -134,13 +133,13 @@ def visualize_gradcam():
             superimposed = cv2.resize(superimposed, (max_w, new_h))
 
         plt.subplot(2, 4, i + 1)
-        plt.title(f"Правда: {class_names[true_label]}", fontsize=11)
+        plt.title(f"Исходник: {class_names[true_label]}", fontsize=11)
         plt.imshow(img_orig[..., ::-1])
         plt.axis('off')
 
         plt.subplot(2, 4, i + 5)
         conf = tf.nn.softmax(preds[0])[pred_idx].numpy()
-        plt.title(f"Предсказано: {class_names[pred_idx]}\nУверенность: {conf:.1%}", fontsize=11)
+        plt.title(f"Обработка: {class_names[pred_idx]}\nУверенность: {conf:.1%}", fontsize=11)
         plt.imshow(superimposed[..., ::-1])
         plt.axis('off')
 
