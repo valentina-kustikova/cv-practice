@@ -36,8 +36,6 @@ lab2_vehicle_detection/
 ├── images/ # кадры
 └── annotations.txt # файл разметки
 
-text
-
 ## Алгоритмы детектирования
 
 ### 1. YOLOv4
@@ -155,6 +153,7 @@ python main.py \
     --model yolo \
     --conf 0.5 \
     --show-gt
+```bash
 Параметры:
 
 --images — путь к директории с кадрами;
@@ -169,12 +168,10 @@ python main.py \
 
 --show-gt — отрисовывать Ground Truth-боксы.
 
-Метрики качества
+## Метрики качества
 После запуска выводятся итоговые значения:
 
 TPR (True Positive Rate) — доля правильно найденных машин;
 
 FDR (False Discovery Rate) — доля ложных срабатываний среди всех детекций.
-
-text
 
