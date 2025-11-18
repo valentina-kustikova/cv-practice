@@ -24,35 +24,37 @@ try:
 except ImportError:
     TF_AVAILABLE = False
 
+def load_dataset(data_path, file_list):
+    """Загрузка датасета из файла со списком изображений"""
+    data_path = Path(data_path)
+    class_names = ['01_NizhnyNovgorodKremlin', '04_ArkhangelskCathedral', '08_PalaceOfLabor', '77_airhockey']
+    class_map = {name: idx for idx, name in enumerate(class_names)}
+    
+    images, labels = [], []
+    with open(file_list, 'r') as f:
+        for line in f:
+            img_path = data_path / line.strip()
+            if not img_path.exists():
+                continue
+            img = cv2.imread(str(img_path))
+            if img is None:
+                continue
+            # Определение класса из пути
+            class_name = img_path.parent.name
+            if class_name in class_map:
+                images.append(img)
+                labels.append(class_map[class_name])
+    return images, np.array(labels), class_names
+
 class ImageClassifier:
     """Базовый класс для классификатора изображений"""
-    def __init__(self, data_path):
-        self.data_path = Path(data_path)
+    def __init__(self):
         self.class_names = ['01_NizhnyNovgorodKremlin', '04_ArkhangelskCathedral', '08_PalaceOfLabor', '77_airhockey']
-        self.class_map = {name: idx for idx, name in enumerate(self.class_names)}
-        
-    def load_dataset(self, file_list):
-        """Загрузка датасета из файла со списком изображений"""
-        images, labels = [], []
-        with open(file_list, 'r') as f:
-            for line in f:
-                img_path = self.data_path / line.strip()
-                if not img_path.exists():
-                    continue
-                img = cv2.imread(str(img_path))
-                if img is None:
-                    continue
-                # Определение класса из пути
-                class_name = img_path.parent.name
-                if class_name in self.class_map:
-                    images.append(img)
-                    labels.append(self.class_map[class_name])
-        return images, np.array(labels)
 
 class BagOfWordsClassifier(ImageClassifier):
     """Классификатор на основе алгоритма Bag of Words"""
-    def __init__(self, data_path, n_clusters=100, descriptor_type='sift'):
-        super().__init__(data_path)
+    def __init__(self, n_clusters=100, descriptor_type='sift'):
+        super().__init__()
         self.n_clusters = n_clusters
         self.descriptor_type = descriptor_type
         self.kmeans = None
@@ -159,10 +161,10 @@ class BagOfWordsClassifier(ImageClassifier):
 
 class NeuralNetworkClassifier(ImageClassifier):
     """Классификатор на основе нейронной сети с transfer learning"""
-    def __init__(self, data_path, img_size=224, epochs=20, batch_size=16):
+    def __init__(self, img_size=224, epochs=20, batch_size=16):
         if not TF_AVAILABLE:
             raise ImportError("TensorFlow не установлен: pip install tensorflow")
-        super().__init__(data_path)
+        super().__init__()
         self.img_size = img_size
         self.epochs = epochs # Сколько раз пройти по всем изображениям
         self.batch_size = batch_size # Сколько изображений обработать за раз
@@ -244,7 +246,7 @@ def main():
     parser.add_argument('--train_file', type=str, default='Data/train.txt', help='Файл с обучающей выборкой')
     parser.add_argument('--test_file', type=str, default='Data/test.txt', help='Файл с тестовой выборкой')
     parser.add_argument('--mode', type=str, choices=['train', 'test', 'both'], default='both', help='Режим работы')
-    parser.add_argument('--algorithm', type=str, choices=['bow', 'nn', 'both'], default='both', help='Алгоритм классификации')
+    parser.add_argument('--algorithm', type=str, choices=['bow', 'nn'], default='bow', help='Алгоритм классификации')
     parser.add_argument('--bow_clusters', type=int, default=100, help='Количество кластеров для BoW')
     parser.add_argument('--bow_descriptor', type=str, choices=['sift', 'orb'], default='sift', help='Тип дескриптора для BoW')
     parser.add_argument('--nn_epochs', type=int, default=20, help='Количество эпох для нейросети')
@@ -256,49 +258,42 @@ def main():
     # Создание директории для моделей
     os.makedirs(args.model_path, exist_ok=True)
     
-    algorithms = ['bow', 'nn'] if args.algorithm == 'both' else [args.algorithm]
-    
-    for algo in algorithms:
-        print(f"\n{'='*60}")
-        print(f"Алгоритм: {'Bag of Words' if algo == 'bow' else 'Neural Network'}")
-        print(f"{'='*60}")
-        
-        # Создание классификатора
-        if algo == 'bow':
-            classifier = BagOfWordsClassifier(args.data_path, args.bow_clusters, args.bow_descriptor)
-            # Имя файла зависит от типа дескриптора
-            if args.bow_descriptor == 'sift':
-                model_path = f"{args.model_path}/bow_model.pkl"
-            else:
-                model_path = f"{args.model_path}/bow_model_{args.bow_descriptor}.pkl"
+    # Создание классификатора
+    if args.algorithm == 'bow':
+        classifier = BagOfWordsClassifier(args.bow_clusters, args.bow_descriptor)
+        # Имя файла зависит от типа дескриптора
+        if args.bow_descriptor == 'sift':
+            model_path = f"{args.model_path}/bow_model.pkl"
         else:
-            classifier = NeuralNetworkClassifier(args.data_path, epochs=args.nn_epochs, batch_size=args.nn_batch)
-            model_path = f"{args.model_path}/nn_model.h5"
+            model_path = f"{args.model_path}/bow_model_{args.bow_descriptor}.pkl"
+    else:
+        classifier = NeuralNetworkClassifier(epochs=args.nn_epochs, batch_size=args.nn_batch)
+        model_path = f"{args.model_path}/nn_model.h5"
+    
+    # Обучение
+    if args.mode in ['train', 'both']:
+        print("\nЗагрузка обучающей выборки...")
+        train_images, train_labels, class_names = load_dataset(args.data_path, args.train_file)
+        print(f"Загружено {len(train_images)} обучающих изображений")
         
-        # Обучение
-        if args.mode in ['train', 'both']:
-            print("\nЗагрузка обучающей выборки...")
-            train_images, train_labels = classifier.load_dataset(args.train_file)
-            print(f"Загружено {len(train_images)} обучающих изображений")
-            
-            classifier.train(train_images, train_labels)
-            classifier.save(model_path)
-            print(f"Модель сохранена в {model_path}")
+        classifier.train(train_images, train_labels)
+        classifier.save(model_path)
+        print(f"Модель сохранена в {model_path}")
+    
+    # Тестирование
+    if args.mode in ['test', 'both']:
+        if args.mode == 'test':
+            print("\nЗагрузка модели...")
+            classifier.load(model_path)
         
-        # Тестирование
-        if args.mode in ['test', 'both']:
-            if args.mode == 'test':
-                print("\nЗагрузка модели...")
-                classifier.load(model_path)
-            
-            print("\nЗагрузка тестовой выборки...")
-            test_images, test_labels = classifier.load_dataset(args.test_file)
-            print(f"Загружено {len(test_images)} тестовых изображений")
-            
-            print("\nКлассификация тестовой выборки...")
-            predictions = classifier.predict(test_images)
-            
-            evaluate(test_labels, predictions, classifier.class_names)
+        print("\nЗагрузка тестовой выборки...")
+        test_images, test_labels, class_names = load_dataset(args.data_path, args.test_file)
+        print(f"Загружено {len(test_images)} тестовых изображений")
+        
+        print("\nКлассификация тестовой выборки...")
+        predictions = classifier.predict(test_images)
+        
+        evaluate(test_labels, predictions, class_names)
 
 if __name__ == '__main__':
     main()

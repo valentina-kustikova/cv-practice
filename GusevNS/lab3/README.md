@@ -42,29 +42,29 @@ pip install opencv-python opencv-contrib-python numpy scikit-learn tensorflow
 
 ## Использование
 
-### Обучение и тестирование обоих алгоритмов
+### Обучение Bag of Words
 
 ```bash
-python lab3.py --mode both --algorithm both
+python lab3.py --mode train --algorithm bow --bow_clusters 100 --bow_descriptor sift
+python lab3.py --mode train --algorithm bow --bow_clusters 50 --bow_descriptor orb
 ```
 
-### Обучение только Bag of Words
+### Обучение нейронной сети
 
 ```bash
-python lab3.py --mode train --algorithm bow --bow_clusters 150 --bow_descriptor sift
+python lab3.py --mode train --algorithm nn
 ```
 
-### Тестирование нейронной сети
+### Обучение и тестирование (одновременно)
 
 ```bash
-python lab3.py --mode test --algorithm nn
+python lab3.py --mode both --algorithm bow --bow_descriptor sift --bow_clusters 100
+python lab3.py --mode both --algorithm bow --bow_descriptor orb --bow_clusters 50
 ```
 
 ### Тестирование готовых моделей (без обучения)
 #### Тестирование Bag of Words модели
 ```bash
-python lab3.py --mode test --algorithm bow
-
 python lab3.py --mode test --algorithm bow --bow_descriptor sift --bow_clusters 100
 
 python lab3.py --mode test --algorithm bow --bow_descriptor orb --bow_clusters 50
@@ -75,18 +75,13 @@ python lab3.py --mode test --algorithm bow --bow_descriptor orb --bow_clusters 5
 python lab3.py --mode test --algorithm nn
 ```
 
-#### Тестирование обеих моделей сразу
-```bash
-python lab3.py --mode test --algorithm both
-```
-
 ### Параметры запуска
 
 - `--data_path` - путь к директории с данными (по умолчанию: `Data`)
 - `--train_file` - файл с обучающей выборкой (по умолчанию: `Data/train.txt`)
 - `--test_file` - файл с тестовой выборкой (по умолчанию: `Data/test.txt`)
 - `--mode` - режим работы: `train`, `test`, `both` (по умолчанию: `both`)
-- `--algorithm` - алгоритм: `bow`, `nn`, `both` (по умолчанию: `both`)
+- `--algorithm` - алгоритм: `bow`, `nn` (по умолчанию: `bow`)
 - `--bow_clusters` - количество кластеров для BoW (по умолчанию: 100)
 - `--bow_descriptor` - тип дескриптора: `sift`, `orb` (по умолчанию: `sift`)
 - `--nn_epochs` - количество эпох для нейросети (по умолчанию: 20)
@@ -111,7 +106,10 @@ lab3/
 
 Приложение выводит следующие метрики:
 - **Accuracy** - общая точность классификации
-- **Precision, Recall, F1-score** - для каждого класса отдельно
+- **Precision** - доля правильных предсказаний среди всех предсказаний класса (точность)
+- **Recall** - доля найденных объектов класса среди всех объектов этого класса (полнота)
+- **F1-score** - гармоническое среднее между Precision и Recall
+- **Support** - количество примеров каждого класса в тестовой выборке
 - **Classification Report** - детальный отчет по всем классам
 
 ## Классы для классификации
@@ -120,11 +118,6 @@ lab3/
 2. **04_ArkhangelskCathedral** - Архангельский собор
 3. **08_PalaceOfLabor** - Дворец труда
 4. **77_airhockey** - Аэрохоккей
-
-## Автор
-
-Гусев Никита
-
 
 ## Результаты
 
@@ -160,18 +153,20 @@ lab3/
 
 
 ### -mode both --algorithm bow --bow_descriptor sift --bow_clusters 100
-Точность (Accuracy): 0.9205
+Точность (Accuracy): 0.9248
 
 Отчет по классификации:
                           precision    recall  f1-score   support
 
-01_NizhnyNovgorodKremlin       0.97      0.97      0.97        39
- 04_ArkhangelskCathedral       0.94      0.75      0.83        20
-        08_PalaceOfLabor       0.85      0.97      0.90        29
+01_NizhnyNovgorodKremlin       0.97      1.00      0.99        39
+ 04_ArkhangelskCathedral       1.00      0.75      0.86        20
+        08_PalaceOfLabor       0.76      1.00      0.87        29
+            77_airhockey       1.00      0.89      0.94        45
 
-                accuracy                           0.92        88
-               macro avg       0.92      0.90      0.90        88
-            weighted avg       0.92      0.92      0.92        88
+                accuracy                           0.92       133
+               macro avg       0.93      0.91      0.91       133
+            weighted avg       0.94      0.92      0.93       133
+
 
 ### --mode both --algorithm bow --bow_descriptor orb --bow_clusters 50
 Точность (Accuracy): 0.8864
@@ -202,3 +197,7 @@ lab3/
                macro avg       0.84      0.83      0.83       133
             weighted avg       0.85      0.85      0.85       133
 
+
+## Автор
+
+Гусев Никита
