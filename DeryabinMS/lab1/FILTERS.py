@@ -105,7 +105,7 @@ def sepia_filter(image, intensity=1.0):
     result = image.astype(np.float32) @ sepia_matrix.T
     result = np.clip(result, 0, 255)
     
-    # Смешиваем с оригиналом в зависимости от интенсивности
+    # Смешиваем с оригиналом
     if intensity < 1.0:
         result = image * (1 - intensity) + result * intensity
         result = np.clip(result, 0, 255)
@@ -219,9 +219,6 @@ def interactive_pixelation(image, pixel_size=10):
                 result = pixelate_region(image, x, y, width, height, pixel_size)
                 cv2.destroyAllWindows()
                 return result
-    
-    cv2.destroyAllWindows()
-    return image
 
 def add_border(image, border_width, border_color):
     """Добавление прямоугольной рамки"""
@@ -239,7 +236,7 @@ def add_border(image, border_width, border_color):
 def add_fancy_border(image, border_type, border_color):
     """Добавление фигурной одноцветной рамки по краям изображения"""
     h, w = image.shape[:2]
-    border_width = min(h, w) // 15  # Ширина рамки 
+    border_width = min(h, w) // 15 
     
     result = image.copy()
     
@@ -269,7 +266,7 @@ def add_fancy_border(image, border_type, border_color):
             
     elif border_type == 'zigzag':
         # Зигзагообразная рамка с пилообразным паттерном
-        period = 40  # Период зигзага
+        period = 40 
         
         for i in range(border_width):
             # Верхняя и нижняя границы
@@ -326,7 +323,7 @@ def add_fancy_border(image, border_type, border_color):
 def lens_flare_effect(image, flare_x, flare_y, intensity=1.0):
     """Эффект бликов"""
     # Загружаем текстуру
-    flare_texture = cv2.imread("src/glare.jpg")
+    flare_texture = cv2.imread("glare.jpg")
         
     h, w = image.shape[:2]
         
@@ -335,8 +332,8 @@ def lens_flare_effect(image, flare_x, flare_y, intensity=1.0):
     abs_y = int(flare_y * h)
         
     # Масштабируем текстуру
-    flare_size = min(h, w) // 4 
-    flare_resized = resize_image(flare_texture, width=flare_size, height=flare_size)
+    flare_size = min(h, w) // 2
+    flare_resized = resize_image(flare_texture, new_width=flare_size, new_height=flare_size)
         
     result = image.astype(np.float32)
     flare_img = flare_resized.astype(np.float32)
@@ -363,13 +360,13 @@ def lens_flare_effect(image, flare_x, flare_y, intensity=1.0):
 def watercolor_effect(image, intensity=0.3):
     """Эффект акварельной бумаги"""
     # Загружаем текстуру
-    texture = cv2.imread("src/watercolor_paper.jpg")
+    texture = cv2.imread("watercolor_paper.jpg")
         
     h, w = image.shape[:2]
         
     # Масштабируем текстуру
     if texture.shape[:2] != (h, w):
-        texture = resize_image(texture, width=w, height=h)
+        texture = resize_image(texture, new_width=w, new_height=h)
         
     # Преобразуем в float 
     img_float = image.astype(np.float32)
@@ -392,7 +389,7 @@ def parse_color(color_str):
     """Парсинг строки цвета"""
     try:
         r, g, b = map(int, color_str.split(','))
-        return [b, g, r]  # OpenCV использует BGR
+        return [b, g, r]  
     except:
         raise ValueError(f"Invalid color format: {color_str}. Use R,G,B")
 
