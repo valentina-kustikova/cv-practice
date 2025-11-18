@@ -20,7 +20,7 @@ class VehicleDetectorFactory:
         """Справочная информация"""
         return {
             "yolo": {
-                "name": "YOLOv4 (Darknet)",
+                "name": "YOLOv4",
                 "vehicle_classes": ["car", "bus", "truck"]
             },
             "ssd": {
@@ -41,7 +41,7 @@ class VehicleDetectorFactory:
 
         if model_key == "yolo":
             config = DetectorConfig(
-                name="YOLOv4 (Darknet)",
+                name="YOLOv4",
                 model_path=os.path.join("models", "yolov4.weights"),
                 config_path=os.path.join("configs", "yolov4.cfg"),
                 classes=classes,
