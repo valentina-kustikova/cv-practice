@@ -18,8 +18,7 @@ class NNClassifier:
         self.label_decoder = {}
 
     def _build_model(self):
-        """Построение модели с transfer learning"""
-        # Используем tf.keras напрямую
+        # Построение модели с transfer learning
         base_model = tf.keras.applications.MobileNetV2(
             weights='imagenet',
             include_top=False,
@@ -47,7 +46,7 @@ class NNClassifier:
         return model
 
     def preprocess_images(self, images, labels):
-        """Предобработка изображений"""
+        # Предобработка изображений
         unique_labels = list(set(labels))
         self.label_encoder = {label: idx for idx, label in enumerate(unique_labels)}
         self.label_decoder = {idx: label for label, idx in self.label_encoder.items()}
@@ -64,7 +63,7 @@ class NNClassifier:
         return np.array(X), np.array(y)
 
     def create_data_generator(self, X, y):
-        """Создание генератора данных с аугментацией"""
+        # Создание генератора данных
         datagen = tf.keras.preprocessing.image.ImageDataGenerator(
             rotation_range=20,
             width_shift_range=0.2,
@@ -77,7 +76,7 @@ class NNClassifier:
         return datagen.flow(X, y, batch_size=self.batch_size)
 
     def train(self, train_data, model_path):
-        """Обучение нейронной сети"""
+        # Обучение сети
         images, labels = zip(*train_data)
         X_train, y_train = self.preprocess_images(images, labels)
         self.num_classes = len(self.label_encoder)
@@ -103,7 +102,7 @@ class NNClassifier:
         print("Модель сохранена!")
 
     def test(self, test_data, model_path):
-        """Тестирование нейронной сети"""
+        # Тестирование сети
         if not os.path.exists(model_path):
             raise ValueError(f"Модель не найдена: {model_path}")
 
@@ -124,7 +123,7 @@ class NNClassifier:
         return accuracy, report
 
     def save_model(self, path):
-        """Сохранение модели"""
+        # Сохранение модели
         model_path = path.replace('.pkl', '_keras.h5')
         self.model.save(model_path)
 
@@ -140,7 +139,7 @@ class NNClassifier:
             pickle.dump(model_info, f)
 
     def load_model(self, path):
-        """Загрузка модели"""
+        # Загрузка модели
         model_path = path.replace('.pkl', '_keras.h5')
         self.model = tf.keras.models.load_model(model_path)
 

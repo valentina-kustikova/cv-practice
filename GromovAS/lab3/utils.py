@@ -4,7 +4,7 @@ import numpy as np
 
 
 def load_dataset_split(split_file):
-    """Загрузка разбиения на выборки"""
+    # Загрузка разбиения на выборки
     files = []
     labels = []
 
@@ -20,7 +20,7 @@ def load_dataset_split(split_file):
 
 
 def load_images_from_split(data_dir, files, labels):
-    """Загрузка изображений на основе разбиения"""
+    # Загрузка изображений на основе разбиения
     images_data = []
 
     for file_path, label in zip(files, labels):
@@ -42,7 +42,7 @@ def load_images_from_split(data_dir, files, labels):
 
 
 def visualize_keypoints(image, detector_type='SIFT'):
-    """Визуализация ключевых точек для отладки BOW"""
+    # Визуализация ключевых точек для отладки BOW
     if detector_type == 'SIFT':
         detector = cv2.SIFT_create()
     elif detector_type == 'ORB':
@@ -55,3 +55,48 @@ def visualize_keypoints(image, detector_type='SIFT'):
     )
 
     return image_with_kp, len(keypoints)
+
+
+def visualize_keypoints_detailed(image, detector_type='SIFT', save_path=None):
+    # Детальная визуализация ключевых точек с информацией
+    if detector_type == 'SIFT':
+        detector = cv2.SIFT_create()
+    elif detector_type == 'ORB':
+        detector = cv2.ORB_create()
+    else:
+        detector = cv2.SIFT_create()  # fallback
+
+    # Детектирование ключевых точек и дескрипторов
+    keypoints, descriptors = detector.detectAndCompute(image, None)
+
+    # Визуализация ключевых точек
+    image_with_kp = cv2.drawKeypoints(
+        image,
+        keypoints,
+        None,
+        flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS,
+        color=(0, 255, 0)  # Зеленый цвет для точек
+    )
+
+    # Добавление информации о количестве точек
+    cv2.putText(image_with_kp,
+                f'Keypoints: {len(keypoints)}',
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (255, 0, 0),
+                2)
+
+    cv2.putText(image_with_kp,
+                f'Detector: {detector_type}',
+                (10, 70),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (255, 0, 0),
+                2)
+
+    # Сохранение если указан путь
+    if save_path:
+        cv2.imwrite(save_path, cv2.cvtColor(image_with_kp, cv2.COLOR_RGB2BGR))
+
+    return image_with_kp, len(keypoints), descriptors

@@ -2,7 +2,7 @@ import os
 
 
 def add_labels_to_split(input_file, output_file):
-    """Добавляет метки классов к файлам разбиения"""
+    # Добавляет метки классов к файлам разбиения
     with open(input_file, 'r', encoding='utf-8') as f_in:
         lines = f_in.readlines()
 
