@@ -24,37 +24,14 @@ def resize_image(image, width=None, height=None, scale=None):
     else:
         return image
     
-    # Создаем новое изображение
-    resized = np.zeros((new_height, new_width, image.shape[2]), dtype=image.dtype)
+    resized = np.zeros((new_height, new_width, 3), dtype=image.dtype)
     
-    # Вычисляем коэффициенты масштабирования
-    x_ratio = w / new_width
-    y_ratio = h / new_height
+    y_ratio = np.linspace(0, h - 1, new_height).astype(int)
+    x_ratio = np.linspace(0, w - 1, new_width).astype(int)
     
-    # Билинейная интерполяция
-    for i in range(new_height):
-        for j in range(new_width):
-            # Вычисляем соответствующие координаты в исходном изображении
-            x = j * x_ratio
-            y = i * y_ratio
-            
-            # Находим соседние пиксели
-            x1 = int(x)
-            y1 = int(y)
-            x2 = min(x1 + 1, w - 1)
-            y2 = min(y1 + 1, h - 1)
-            
-            # Вычисляем веса для интерполяции
-            dx = x - x1
-            dy = y - y1
-            
-            # Билинейная интерполяция для каждого канала
-            for c in range(image.shape[2]):
-                value = (image[y1, x1, c] * (1 - dx) * (1 - dy) +
-                        image[y1, x2, c] * dx * (1 - dy) +
-                        image[y2, x1, c] * (1 - dx) * dy +
-                        image[y2, x2, c] * dx * dy)
-                resized[i, j, c] = int(value)
+    y_indices, x_indices = np.meshgrid(y_ratio, x_ratio, indexing='ij')
+    
+    resized = image[y_indices, x_indices]
     
     return resized
 
@@ -62,53 +39,46 @@ def resize_image(image, width=None, height=None, scale=None):
 def apply_sepia(image, intensity=1.0):
     # Создаем копию изображения
     sepia_image = np.copy(image).astype(np.float32)
+
+    sepia_matrix = np.array([
+        [0.131, 0.534, 0.272],
+        [0.168, 0.686, 0.349],
+        [0.189, 0.769, 0.393]
+    ])
     
-    # Матрица преобразования для сепии (BGR формат)
-    # Применяем преобразование для каждого пикселя
-    for i in range(sepia_image.shape[0]):
-        for j in range(sepia_image.shape[1]):
-            b, g, r = sepia_image[i, j]
-            
-            # Формулы для эффекта сепии
-            new_r = min(255, 0.393 * r + 0.769 * g + 0.189 * b)
-            new_g = min(255, 0.349 * r + 0.686 * g + 0.168 * b)
-            new_b = min(255, 0.272 * r + 0.534 * g + 0.131 * b)
-            
-            # Применяем интенсивность
-            sepia_image[i, j, 0] = b * (1 - intensity) + new_b * intensity
-            sepia_image[i, j, 1] = g * (1 - intensity) + new_g * intensity
-            sepia_image[i, j, 2] = r * (1 - intensity) + new_r * intensity
+    result = image.astype(np.float32)
+    sepia_image = result @ sepia_matrix.T
     
-    return sepia_image.astype(np.uint8)
+    # Обрезаем значения до [0, 255] 
+    sepia_image = np.clip(sepia_image, 0, 255)
+    
+    # Смешиваем с оригиналом согласно интенсивности
+    result = result * (1 - intensity) + sepia_image * intensity
+    
+    return result.astype(np.uint8)
 
 
 def apply_vignette(image, strength=0.5):
     h, w = image.shape[:2]
     
-    # Создаем маску виньетки
-    center_x, center_y = w // 2, h // 2
-    
-    # Максимальное расстояние от центра
+    center_x, center_y = w / 2, h / 2
     max_distance = np.sqrt(center_x**2 + center_y**2)
+
+    y_coords, x_coords = np.ogrid[:h, :w]
+
+    distance = np.sqrt((x_coords - center_x)**2 + (y_coords - center_y)**2)
     
-    # Создаем маску
-    mask = np.zeros((h, w), dtype=np.float32)
+    norm_distance = distance / max_distance
     
-    for i in range(h):
-        for j in range(w):
-            # Вычисляем расстояние от центра
-            distance = np.sqrt((j - center_x)**2 + (i - center_y)**2)
-            
-            # Нормализуем расстояние и применяем затемнение
-            normalized_distance = distance / max_distance
-            mask[i, j] = 1 - (normalized_distance * strength) # если normalized_distance == 0 оставляем пиксель без изменений
+    vignette_factor = 1.0 - (norm_distance * strength)
+
+    vignette_factor = np.maximum(0.0, vignette_factor)
+
+    vignette_factor = vignette_factor[:, :, np.newaxis]
+
+    result = image.astype(np.float32) * vignette_factor
     
-    # Применяем маску к каждому каналу
-    vignette_image = np.copy(image).astype(np.float32)
-    for c in range(image.shape[2]):
-        vignette_image[:, :, c] = vignette_image[:, :, c] * mask
-    
-    return vignette_image.astype(np.uint8)
+    return result.astype(np.uint8)
 
 
 def pixelate_region(image, x, y, width, height, pixel_size=10):
