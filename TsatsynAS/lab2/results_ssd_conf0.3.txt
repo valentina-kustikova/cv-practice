@@ -1,0 +1,7 @@
+=== Vehicle Detection Results ===
+Model: ssd
+Confidence threshold: 0.3
+Processed frames: 3456
+Average TPR: 0.492
+Average FDR: 0.040
+Quality Score: 4.92/10
