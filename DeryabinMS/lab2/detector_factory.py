@@ -57,13 +57,13 @@ class VehicleDetectorFactory:
         if model_key == "ssd":
             config = DetectorConfig(
                 name="SSD MobileNet v3",
-                model_path=os.path.join("models", "ssd_mobilenet_v3_large_coco_2020_01_14.pb"),
-                config_path=os.path.join("configs", "ssd_mobilenet_v3_large_coco.pbtxt"),
+                model_path=os.path.join("models", "frozen_inference_graph.pb"),
+                config_path=os.path.join("configs", "ssd_mobilenet_v2_coco_2018_03_29.pbtxt"),
                 classes=classes,
-                input_size=(300, 300),
-                scale=1.0 / 127.5,
+                input_size=(320, 320),
+                scale=1.0,
                 swap_rb=True,
-                mean=(127.5, 127.5, 127.5),
+                mean=(0.0, 0.0, 0.0),
                 conf_threshold=confidence_threshold,
                 nms_threshold=0.4,
             )
@@ -73,7 +73,7 @@ class VehicleDetectorFactory:
             config = DetectorConfig(
                 name="Faster R-CNN",
                 model_path=os.path.join("models", "frozen_inference_graph_faster_rcnn.pb"),
-                config_path=os.path.join("configs", "faster_rcnn_inception_v2_coco.pbtxt"),
+                config_path=os.path.join("configs", "faster_rcnn_inception_v2_coco_2018_01_28.pbtxt"),
                 classes=classes,
                 input_size=(300, 300),
                 scale=1.0,
