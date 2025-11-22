@@ -27,7 +27,6 @@ def mouse_callback(event, x, y, flags, param):
 
 
 def change_resolution(image, new_width=None, new_height=None):
-
     height, width = image.shape[:2]
 
     if new_width is None and new_height is None:
@@ -52,7 +51,6 @@ def change_resolution(image, new_width=None, new_height=None):
 
 
 def apply_sepia(image):
-
     sepia_filter = np.array([
         [0.393, 0.769, 0.189],
         [0.349, 0.686, 0.168],
@@ -66,7 +64,6 @@ def apply_sepia(image):
 
 
 def apply_vignette(image, strength=0.8):
-
     height, width = image.shape[:2]
 
     x = np.arange(width)
@@ -84,12 +81,45 @@ def apply_vignette(image, strength=0.8):
     return vignette_image.astype(np.uint8)
 
 
-def pixelate_region(image):
+def pixelate_region(image, x, y, width, height, pixel_size=10):
+    """
+    Основная функция пикселизации - отдельно от коллбэков
+    Использует ТВОЙ алгоритм с усреднением блоков
+    """
+    pixelated_image = image.copy()
 
+    # Ограничиваем координаты размерами изображения
+    x1 = max(0, x)
+    y1 = max(0, y)
+    x2 = min(image.shape[1], x + width)
+    y2 = min(image.shape[0], y + height)
+
+    # Пикселизируем область - ТВОЙ АЛГОРИТМ
+    for block_y in range(y1, y2, pixel_size):
+        for block_x in range(x1, x2, pixel_size):
+            block_end_y = min(block_y + pixel_size, y2)
+            block_end_x = min(block_x + pixel_size, x2)
+
+            # Вычисляем средний цвет блока
+            block = image[block_y:block_end_y, block_x:block_end_x]
+            if block.size > 0:
+                avg_color = np.mean(block, axis=(0, 1))
+
+                # Заполняем блок средним цветом
+                pixelated_image[block_y:block_end_y, block_x:block_end_x] = avg_color
+
+    return pixelated_image
+
+
+def interactive_pixelation(image, pixel_size=10):
+  
     global selection_start, selection_end, current_image
 
     current_image = image.copy()
     temp_image = image.copy()
+
+    selection_start = None
+    selection_end = None
 
     window_name = "Select Region to Pixelate (Drag mouse, press SPACE to confirm, ESC to cancel)"
     cv2.namedWindow(window_name)
@@ -115,17 +145,10 @@ def pixelate_region(image):
                 x_min, x_max = min(x1, x2), max(x1, x2)
                 y_min, y_max = min(y1, y2), max(y1, y2)
 
-                pixel_size = 10
-                for block_y in range(y_min, y_max, pixel_size):
-                    for block_x in range(x_min, x_max, pixel_size):
-                        block_end_y = min(block_y + pixel_size, y_max)
-                        block_end_x = min(block_x + pixel_size, x_max)
+                width = x_max - x_min
+                height = y_max - y_min
 
-                        block = current_image[block_y:block_end_y, block_x:block_end_x]
-                        if block.size > 0:
-                            avg_color = np.mean(block, axis=(0, 1))
-                            temp_image[block_y:block_end_y, block_x:block_end_x] = avg_color
-
+                temp_image = pixelate_region(image, x_min, y_min, width, height, pixel_size)
                 current_image = temp_image.copy()
                 break
 
@@ -138,7 +161,6 @@ def pixelate_region(image):
 
 
 def add_solid_border(image, border_width=10, border_color=(255, 255, 255)):
-
     height, width = image.shape[:2]
 
     bordered_image = np.zeros(
@@ -197,71 +219,42 @@ def add_patterned_border(image, border_width=20, border_color=(255, 255, 255), p
     return bordered_image
 
 
-def apply_lens_flare(image, intensity=0.3):
+def apply_lens_flare(image, intensity=0.3, flare_texture_path='lens_flare.jpg'):
+    flare_texture = cv2.imread(flare_texture_path)
+    if flare_texture is None:
+        print(f"Текстура {flare_texture_path} не найдена, создаем базовую текстуру")
+    else:
+        flare_texture = cv2.resize(flare_texture, (image.shape[1], image.shape[0]))
 
+    # Конвертируем в float для вычислений
+    image_float = image.astype(np.float32)
+    flare_float = flare_texture.astype(np.float32)
+
+    # Альфа-смешивание
+    result = image_float * (1 - intensity) + flare_float * intensity
+    result = np.clip(result, 0, 255)
+
+    return result.astype(np.uint8)
+
+
+def apply_watercolor_texture(image, texture_intensity=0.3, paper_texture_path='watercolor_paper.jpg'):
     height, width = image.shape[:2]
 
-    # Создаем маску бликов
-    flare_mask = np.zeros((height, width, 3), dtype=np.float32)
+    paper_texture = cv2.imread(paper_texture_path)
+    if paper_texture is None:
+        print(f"Текстура {paper_texture_path} не найдена, создаем базовую текстуру")
+    else:
+        paper_texture = cv2.resize(paper_texture, (width, height))
 
-    # Позиции источников света
-    light_sources = [
-        (width // 4, height // 4),
-        (3 * width // 4, height // 3),
-        (width // 2, 2 * height // 3)
-    ]
+    texture_gray = np.mean(paper_texture, axis=2)
+    texture_mask = 1 - (texture_gray / 255.0)
+    texture_mask = texture_mask ** (1 / 0.9)
+    texture_mask = texture_mask[:, :, np.newaxis]
 
-    # Создаем блики для каждого источника
-    for center_x, center_y in light_sources:
-        Y, X = np.ogrid[:height, :width]
-        dist = np.sqrt((X - center_x) ** 2 + (Y - center_y) ** 2)
+    blended = (image.astype(np.float32) * (1 - texture_mask * texture_intensity) +
+               paper_texture.astype(np.float32) * (texture_mask * texture_intensity))
 
-        # Создаем гауссово распределение для блика
-        radius = min(width, height) // 4
-        flare_strength = np.exp(-(dist ** 2) / (radius ** 2 / 4))
-
-        # Добавляем к маске
-        flare_mask += flare_strength[:, :, np.newaxis]
-
-    # Нормализуем и применяем интенсивность
-    flare_mask = np.clip(flare_mask, 0, 1) * intensity
-
-    # Создаем блик (белый цвет)
-    flare_effect = np.ones_like(image, dtype=np.float32) * 255
-
-    result = image.astype(np.float32) * (1 - flare_mask) + flare_effect * flare_mask
-    return np.clip(result, 0, 255).astype(np.uint8)
-
-
-def create_watercolor_texture(height, width):
-    Y, X = np.ogrid[:height, :width]
-    texture = np.zeros((height, width), dtype=np.float32)
-
-    # Создаем сложную текстуру с разными частотами
-    for freq in [0.005, 0.02, 0.1]:
-        texture += (np.sin(X * freq) * np.sin(Y * freq)) * 0.2
-
-    # Нормализуем к диапазону [0, 1]
-    texture = (texture - texture.min()) / (texture.max() - texture.min())
-    return texture
-
-def apply_watercolor_texture(image, texture_intensity=0.3):
-
-    height, width = image.shape[:2]
-
-    # Создаем текстуру бумаги
-    paper_texture = create_watercolor_texture(height, width)
-
-    # Создаем эффект затемнения на основе текстуры
-    texture_effect = 0.7 + paper_texture * 0.6  # Диапазон [0.7, 1.3]
-
-    # Применяем текстуру через альфа-смешивание
-    textured_image = image.astype(np.float32) * texture_effect[:, :, np.newaxis]
-    textured_image = np.clip(textured_image, 0, 255)
-
-    # Смешиваем с оригиналом
-    result = image.astype(np.float32) * (1 - texture_intensity) + textured_image * texture_intensity
-    return np.clip(result, 0, 255).astype(np.uint8)
+    return np.clip(blended, 0, 255).astype(np.uint8)
 
 
 def demonstrate_filters():
@@ -296,7 +289,7 @@ def demonstrate_filters():
 
     # Пикселизация
     print("Выберите область для пикселизации")
-    pixelated = pixelate_region(resized)
+    pixelated = interactive_pixelation(resized)
     cv2.imshow('Pixelated Result', pixelated)
     cv2.waitKey(3000)
     cv2.destroyAllWindows()
@@ -311,6 +304,7 @@ def demonstrate_filters():
     patterned_border = add_patterned_border(resized, border_width=25,
                                             border_color=(0, 255, 0),
                                             pattern_type="zigzag")
+    cv2.imshow('Original', resized)
     cv2.imshow('Patterned Border', patterned_border)
     cv2.waitKey(3000)
     cv2.destroyAllWindows()
@@ -363,7 +357,7 @@ def main():
     elif args.filter == 'vignette':
         result = apply_vignette(image, args.strength)
     elif args.filter == 'pixelate':
-        result = pixelate_region(image)
+        result = interactive_pixelation(image)
     elif args.filter == 'solid_border':
         result = add_solid_border(image, args.border_width, tuple(args.border_color))
     elif args.filter == 'patterned_border':
@@ -387,4 +381,3 @@ if __name__ == "__main__":
         main()
     else:
         demonstrate_filters()
-
