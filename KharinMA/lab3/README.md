@@ -175,7 +175,7 @@ python main.py --data_dir NNClassification --train_file train.txt --test_file te
 
 **Визуализация SIFT-ключевых точек:**
 ```bash
-python main.py --visualize "NNClassification/ExtDataset/01_NizhnyNovgorodKremlin/DSC_3184.jpg"
+python main.py --visualize "NNClassification/ExtDataset/01_NizhnyNovgorodKremlin/1e1f8c18-6a6b-41e5-bd48-abb3be5e388a.jpg" --visualize_output sift_visualization.jpg
 ```
 
 ---
