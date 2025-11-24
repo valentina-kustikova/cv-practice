@@ -16,6 +16,7 @@ from PyQt5.QtCore import Qt, QUrl
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QColor, QDesktopServices
 
 from .filters import ImageFilter
+from .processors import FilterProcessor, ColorConverter
 
 
 class ImageViewer(QLabel):
@@ -42,16 +43,21 @@ class ImageViewer(QLabel):
             return
 
         if len(image.shape) == 3:
-            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            rgb_image = ColorConverter.bgr_to_rgb(image)
+            # Ensure contiguous array for QImage
+            rgb_image = np.ascontiguousarray(rgb_image)
         else:
             rgb_image = image
+            if not rgb_image.flags['C_CONTIGUOUS']:
+                rgb_image = np.ascontiguousarray(rgb_image)
 
         height, width = rgb_image.shape[:2]
-        bytes_per_line = 3 * width if len(rgb_image.shape) == 3 else width
-
+        
         if len(rgb_image.shape) == 2:
+            bytes_per_line = width
             q_image = QImage(rgb_image.data, width, height, bytes_per_line, QImage.Format_Grayscale8)
         else:
+            bytes_per_line = 3 * width
             q_image = QImage(rgb_image.data, width, height, bytes_per_line, QImage.Format_RGB888)
 
         pixmap = QPixmap.fromImage(q_image)
@@ -478,29 +484,36 @@ class FilterWindow(QMainWindow):
         height, width = image.shape[:2]
 
         if image.ndim == 2:
+            if not image.flags['C_CONTIGUOUS']:
+                image = np.ascontiguousarray(image)
+            bytes_per_line = width
             q_image = QImage(
                 image.data,
                 width,
                 height,
-                image.strides[0],
+                bytes_per_line,
                 QImage.Format_Grayscale8
             )
         elif image.shape[2] == 3:
-            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            rgb_image = ColorConverter.bgr_to_rgb(image)
+            rgb_image = np.ascontiguousarray(rgb_image)
+            bytes_per_line = 3 * width
             q_image = QImage(
                 rgb_image.data,
                 width,
                 height,
-                rgb_image.strides[0],
+                bytes_per_line,
                 QImage.Format_RGB888
             )
         else:
-            rgba_image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGBA)
+            rgba_image = ColorConverter.bgra_to_rgba(image)
+            rgba_image = np.ascontiguousarray(rgba_image)
+            bytes_per_line = 4 * width
             q_image = QImage(
                 rgba_image.data,
                 width,
                 height,
-                rgba_image.strides[0],
+                bytes_per_line,
                 QImage.Format_RGBA8888
             )
 
@@ -976,99 +989,13 @@ class FilterWindow(QMainWindow):
 
     def _apply_filter_to_image(self, image: np.ndarray) -> np.ndarray:
         """Applies filter to image"""
-        if self.current_filter == "Nearest Neighbour Interpolation":
-            scale = self.filter_params.get("scale_factor", 2)
-            return ImageFilter.apply_Nearest_Neighbor_interpolation(image, scale)
-
-        elif self.current_filter == "Bilinear interpolation":
-            scale = self.filter_params.get("scale_factor", 2)
-            return ImageFilter.apply_Bilinear_interpolation(image, scale)
-
-        elif self.current_filter == "Linear resize":
-            new_width = self.filter_params.get("new_width")
-            new_height = self.filter_params.get("new_height")
-            if new_width is None or new_height is None:
-                h, w = image.shape[:2]
-                new_width = w
-                new_height = h
-            return ImageFilter.apply_linear_resize(image, new_height, new_width)
-
-        elif self.current_filter == "sepia":
-            return ImageFilter.apply_sepia(image)
-
-        elif self.current_filter == "vignette":
-            intensity = self.filter_params.get("intensity", 70) / 100.0
-            radius = self.filter_params.get("radius", 50) / 100.0
-            center_x = self.filter_params.get("center_x")
-            center_y = self.filter_params.get("center_y")
-            if center_x is None or center_y is None:
-                height, width = image.shape[:2]
-                center_x = width // 2
-                center_y = height // 2
-            return ImageFilter.apply_vignette(image, intensity, radius, center_x, center_y)
-
-        elif self.current_filter == "pixelation":
-            return ImageFilter.apply_pixelation(
-                image,
-                self.filter_params.get("x", 0),
-                self.filter_params.get("y", 0),
-                self.filter_params.get("width", 100),
-                self.filter_params.get("height", 100),
-                self.filter_params.get("pixel_size", 10)
-            )
-
-        elif self.current_filter == "frame_simple":
-            color = (
-                int(self.filter_params.get("frame_color_r", 0)) % 256,
-                int(self.filter_params.get("frame_color_g", 0)) % 256,
-                int(self.filter_params.get("frame_color_b", 0)) % 256,
-            )
-            return ImageFilter.apply_frame_simple(
-                image,
-                self.filter_params.get("frame_width", 10),
-                color
-            )
-
-        elif self.current_filter == "frame_curvy":
-            color = (
-                int(self.filter_params.get("frame_color_r", 0)) % 256,
-                int(self.filter_params.get("frame_color_g", 0)) % 256,
-                int(self.filter_params.get("frame_color_b", 0)) % 256,
-            )
-            if self.use_overlay_for_frame and self.overlay_image is not None:
-                return ImageFilter.apply_overlay(image, self.overlay_image)
-            return ImageFilter.apply_frame_curvy(
-                image,
-                self.filter_params.get("frame_width", 10),
-                "wave",
-                color
-            )
-
-        elif self.current_filter == "glare":
-            h, w = image.shape[:2]
-            center_x = self.filter_params.get("center_x", w // 2)
-            center_y = self.filter_params.get("center_y", h // 2)
-            radius = self.filter_params.get("radius", 100)
-            intensity = self.filter_params.get("intensity", 50) / 100.0
-            if self.overlay_image is not None:
-                return ImageFilter.apply_overlay_centered(
-                    image,
-                    self.overlay_image,
-                    center_x,
-                    center_y,
-                    intensity=intensity,
-                    scale=self.filter_params.get("overlay_scale", 100) / 100.0
-                )
-            return ImageFilter.apply_glare(image, center_x, center_y, radius, intensity)
-
-        elif self.current_filter == "watercolor_texture":
-            intensity = self.filter_params.get("texture_intensity", 30) / 100.0
-            return ImageFilter.apply_watercolor_texture(image, intensity, self.overlay_image)
-
-        elif self.current_filter == "overlay_alpha":
-            return ImageFilter.apply_overlay(image, self.overlay_image)
-
-        return image
+        return FilterProcessor.apply_filter(
+            image,
+            self.current_filter,
+            self.filter_params,
+            self.overlay_image,
+            self.use_overlay_for_frame
+        )
 
     def _update_image_info(self):
         """Updates information labels for images"""

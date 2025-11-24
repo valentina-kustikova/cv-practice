@@ -1,5 +1,5 @@
 """
-Точка входа для приложения библиотеки фильтров изображений
+Entry point for the image filters library application
 """
 import sys
 from image_filters.gui import run_app

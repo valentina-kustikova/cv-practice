@@ -1,14 +1,125 @@
 """
-Image filters module using OpenCV
+Image filters module using numpy
 """
-import cv2
 import numpy as np
 from math import floor
 from typing import Tuple, Optional
 
+from .processors import ColorConverter
 
-# TODO: Check all functions and methods for using restricted cv2 functions and replace them.
-# TODO: Move apply_overlay* functionlity into methods or move it to separate module.
+
+def _draw_line_numpy(image: np.ndarray, pt1: Tuple[int, int], pt2: Tuple[int, int], 
+                     color: Tuple[int, int, int], thickness: int):
+    """Draws a line on image using numpy"""
+    x1, y1 = pt1
+    x2, y2 = pt2
+    h, w = image.shape[:2]
+    
+    # Bresenham's line algorithm
+    dx = abs(x2 - x1)
+    dy = abs(y2 - y1)
+    sx = 1 if x1 < x2 else -1
+    sy = 1 if y1 < y2 else -1
+    err = dx - dy
+    
+    x, y = x1, y1
+    half_thickness = thickness // 2
+    
+    while True:
+        # Draw thick line by filling a square around each point
+        for dy_offset in range(-half_thickness, half_thickness + 1):
+            for dx_offset in range(-half_thickness, half_thickness + 1):
+                px = x + dx_offset
+                py = y + dy_offset
+                if 0 <= px < w and 0 <= py < h:
+                    if image.ndim == 2:
+                        # For grayscale, use average of color channels or first channel
+                        gray_value = int(np.mean(color)) if len(color) > 0 else 0
+                        image[py, px] = gray_value
+                    else:
+                        image[py, px] = color
+        
+        if x == x2 and y == y2:
+            break
+        
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x += sx
+        if e2 < dx:
+            err += dx
+            y += sy
+
+
+def _draw_polyline_numpy(image: np.ndarray, points: np.ndarray, color: Tuple[int, int, int], thickness: int):
+    """Draws a polyline on image using numpy"""
+    if len(points) < 2:
+        return
+    
+    for i in range(len(points) - 1):
+        pt1 = tuple(points[i])
+        pt2 = tuple(points[i + 1])
+        _draw_line_numpy(image, pt1, pt2, color, thickness)
+
+
+def _draw_rectangle_numpy(image: np.ndarray, pt1: Tuple[int, int], pt2: Tuple[int, int],
+                         color: Tuple[int, int, int], thickness: int):
+    """Draws a rectangle on image using numpy"""
+    x1, y1 = pt1
+    x2, y2 = pt2
+    h, w = image.shape[:2]
+    
+    x1, x2 = min(x1, x2), max(x1, x2)
+    y1, y2 = min(y1, y2), max(y1, y2)
+    
+    # Clamp to image bounds
+    x1 = max(0, min(x1, w - 1))
+    x2 = max(0, min(x2, w - 1))
+    y1 = max(0, min(y1, h - 1))
+    y2 = max(0, min(y2, h - 1))
+    
+    if thickness > 0:
+        # Draw four edges
+        # Top edge
+        for x in range(x1, x2 + 1):
+            for t in range(thickness):
+                y = y1 + t
+                if 0 <= y < h and 0 <= x < w:
+                    if image.ndim == 2:
+                        image[y, x] = color[0] if len(color) > 0 else 0
+                    else:
+                        image[y, x] = color
+        
+        # Bottom edge
+        for x in range(x1, x2 + 1):
+            for t in range(thickness):
+                y = y2 - t
+                if 0 <= y < h and 0 <= x < w:
+                    if image.ndim == 2:
+                        image[y, x] = color[0] if len(color) > 0 else 0
+                    else:
+                        image[y, x] = color
+        
+        # Left edge
+        for y in range(y1, y2 + 1):
+            for t in range(thickness):
+                x = x1 + t
+                if 0 <= y < h and 0 <= x < w:
+                    if image.ndim == 2:
+                        image[y, x] = color[0] if len(color) > 0 else 0
+                    else:
+                        image[y, x] = color
+        
+        # Right edge
+        for y in range(y1, y2 + 1):
+            for t in range(thickness):
+                x = x2 - t
+                if 0 <= y < h and 0 <= x < w:
+                    if image.ndim == 2:
+                        image[y, x] = color[0] if len(color) > 0 else 0
+                    else:
+                        image[y, x] = color
+
 
 class ImageFilter:
     """Base class for image filters"""
@@ -98,135 +209,6 @@ class ImageFilter:
         return result
 
     @staticmethod
-    def apply_overlay(image: np.ndarray, overlay: Optional[np.ndarray]) -> np.ndarray:
-        """Overlays external image using its alpha channel when available (used in frame_curvy and glare filters)"""
-        if image is None:
-            raise ValueError("Input image must not be None")
-        if overlay is None:
-            return image.copy()
-
-        base = image
-        overlay_image = overlay
-
-        overlay_channels = overlay_image.shape[2]
-        base_channels = base.shape[2]
-
-        target_size = (base.shape[1], base.shape[0])
-        if overlay_image.shape[:2] != base.shape[:2]:
-            overlay_image = ImageFilter.apply_linear_resize(
-                overlay_image,
-                base.shape[0],
-                base.shape[1]
-            )
-
-        overlay_alpha_channel: Optional[np.ndarray] = None
-        if overlay_channels == 3:
-            overlay_bgr = overlay_image.astype(np.float32)
-            alpha = np.ones((base.shape[0], base.shape[1], 1), dtype=np.float32)
-        else:
-            overlay_bgr = overlay_image[..., :3].astype(np.float32)
-            alpha_channel = overlay_image[..., 3].astype(np.float32) / 255.0
-            alpha = alpha_channel[..., np.newaxis]
-            overlay_alpha_channel = alpha_channel
-
-        base_bgr = base[..., :3].astype(np.float32)
-
-        blended = overlay_bgr * alpha + base_bgr * (1.0 - alpha)
-        blended = np.clip(blended, 0, 255).astype(np.uint8)
-
-        if base_channels == 1:
-            return cv2.cvtColor(blended, cv2.COLOR_BGR2GRAY)
-
-        if base_channels == 4:
-            base_alpha = base[..., 3].astype(np.float32) / 255.0
-            if overlay_alpha_channel is not None:
-                out_alpha = np.clip(overlay_alpha_channel + (1.0 - overlay_alpha_channel) * base_alpha, 0.0, 1.0)
-            else:
-                out_alpha = base_alpha
-            out_alpha = (out_alpha * 255.0).astype(np.uint8)
-            return np.dstack((blended, out_alpha))
-
-        return blended
-
-    @staticmethod
-    def apply_overlay_centered(image: np.ndarray,
-                               overlay: Optional[np.ndarray],
-                               center_x: int,
-                               center_y: int,
-                               intensity: float = 1.0,
-                               scale: float = 1.0) -> np.ndarray:
-        """Overlays external image centered at given coordinates without stretching"""
-        if image is None:
-            raise ValueError("Input image must not be None")
-        if overlay is None:
-            return image.copy()
-
-        if intensity <= 0:
-            return image.copy()
-
-        base = image.astype(np.float32)
-        h, w = base.shape[:2]
-
-        overlay_image = overlay
-        if overlay_image.shape[2] == 3:
-            alpha_plain = np.full(overlay_image.shape[:2], 255, dtype=overlay_image.dtype)
-            overlay_image = np.dstack((overlay_image, alpha_plain))
-
-        overlay_image = overlay_image.astype(np.float32)
-
-        if scale != 1.0 and scale > 0:
-            new_width = max(1, int(round(overlay_image.shape[1] * scale)))
-            new_height = max(1, int(round(overlay_image.shape[0] * scale)))
-            overlay_image = ImageFilter.apply_linear_resize(overlay_image, new_height, new_width)
-
-        overlay_h, overlay_w = overlay_image.shape[:2]
-
-        center_x = int(np.clip(center_x, 0, w - 1))
-        center_y = int(np.clip(center_y, 0, h - 1))
-
-        half_w = overlay_w // 2
-        half_h = overlay_h // 2
-
-        x1 = center_x - half_w
-        y1 = center_y - half_h
-        x2 = x1 + overlay_w
-        y2 = y1 + overlay_h
-
-        base_x1 = max(0, x1)
-        base_y1 = max(0, y1)
-        base_x2 = min(w, x2)
-        base_y2 = min(h, y2)
-
-        overlay_x1 = base_x1 - x1
-        overlay_y1 = base_y1 - y1
-        overlay_x2 = overlay_x1 + (base_x2 - base_x1)
-        overlay_y2 = overlay_y1 + (base_y2 - base_y1)
-
-        if base_x1 >= base_x2 or base_y1 >= base_y2:
-            return image.copy()
-
-        overlay_region = overlay_image[overlay_y1:overlay_y2, overlay_x1:overlay_x2]
-        overlay_rgb = overlay_region[..., :3]
-        overlay_alpha = (overlay_region[..., 3] / 255.0) * np.clip(intensity, 0.0, 1.0)
-
-        if base.ndim == 2:
-            base_rgb = cv2.cvtColor(base, cv2.COLOR_GRAY2BGR)
-        else:
-            base_rgb = base.copy()
-
-        base_subregion = base_rgb[base_y1:base_y2, base_x1:base_x2]
-
-        blended_region = overlay_rgb * overlay_alpha[..., np.newaxis] + base_subregion * (1.0 - overlay_alpha[..., np.newaxis])
-        base_rgb[base_y1:base_y2, base_x1:base_x2] = blended_region
-
-        result = np.clip(base_rgb, 0, 255).astype(np.uint8)
-
-        if base.ndim == 2:
-            result = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
-
-        return result
-
-    @staticmethod
     def apply_sepia(image: np.ndarray) -> np.ndarray:
         """Applies sepia effect"""
         if image is None:
@@ -296,22 +278,24 @@ class ImageFilter:
                         x: int, y: int, width: int, height: int,
                         pixel_size: int = 10) -> np.ndarray:
         """Pixelates rectangular area"""
+
         if image is None:
             raise ValueError("Input image must not be None")
 
         h, w = image.shape[:2]
         pixel_size = max(1, int(pixel_size))
 
-        # Допуская плохие входные данные, приводим координаты к допустимым диапазонам.
         x = max(0, min(w - 1, int(x)))
         y = max(0, min(h - 1, int(y)))
         width = max(1, int(width))
         height = max(1, int(height))
 
-        # Гарантия того, что правая и нижняя границы не выходят за пределы изображения
-        # а также регион содержит минимум один пиксель.
         x_end = max(x + 1, min(w, x + width))
         y_end = max(y + 1, min(h, y + height))
+
+        # Save original coordinates for final assignment
+        roi_x_end = x_end
+        roi_y_end = y_end
 
         roi = image[y:y_end, x:x_end]
         if roi.size == 0:
@@ -326,30 +310,29 @@ class ImageFilter:
         block_h = roi_h / down_h
         block_w = roi_w / down_w
 
-        for i in range(down_h):    # усредняем блоки для понижения разрешения
+        for i in range(down_h):
             for j in range(down_w):
                 y_start = int(round(i * block_h))
-                y_block_end = int(round((i + 1) * block_h))
+                block_y_end = int(round((i + 1) * block_h))
                 x_start = int(round(j * block_w))
-                x_block_end = int(round((j + 1) * block_w))
+                block_x_end = int(round((j + 1) * block_w))
 
-                y_block_end = min(y_block_end, roi_h)
-                x_block_end = min(x_block_end, roi_w)
-                if y_block_end <= y_start:
-                    y_block_end = min(y_start + 1, roi_h)
-                if x_block_end <= x_start:
-                    x_block_end = min(x_start + 1, roi_w)
+                block_y_end = min(block_y_end, roi_h)
+                block_x_end = min(block_x_end, roi_w)
+                if block_y_end <= y_start:
+                    block_y_end = min(y_start + 1, roi_h)
+                if block_x_end <= x_start:
+                    block_x_end = min(x_start + 1, roi_w)
                 y_start = max(0, min(y_start, roi_h - 1))
                 x_start = max(0, min(x_start, roi_w - 1))
 
-                block = roi[y_start:y_block_end, x_start:x_block_end]
+                block = roi[y_start:block_y_end, x_start:block_x_end]
                 if block.size == 0:
                     continue
                 reduced[i, j] = block.mean(axis=(0, 1))
 
-        # zeros_like, чтобы поддерживать BGR и Grayscale.
         pixelated = np.zeros_like(roi)
-        for i in range(roi_h):    # растягиваем усреднённые блоки обратно
+        for i in range(roi_h):
             for j in range(roi_w):
                 src_i = int(i / block_h)
                 src_j = int(j / block_w)
@@ -358,7 +341,7 @@ class ImageFilter:
                 pixelated[i, j] = reduced[src_i, src_j]
 
         result = image.copy()
-        result[y:y_end, x:x_end] = np.clip(pixelated, 0, 255).astype(np.uint8)
+        result[y:roi_y_end, x:roi_x_end] = np.clip(pixelated, 0, 255).astype(np.uint8)
         return result
 
     @staticmethod
@@ -381,13 +364,13 @@ class ImageFilter:
 
         fw = min(frame_width, h // 2 + (h % 2), w // 2 + (w % 2))
 
-        # верхняя полоса
+        # top stripe
         result[:fw, :] = color
-        # нижняя полоса
+        # bottom stripe
         result[h - fw:h, :] = color
-        # левая полоса
+        # left stripe
         result[:, :fw] = color
-        # правая полоса
+        # right stripe
         result[:, w - fw:w] = color
 
         return result
@@ -435,12 +418,12 @@ class ImageFilter:
             left_points = np.array(left_points, dtype=np.int32)
             right_points = np.array(right_points, dtype=np.int32)
 
-            cv2.polylines(overlay, [top_points], False, color, thickness=frame_width)
-            cv2.polylines(overlay, [bottom_points], False, color, thickness=frame_width)
-            cv2.polylines(overlay, [left_points], False, color, thickness=frame_width)
-            cv2.polylines(overlay, [right_points], False, color, thickness=frame_width)
+            _draw_polyline_numpy(overlay, top_points, color, frame_width)
+            _draw_polyline_numpy(overlay, bottom_points, color, frame_width)
+            _draw_polyline_numpy(overlay, left_points, color, frame_width)
+            _draw_polyline_numpy(overlay, right_points, color, frame_width)
         else:
-            cv2.rectangle(overlay, (0, 0), (w - 1, h - 1), color, thickness=frame_width)
+            _draw_rectangle_numpy(overlay, (0, 0), (w - 1, h - 1), color, frame_width)
 
         return overlay
 
@@ -484,13 +467,12 @@ class ImageFilter:
         if texture_intensity == 0 or texture_image is None:
             raise ValueError("Texture overlay is required for watercolor texture")
 
-        smooth = cv2.bilateralFilter(image, d=9, sigmaColor=50, sigmaSpace=50)
         h, w = image.shape[:2]
 
         overlay = texture_image
 
         if overlay.ndim == 2:
-            texture_bgr = cv2.cvtColor(overlay, cv2.COLOR_GRAY2BGR)
+            texture_bgr = ColorConverter.gray_to_bgr(overlay)
             alpha_channel = None
         elif overlay.shape[2] == 3:
             texture_bgr = overlay[..., :3]
@@ -507,21 +489,21 @@ class ImageFilter:
         texture_bgr = texture_bgr.astype(np.float32)
 
         if alpha_channel is None:
-            alpha_channel = cv2.cvtColor(texture_bgr.astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+            alpha_channel = ColorConverter.bgr_to_gray(texture_bgr.astype(np.uint8)).astype(np.float32) / 255.0
 
         alpha_map = np.clip(alpha_channel * texture_intensity, 0.0, 1.0)
         if image.ndim == 3:
             alpha_map = alpha_map[..., np.newaxis]
 
         if image.ndim == 2:
-            smooth_bgr = cv2.cvtColor(smooth, cv2.COLOR_GRAY2BGR).astype(np.float32)
+            image_bgr = ColorConverter.gray_to_bgr(image).astype(np.float32)
         else:
-            smooth_bgr = smooth.astype(np.float32)
+            image_bgr = image.astype(np.float32)
 
-        blended = smooth_bgr * (1.0 - alpha_map) + texture_bgr * alpha_map
+        blended = image_bgr * (1.0 - alpha_map) + texture_bgr * alpha_map
         blended = np.clip(blended, 0, 255).astype(np.uint8)
 
         if image.ndim == 2:
-            return cv2.cvtColor(blended, cv2.COLOR_BGR2GRAY)
+            return ColorConverter.bgr_to_gray(blended)
 
         return blended
