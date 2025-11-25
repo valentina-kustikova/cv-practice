@@ -1,0 +1,21 @@
+{
+  "algorithm": "nn",
+  "created_at": "2025-11-19T00:28:59.432786",
+  "parameters": {
+    "detector": "SIFT",
+    "vocab_size": 50,
+    "epochs": 5,
+    "batch_size": 32,
+    "lr": 0.001,
+    "device": "auto"
+  },
+  "data_info": {
+    "train_split": "data/train.txt",
+    "test_split": "data/test.txt",
+    "data_path": "./data"
+  },
+  "performance": {
+    "accuracy": 0.9942857142857143,
+    "test_accuracy": null
+  }
+}
