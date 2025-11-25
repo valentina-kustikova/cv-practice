@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 import math
 
-# Глобальные переменные для интерактивной пикселизации
 drawing = False
 ix, iy = -1, -1
 fx, fy = -1, -1
