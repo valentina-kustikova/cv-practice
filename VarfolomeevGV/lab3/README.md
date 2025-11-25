@@ -151,8 +151,8 @@ python main.py --mode train --algorithm nn --nn_epochs 30 --nn_batch_size 32
 
 <table>
   <tr>
-    <td><img src="results/algorithm_comparison.png" alt="Сравнение алгоритмов" width="450"/></td>
-    <td><img src="results/nn_training_history.png" alt="История обучения нейросети" width="450"/></td>
+    <td><img src="https://raw.githubusercontent.com/valentina-kustikova/cv-practice/275b7197df8b6a05b81cdb571e9201174ce12365/VarfolomeevGV/lab3/results/algorithm_comparison.png" alt="Сравнение алгоритмов" width="450"/></td>
+    <td><img src="https://raw.githubusercontent.com/valentina-kustikova/cv-practice/275b7197df8b6a05b81cdb571e9201174ce12365/VarfolomeevGV/lab3/results/nn_training_history.png" alt="История обучения нейросети" width="450"/></td>
   </tr>
   <tr>
     <td align="center"><b>Сравнение метрик алгоритмов</b></td>
@@ -164,8 +164,8 @@ python main.py --mode train --algorithm nn --nn_epochs 30 --nn_batch_size 32
 
 <table>
   <tr>
-    <td><img src="results/bow_confusion_matrix.png" alt="Матрица ошибок - Мешок слов" width="450"/></td>
-    <td><img src="results/nn_confusion_matrix.png" alt="Матрица ошибок - Нейросеть" width="450"/></td>
+    <td><img src="https://raw.githubusercontent.com/valentina-kustikova/cv-practice/275b7197df8b6a05b81cdb571e9201174ce12365/VarfolomeevGV/lab3/results/bow_confusion_matrix.png" alt="Матрица ошибок - Мешок слов" width="450"/></td>
+    <td><img src="https://raw.githubusercontent.com/valentina-kustikova/cv-practice/275b7197df8b6a05b81cdb571e9201174ce12365/VarfolomeevGV/lab3/results/nn_confusion_matrix.png" alt="Матрица ошибок - Нейросеть" width="450"/></td>
   </tr>
   <tr>
     <td align="center"><b>Мешок слов (BoW)</b></td>
