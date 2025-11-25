@@ -1,0 +1,36 @@
+# Данные
+NNClassification/
+
+# Тренировочная выборка
+train.txt
+
+# Модели
+models/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Виртуальное окружение
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Операционная система
+.DS_Store
+Thumbs.db
+
+# Результаты (опционально, можно раскомментировать если не нужно коммитить результаты)
+# results/
+
