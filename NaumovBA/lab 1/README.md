@@ -1,21 +1,20 @@
-Детальное описание алгоритмов
-1. Изменение размера изображения
-Функция: resize_image(image, new_width, new_height, interpolation='nearest')
+# Детальное описание алгоритмов
 
-Входные параметры:
-image: исходное изображение (numpy array H×W×C)
+## 1. Изменение размера изображения
+**Функция:** `resize_image(image, new_width, new_height, interpolation='nearest')`
 
-new_width, new_height: целевые размеры
+### Входные параметры:
+- `image` - исходное изображение (numpy array H×W×C)
+- `new_width`, `new_height` - целевые размеры
+- `interpolation` - метод интерполяции (`'nearest'` или `'bilinear'`)
 
-interpolation: метод интерполяции ('nearest' или 'bilinear')
+### Выходные данные:
+- Изображение нового размера (numpy array)
 
-Выходные данные:
-Изображение нового размера (numpy array)
+### Алгоритм работы:
+**Метод ближайшего соседа:**
 
-Алгоритм работы:
-Метод ближайшего соседа:
-
-python
+```python
 scale_x = w / new_width
 scale_y = h / new_height
 for y in range(new_height):
@@ -23,9 +22,11 @@ for y in range(new_height):
         src_x = min(int(x * scale_x), w - 1)
         src_y = min(int(y * scale_y), h - 1)
         resized[y, x] = image[src_y, src_x]
-Билинейная интерполяция:
+```
 
-python
+**Билинейная интерполяция:**
+
+```python
 src_x = x * scale_x
 src_y = y * scale_y
 x1, y1 = int(src_x), int(src_y)
@@ -36,60 +37,63 @@ for c in range(3):
     a = image[y1, x1, c] * (1 - wx) + image[y1, x2, c] * wx
     b = image[y2, x1, c] * (1 - wx) + image[y2, x2, c] * wx
     resized[y, x, c] = a * (1 - wy) + b * wy
-Сложность: O(new_width × new_height × channels)
+```
+### Сложность: O(new_width × new_height × channels)
 
-2. Сепия фильтр
-Функция: apply_sepia(image, intensity=1.0)
+## 2. Сепия фильтр
+**Функция:** ` apply_sepia(image, intensity=1.0) `
 
-Входные параметры:
-image: исходное изображение
+### Входные параметры:
+- `image`: исходное изображение
+- `intensity`: интенсивность эффекта (0.1-2.0)
 
-intensity: интенсивность эффекта (0.1-2.0)
+### Выходные данные:
+- Изображение с сепия-эффектом
 
-Выходные данные:
-Изображение с сепия-эффектом
+### Алгоритм работы:
+**Матрица преобразования:**
 
-Алгоритм работы:
-Матрица преобразования:
-
-python
+```python
 sepia_filter = np.array([
     [0.393, 0.769, 0.189],  # Красный канал
     [0.349, 0.686, 0.168],  # Зеленый канал  
     [0.272, 0.534, 0.131]   # Синий канал
 ])
-Преобразование пикселей:
+```
 
-python
+**Преобразование пикселей:**
+
+```python
 for y in range(image.shape[0]):
     for x in range(image.shape[1]):
         pixel = image[y, x].astype(np.float32)
         new_pixel = np.dot(sepia_filter, pixel)
         new_pixel = np.clip(new_pixel * intensity, 0, 255)
         result[y, x] = new_pixel
-Математическая основа: Линейное преобразование цветового пространства RGB для создания "винтажного" эффекта.
+```
+**Математическая основа: Линейное преобразование цветового пространства RGB для создания "винтажного" эффекта.**
 
-3. Эффект виньетки
-Функция: apply_vignette(image, strength=0.8)
+## 3. Эффект виньетки
+**Функция:** ` apply_vignette(image, strength=0.8)`
 
-Входные параметры:
-image: исходное изображение
+### Входные параметры:
+- `image`: исходное изображение
+- `strength`: сила затемнения (0.1-1.0)
 
-strength: сила затемнения (0.1-1.0)
+### Выходные данные:
+- Изображение с эффектом виньетки
 
-Выходные данные:
-Изображение с эффектом виньетки
+### Алгоритм работы:
+**Инициализация:**
 
-Алгоритм работы:
-Инициализация:
-
-python
+```python
 h, w = image.shape[:2]
 center_x, center_y = w // 2, h // 2
 max_distance = math.sqrt(center_x**2 + center_y**2)
-Расчет затемнения:
+```
+**Расчет затемнения:**
 
-python
+```python
 for y in range(h):
     for x in range(w):
         distance = math.sqrt((x - center_x)**2 + (y - center_y)**2)
@@ -98,34 +102,33 @@ for y in range(h):
         
         for c in range(3):
             result[y, x, c] = image[y, x, c] * vignette
-Физическая интерпретация: Имитация оптического явления падения освещенности к краям кадра.
+```
+**Физическая интерпретация: Имитация оптического явления падения освещенности к краям кадра.**
 
-4. Пикселизация области
-Функция: pixelate_region(image, x, y, width, height, pixel_size=10)
+## 4. Пикселизация области
+**Функция:** ` pixelate_region(image, x, y, width, height, pixel_size=10)`
 
-Входные параметры:
-image: исходное изображение
+### Входные параметры:
+- `image`: исходное изображение
+- `x`, `y`: координаты области 
+- `width`, `height`: размеры области
+- `pixel_size`: размер блока пикселизации
 
-x, y: координаты области
+### Выходные данные:
+- Изображение с пикселизированной областью
 
-width, height: размеры области
+### Алгоритм работы:
+**Корректировка границ:**
 
-pixel_size: размер блока пикселизации
-
-Выходные данные:
-Изображение с пикселизированной областью
-
-Алгоритм работы:
-Корректировка границ:
-
-python
+```python
 x = max(0, min(x, image.shape[1] - 1))
 y = max(0, min(y, image.shape[0] - 1))
 width = min(width, image.shape[1] - x)
 height = min(height, image.shape[0] - y)
-Блочная обработка:
+```
+**Блочная обработка:**
 
-python
+```python
 for block_y in range(y, y + height, pixel_size):
     for block_x in range(x, x + width, pixel_size):
         block_end_y = min(block_y + pixel_size, y + height)
@@ -135,49 +138,50 @@ for block_y in range(y, y + height, pixel_size):
         if block.size > 0:
             avg_color = np.mean(block, axis=(0, 1))
             result[block_y:block_end_y, block_x:block_end_x] = avg_color
-5. Простая рамка
-Функция: add_border(image, border_width, color=(0, 0, 0))
+```
 
-Входные параметры:
-image: исходное изображение
+## 5. Простая рамка
+**Функция:** ` add_border(image, border_width, color=(0, 0, 0))`
 
-border_width: толщина рамки
+### Входные параметры:
+- `image`: исходное изображение
+- `border_width`: толщина рамки
+- `color`: цвет рамки (BGR)
 
-color: цвет рамки (BGR)
+### Выходные данные:
+- Изображение с рамкой
 
-Выходные данные:
-Изображение с рамкой
-
-Алгоритм работы:
-python
+### Алгоритм работы:
+```python
 h, w = image.shape[:2]
 new_h = h + 2 * border_width
 new_w = w + 2 * border_width
 
 bordered = np.full((new_h, new_w, image.shape[2]), color, dtype=image.dtype)
 bordered[border_width:border_width+h, border_width:border_width+w] = image
-6. Фигурная рамка
-Функция: add_fancy_border(image, border_width=20, color=(0, 0, 0))
+```
+## 6. Фигурная рамка
+**Функция:** ` add_fancy_border(image, border_width=20, color=(0, 0, 0))`
 
-Входные параметры:
-image: исходное изображение
+## Входные параметры:
+- `image`: исходное изображение
+- `border_width`: толщина рамки
+- `color`: цвет рамки
 
-border_width: толщина рамки
+## Выходные данные:
+- Изображение с волнистой рамкой
 
-color: цвет рамки
+## Алгоритм работы:
+**Параметры волны:**
 
-Выходные данные:
-Изображение с волнистой рамкой
-
-Алгоритм работы:
-Параметры волны:
-
-python
+```python
 amplitude = border_width // 3
 frequency = 0.1
-Генерация маски:
+```
 
-python
+**Генерация маски:**
+
+```python
 # Верхняя и нижняя границы
 for x in range(new_w):
     wave_offset_top = int(amplitude * math.sin(x * frequency))
@@ -197,9 +201,10 @@ for y in range(new_h):
     wave_offset_right = int(amplitude * math.sin(y * frequency + math.pi))
     x_right = w + border_width - wave_offset_right
     mask[y, x_right:] = 1
-Применение маски:
+```
+**Применение маски:**
 
-python
+```python
 for y in range(new_h):
     for x in range(new_w):
         if mask[y, x] == 1:
@@ -209,33 +214,32 @@ for y in range(new_h):
             src_x = x - border_width
             if 0 <= src_y < h and 0 <= src_x < w:
                 bordered[y, x] = image[src_y, src_x]
-7. Эффект бликов
-Функция: add_lens_flare(image, position, size=50, intensity=0.7)
+```
+## 7. Эффект бликов
+**Функция:** ` add_lens_flare(image, position, size=50, intensity=0.7)`
 
-Входные параметры:
-image: исходное изображение
+### Входные параметры:
+- `image`: исходное изображение
+- `position`: координаты центра (x, y)
+- `size`: размер области
+- `intensity`: интенсивность
 
-position: координаты центра (x, y)
+### Выходные данные:
+- Изображение с эффектом бликов
 
-size: размер области
+### Алгоритм работы:
+**Система бликов:**
 
-intensity: интенсивность
-
-Выходные данные:
-Изображение с эффектом бликов
-
-Алгоритм работы:
-Система бликов:
-
-python
+```python
 flares = [
     (size, intensity, position),
     (size*0.7, intensity*0.6, (position[0]-size//2, position[1]-size//2)),
     (size*0.4, intensity*0.4, (position[0]+size//3, position[1]+size//3))
 ]
-Гауссово распределение:
+```
+**Гауссово распределение:**
 
-python
+```python
 for flare_size, flare_intensity, flare_pos in flares:
     flare_x = min(max(flare_pos[0], 0), w-1)
     flare_y = min(max(flare_pos[1], 0), h-1)
@@ -249,21 +253,22 @@ for flare_size, flare_intensity, flare_pos in flares:
                 
                 for c in range(3):
                     result[y, x, c] = min(255, result[y, x, c] + flare_value * 255)
-8. Текстура акварельной бумаги
-Функция: apply_watercolor_paper(image, texture_intensity=0.3)
+```
 
-Входные параметры:
-image: исходное изображение
+## 8. Текстура акварельной бумаги
+**Функция:** ` apply_watercolor_paper(image, texture_intensity=0.3)`
 
-texture_intensity: интенсивность текстуры
+### Входные параметры:
+- `image`: исходное изображение
+- `texture_intensity`: интенсивность текстуры
 
-Выходные данные:
-Изображение с текстурой бумаги
+### Выходные данные:
+- Изображение с текстурой бумаги
 
-Алгоритм работы:
-Генерация текстуры:
+### Алгоритм работы:
+**Генерация текстуры:**
 
-python
+```python
 def generate_paper_texture(height, width):
     texture = np.zeros((height, width))
     
@@ -278,9 +283,10 @@ def generate_paper_texture(height, width):
                 texture[y, x] += value * amplitude
     
     return (texture - texture.min()) / (texture.max() - texture.min())
-Наложение текстуры:
+```
+**Наложение текстуры:**
 
-python
+```python
 for y in range(h):
     for x in range(w):
         texture_value = paper_texture[y, x]
@@ -288,20 +294,18 @@ for y in range(h):
             blended = result[y, x, c] * (1 - texture_intensity) + \
                      result[y, x, c] * texture_value * texture_intensity
             result[y, x, c] = blended
-Интерактивная пикселизация
-Функция: interactive_pixelation(original_image)
+```
+## Интерактивная пикселизация
+**Функция:** ` interactive_pixelation(original_image)`
 
 Управление:
-ЛКМ: Выделение области для пикселизации
+- ЛКМ: Выделение области для пикселизации
+- r: Сброс к оригинальному изображению
+- +/-: Изменение размера пикселя
+- q: Выход из режима
 
-r: Сброс к оригинальному изображению
-
-+/-: Изменение размера пикселя
-
-q: Выход из режима
-
-Алгоритм обработки мыши:
-python
+**Алгоритм обработки мыши:**
+```python
 def mouse_callback(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
         drawing = True
@@ -323,3 +327,4 @@ def mouse_callback(event, x, y, flags, param):
         
         if width > 0 and height > 0:
             # Применение пикселизации
+```
