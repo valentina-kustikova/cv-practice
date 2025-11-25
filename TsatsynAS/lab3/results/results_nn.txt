@@ -1,0 +1,14 @@
+=== Classification Results ===
+Model: nn
+Mode: test
+Точность: 1.0000
+Отчет классификации:
+              precision    recall  f1-score   support
+
+     kremlin       1.00      1.00      1.00        39
+      palace       1.00      1.00      1.00        29
+       sobor       1.00      1.00      1.00        20
+
+    accuracy                           1.00        88
+   macro avg       1.00      1.00      1.00        88
+weighted avg       1.00      1.00      1.00        88
