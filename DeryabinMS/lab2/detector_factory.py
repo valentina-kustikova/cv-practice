@@ -8,7 +8,6 @@ from faster_rcnn_detector import FasterRCNNDetector
 
 
 class VehicleDetectorFactory:
-    """Фабрика для создания детекторов"""
 
     @staticmethod
     def _load_classes(names_path: str) -> List[str]:
@@ -17,7 +16,7 @@ class VehicleDetectorFactory:
 
     @staticmethod
     def get_available_models() -> Dict[str, Dict[str, Any]]:
-        """Справочная информация"""
+        """Справка"""
         return {
             "yolo": {
                 "name": "YOLOv4",
@@ -83,5 +82,3 @@ class VehicleDetectorFactory:
                 nms_threshold=0.4,
             )
             return FasterRCNNDetector(config)
-
-        raise ValueError(f"Неизвестная модель: {model_key}")
