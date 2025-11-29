@@ -11,12 +11,11 @@ class Detection:
     class_id: int
     class_name: str
     confidence: float
-    bbox: Tuple[int, int, int, int]  
+    bbox: Tuple[int, int, int, int]
 
 
 @dataclass
 class DetectorConfig:
-    """Настройки модели"""
     name: str
     model_path: str
     config_path: str
@@ -30,9 +29,6 @@ class DetectorConfig:
 
 
 class BaseDetector(ABC):
-    """
-    Базовый класс детектора
-    """
     def __init__(self, config: DetectorConfig):
         self.config = config
         self.net = cv.dnn.readNet(config.model_path, config.config_path)
@@ -51,7 +47,6 @@ class BaseDetector(ABC):
         return blob
 
     def _forward(self, blob: np.ndarray):
-        """Стандартный forward"""
         self.net.setInput(blob)
         return self.net.forward()
 
@@ -61,7 +56,7 @@ class BaseDetector(ABC):
         pass
 
     def _apply_nms(self, detections: List[Detection]) -> List[Detection]:
-        """Non-Maximum Suppression по всем детекциям"""
+        """Non-Maximum Suppression"""
         if not detections:
             return []
 
@@ -86,7 +81,7 @@ class BaseDetector(ABC):
         return [detections[i] for i in indices]
 
     def detect(self, image) -> List[Detection]:
-        """Полный цикл детектирования"""
+        """Цикл детектирования"""
         blob = self._make_blob(image)
         outputs = self._forward(blob)
         raw_detections = self._postprocess(outputs, image.shape[:2])
