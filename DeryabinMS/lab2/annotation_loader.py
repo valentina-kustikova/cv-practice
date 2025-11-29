@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple
 
 class AnnotationLoader:
     """
-    Загружает разметку
+    Загружаем разметку
     Формат строки:
     image_id class_name x1 y1 x2 y2 ...
     Используем только объекты класса 'car'
@@ -42,5 +42,5 @@ class AnnotationLoader:
         return annotations
 
     def get_ground_truth(self, image_id: str) -> List[Tuple[int, int, int, int]]:
-        """Возвращает список GT-боксов кадра"""
+        """Возвращаем список GT-боксов кадра"""
         return self._annotations.get(image_id, [])
