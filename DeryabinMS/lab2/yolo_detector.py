@@ -6,7 +6,6 @@ from detector_base import BaseDetector, Detection, DetectorConfig
 
 
 class YOLOv4Detector(BaseDetector):
-    """Детектор на основе YOLOv4"""
 
     def __init__(self, config: DetectorConfig):
         super().__init__(config)
