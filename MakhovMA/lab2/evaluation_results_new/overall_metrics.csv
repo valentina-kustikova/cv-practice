@@ -1,0 +1,15 @@
+Metric,Value
+overall_precision,0.9487704918032787
+overall_recall,0.9686192468619247
+overall_f1_score,0.958592132505176
+total_true_positives,463
+total_false_positives,25
+total_false_negatives,15
+total_detections,488
+total_ground_truth,478
+evaluation_time,2025-11-24 17:27:45
+iou_threshold,0.5
+total_images_processed,100
+frames_with_annotations,100
+frames_evaluated,100
+annotation_file,mov03478.txt
