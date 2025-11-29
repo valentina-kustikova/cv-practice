@@ -42,7 +42,7 @@ class DetectionEvaluator:
                        gt_boxes: List[Tuple[int, int, int, int]],
                        iou_threshold: float = 0.5) -> Tuple[float, float]:
         """
-        Обновляет счётчики + возвращает TPR/FDR для кадра.
+        Обновляем счётчики + возвращаем TPR/FDR для кадра.
         """
         frame_tp = 0
         frame_fp = 0
