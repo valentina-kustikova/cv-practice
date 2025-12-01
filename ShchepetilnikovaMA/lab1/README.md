@@ -25,10 +25,12 @@
 
 **Пример использования.**
 
+```bash
 python main.py -i image.jpg -f resize --scale 0.5 -o smaall.jpg    
 python main.py -i image.jpg -f resize --new_size 800 600 -o resize.jpg    
 python main.py -i image.jpg -f resize --scale 2 -o big.jpg    
-python main.py -i image.jpg -f resize -o image.jpg    
+python main.py -i image.jpg -f resize -o image.jpg
+```
 
 ## 2. Эффект сепии (класс SepiaFilter)
 Применяет к изображению эффект сепии (желтоватый оттенок, характерный для старых фотографий).
@@ -49,8 +51,10 @@ python main.py -i image.jpg -f resize -o image.jpg
 
 **Пример использования.**
 
+```bash
 python main.py -i image.jpg -f sepia -o sepia.jpg    
 python main.py -i image.jpg -f sepia --k 0.5 -o light_sepia.jpg    
+```
 
 ## 3. Эффект виньетки (класс VignetteFilter)
 Создает эффект затемнения по краям изображения (виньетка).
@@ -77,8 +81,10 @@ mask = exp(-((x - center_x)² / (2*(width*strength)²) + (y - center_y)² / (2*(
 
 **Пример использования.**
 
+```bash
 python main.py -i image.jpg -f vinetka -o vignette.jpg    
-python main.py -i image.jpg -f vinetka --radius 0.8 -o strong_vignette.jpg     
+python main.py -i image.jpg -f vinetka --radius 0.8 -o strong_vignette.jpg
+```
 
 ## 4. Пикселизация области (класс PixelateFilter)
 Пикселизирует указанную область изображения, создавая эффект мозаики.
@@ -101,8 +107,10 @@ python main.py -i image.jpg -f vinetka --radius 0.8 -o strong_vignette.jpg
 
 **Пример использования.**
 
+```bash
 python main.py -i image.jpg -f pixelize --k 20 -o pixelated.jpg     
-python main.py -i image.jpg -f pixelize --pixel_x 150 --pixel_y 20 --pixel_w 300 --pixel_h 300 --k 15 -o area_pixel.jpg     
+python main.py -i image.jpg -f pixelize --pixel_x 150 --pixel_y 20 --pixel_w 300 --pixel_h 300 --k 15 -o area_pixel.jpg
+``` 
 
 ## 5. Прямоугольная рамка (класс RectBorder)
 Добавляет прямоугольную рамку заданной толщины и цвета по краям изображения.
@@ -124,8 +132,10 @@ python main.py -i image.jpg -f pixelize --pixel_x 150 --pixel_y 20 --pixel_w 300
 
 **Пример использования.**
 
+```bash
 python main.py -i image.jpg -f rect_frame -o bordered.jpg     
-python main.py -i image.jpg -f rect_frame --thickness 25 --color 0 0 255 -o red_border.jpg     
+python main.py -i image.jpg -f rect_frame --thickness 25 --color 0 0 255 -o red_border.jpg
+```
 
 ## 6. Фигурная рамка (класс FrameFilter)
 Добавляет декоративную рамку различных геометрических форм вокруг изображения.
@@ -145,9 +155,11 @@ python main.py -i image.jpg -f rect_frame --thickness 25 --color 0 0 255 -o red_
 
 **Пример использования.**
 
+```bash
 python main.py -i image.jpg -f frame -o circle_frame.jpg     
 python main.py -i image.jpg -f frame --frame_type diamond -o diamond_frame.jpg    
-python main.py -i image.jpg -f frame --frame_type diamond --thickness 15 --color 0 255 0 -o diamond_frame.jpg    
+python main.py -i image.jpg -f frame --frame_type diamond --thickness 15 --color 0 255 0 -o diamond_frame.jpg
+```
 
 ## 7. Эффект бликов объектива (класс BliksFilter)
 Имитирует эффект бликов объектива камеры.
@@ -173,9 +185,11 @@ flare = exp(-2 * distance / max_distance) * intensity
 
 **Пример использования.**
 
+```bash
 python main.py -i image.jpg -f bliki -o flare.jpg     
 python main.py -i image.jpg -f bliki --cx 300 --cy 200 --k 0.8 -o custom_flare.jpg     
-python main.py -i image.jpg -f bliki --cx 300 --cy 200 --k 0.8 -o custom_flare.jpg     
+python main.py -i image.jpg -f bliki --cx 300 --cy 200 --k 0.8 -o custom_flare.jpg
+```
 
 ## 8. Текстура акварельной бумаги (класс WatercolorFilter)
 Накладывает текстуру, имитирующую акварельную бумагу.
@@ -194,5 +208,7 @@ python main.py -i image.jpg -f bliki --cx 300 --cy 200 --k 0.8 -o custom_flare.j
 
 **Пример использования.**
 
+```bash
 python main.py -i image.jpg -f watercolor -o watercolor.jpg    
 python main.py -i image.jpg -f watercolor --k 0.5 -o strong_watercolor.jpg    
+```
