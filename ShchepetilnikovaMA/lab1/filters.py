@@ -221,3 +221,5 @@ class WatercolorFilter(Filter):
             texture[:, :, i] = cv.GaussianBlur(noise[:, :, i], (25, 25), 0)
         logger.info(f"Применен акварельный фильтр с интенсивностью {intensity}")
         return cv.addWeighted(image, 1 - intensity, texture, intensity, 0)
+    
+    
