@@ -4,7 +4,6 @@ import logging
 import cv2 as cv
 from filters import Filter
 
-# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -15,7 +14,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-#Настройка и конфигурация парсера аргументов командной строки
+def read_image(path):
+    image = cv.imread(path)
+    if image is None:
+        logger.error(f"Не удалось загрузить изображение: {path}")
+        sys.exit(1)
+    return image
+
 def cli_argument_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', 
@@ -33,7 +38,6 @@ def cli_argument_parser():
                         help='Function to apply',
                         choices=['resize', 'sepia', 'vinetka', 'pixelize', 'rect_frame', 'frame', 'bliki', 'watercolor'],
                         required=True)
-    #Параметры фильтров
     parser.add_argument('--k',
                         type=float,
                         help='Parameter k (intensities for different filters)')
@@ -84,10 +88,10 @@ def cli_argument_parser():
                         type=int,
                         help='Height for pixelate area')
     return parser
-#Преобразование аргументов командной строки в параметры фильтров
+
+
 def apply_filter_by_args(args):
     parameters = {}
-    #Маппинг аргументов на имена параметров
     if args.k is not None:
         parameters['intensity'] = args.k
         parameters['block_size'] = int(args.k)
@@ -107,7 +111,6 @@ def apply_filter_by_args(args):
         parameters['cx'] = args.cx
     if args.cy is not None:
         parameters['cy'] = args.cy
-    #Параметры области пикселизации
     if args.pixel_x is not None:
         parameters['x'] = args.pixel_x
     if args.pixel_y is not None:
@@ -121,24 +124,19 @@ def apply_filter_by_args(args):
 def main():
     parser = cli_argument_parser()
     args = parser.parse_args()
-    #Загрузка изображения
     image = cv.imread(args.image)
-    if image is None:
-        logger.error(f"Не удалось загрузить изображение: {args.image}")
-        sys.exit(1)
+    logger.info(f"Загрузка изображения из: {args.image}")
+    image = read_image(args.image)
     try:
-        #Создание фильтра и применение
         filter_instance = Filter.create_filter(args.func)
         parameters = apply_filter_by_args(args)
         logger.info(f"Применение фильтра {args.func} с параметрами: {parameters}")
         filtered_image = filter_instance.apply(image, parameters)
-        # Отображение результатов
         cv.imshow("Original", image)
         cv.imshow("Filtered", filtered_image)
-        logger.info("Нажмите любую клавишу для закрытия окон...")
+        logger.info("Нажмите любую клавишу для закрытия окон.")
         cv.waitKey(0)
         cv.destroyAllWindows()
-        # Сохранение результата
         cv.imwrite(args.output, filtered_image)
     except Exception as e:
         logger.error(f"Ошибка при применении фильтра: {e}")
