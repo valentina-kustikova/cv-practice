@@ -278,70 +278,46 @@ class ImageFilter:
                         x: int, y: int, width: int, height: int,
                         pixel_size: int = 10) -> np.ndarray:
         """Pixelates rectangular area"""
-
         if image is None:
             raise ValueError("Input image must not be None")
 
         h, w = image.shape[:2]
         pixel_size = max(1, int(pixel_size))
 
+        # Валидация и приведение координат к допустимым диапазонам
         x = max(0, min(w - 1, int(x)))
         y = max(0, min(h - 1, int(y)))
         width = max(1, int(width))
         height = max(1, int(height))
 
-        x_end = max(x + 1, min(w, x + width))
-        y_end = max(y + 1, min(h, y + height))
+        # Вычисляем правую и нижнюю границы, не выходящие за пределы изображения
+        x_end = min(x + width, w)
+        y_end = min(y + height, h)
 
-        # Save original coordinates for final assignment
-        roi_x_end = x_end
-        roi_y_end = y_end
+        # Копируем изображение для модификации
+        result = image.copy()
 
-        roi = image[y:y_end, x:x_end]
-        if roi.size == 0:
-            return image.copy()
+        # Обрабатываем регион блоками pixel_size x pixel_size
+        for i in range(y, y_end, pixel_size):
+            for j in range(x, x_end, pixel_size):
+                # Определяем границы текущего блока с учётом края изображения
+                i_end = min(i + pixel_size, y_end)
+                j_end = min(j + pixel_size, x_end)
 
-        roi_h, roi_w = roi.shape[:2]
-        down_w = max(1, roi_w // pixel_size)
-        down_h = max(1, roi_h // pixel_size)
-
-        reduced = np.zeros((down_h, down_w, roi.shape[2]), dtype=np.float32)
-
-        block_h = roi_h / down_h
-        block_w = roi_w / down_w
-
-        for i in range(down_h):
-            for j in range(down_w):
-                y_start = int(round(i * block_h))
-                block_y_end = int(round((i + 1) * block_h))
-                x_start = int(round(j * block_w))
-                block_x_end = int(round((j + 1) * block_w))
-
-                block_y_end = min(block_y_end, roi_h)
-                block_x_end = min(block_x_end, roi_w)
-                if block_y_end <= y_start:
-                    block_y_end = min(y_start + 1, roi_h)
-                if block_x_end <= x_start:
-                    block_x_end = min(x_start + 1, roi_w)
-                y_start = max(0, min(y_start, roi_h - 1))
-                x_start = max(0, min(x_start, roi_w - 1))
-
-                block = roi[y_start:block_y_end, x_start:block_x_end]
+                block = result[i:i_end, j:j_end]
                 if block.size == 0:
                     continue
-                reduced[i, j] = block.mean(axis=(0, 1))
 
-        pixelated = np.zeros_like(roi)
-        for i in range(roi_h):
-            for j in range(roi_w):
-                src_i = int(i / block_h)
-                src_j = int(j / block_w)
-                src_i = min(src_i, down_h - 1)
-                src_j = min(src_j, down_w - 1)
-                pixelated[i, j] = reduced[src_i, src_j]
+                # Вычисляем среднее значение блока
+                # Для цветных изображений: axis=(0,1), для grayscale: просто mean()
+                if block.ndim == 3:
+                    avg_color = block.mean(axis=(0, 1)).astype(np.uint8)
+                else:
+                    avg_color = block.mean().astype(np.uint8)
 
-        result = image.copy()
-        result[y:roi_y_end, x:roi_x_end] = np.clip(pixelated, 0, 255).astype(np.uint8)
+                # Заменяем весь блок на среднее значение
+                result[i:i_end, j:j_end] = avg_color
+
         return result
 
     @staticmethod
