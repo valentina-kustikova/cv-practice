@@ -5,12 +5,33 @@ from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report
 from detectors import SIFTDetector, ORBDetector, AKAZEDetector
+from abc import ABC, abstractmethod
+from typing import List, Tuple
 import pickle
 import os
 from tqdm import tqdm
 
 
-class BoWClassifier:
+class AbstractClassifier(ABC):
+    @abstractmethod
+    def fit(self, train_data: List[Tuple[str, int]]):
+        pass
+
+    @abstractmethod
+    def predict(self, test_data: List[Tuple[str, int]]):
+        pass
+
+    @abstractmethod
+    def save(self, path: str):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def load(cls, path: str):
+        pass
+
+
+class BoWClassifier(AbstractClassifier):
     def __init__(self, k=600, detector_type="sift"):
         self.k = k
         self.detector_type = detector_type.lower()
@@ -93,10 +114,10 @@ class BoWClassifier:
         }, open(path, 'wb'))
         print(f"Сохранено → {path}")
 
-    @staticmethod
-    def load(path):
+    @classmethod
+    def load(cls, path):
         data = pickle.load(open(path, 'rb'))
-        model = BoWClassifier(k=data['k'], detector_type=data['detector_type'])
+        model = cls(k=data['k'], detector_type=data['detector_type'])
         model.kmeans = data['kmeans']
         model.scaler = data['scaler']
         model.clf = data['clf']

@@ -1,3 +1,4 @@
+# nn_classifier.py
 import tensorflow as tf
 from tensorflow.keras.applications import EfficientNetB0
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
@@ -7,8 +8,30 @@ from sklearn.metrics import accuracy_score, classification_report
 import numpy as np
 import os
 from tqdm import tqdm
+from abc import ABC, abstractmethod
+from typing import List, Tuple
 
-class NNClassifier:
+
+class AbstractClassifier(ABC):
+    @abstractmethod
+    def fit(self, train_data: List[Tuple[str, int]]):
+        pass
+
+    @abstractmethod
+    def predict(self, test_data: List[Tuple[str, int]]):
+        pass
+
+    @abstractmethod
+    def save(self, path: str):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def load(cls, path: str):
+        pass
+
+
+class NNClassifier(AbstractClassifier):
     def __init__(self):
         self.model = None
 
@@ -68,3 +91,10 @@ class NNClassifier:
         print(classification_report(labels, preds,
               target_names=['Кремль', 'Архангельский собор', 'Дворец труда']))
         return acc
+
+    def save(self, path: str):
+        pass  # сохраняется в fit()
+
+    @classmethod
+    def load(cls, path: str):
+        raise NotImplementedError("NNClassifier использует .keras файл")

@@ -169,7 +169,7 @@ if __name__ == "__main__":
         if args.algo in ["bow", "both"]:
             detector = args.detector
             if args.mode in ["train", "both"]:
-                bow = BoWClassifier(k=600, detector_type=detector)  # ← правильный аргумент!
+                bow = BoWClassifier(k=600, detector_type=detector)
                 bow.fit(train_data)
                 bow.save(f"models/bow_{detector}_model.pkl")
             if args.mode in ["test", "both"]:
