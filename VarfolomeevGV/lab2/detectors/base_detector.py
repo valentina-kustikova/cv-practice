@@ -101,11 +101,8 @@ class BaseDetector(ABC):
         Фильтрация детекций по классам транспортных средств.
         
         COCO классы транспортных средств (0-based index):
-        - 1: bicycle (велосипед)
         - 2: car (автомобиль)
-        - 3: motorcycle (мотоцикл)
         - 5: bus (автобус)
-        - 7: truck (грузовик)
         
         Args:
             detections: Список детекций
@@ -113,7 +110,7 @@ class BaseDetector(ABC):
         Returns:
             Отфильтрованный список детекций
         """
-        vehicle_classes = {1, 2, 3, 5, 7}
+        vehicle_classes = {2, 5}
         filtered = []
         for det in detections:
             if len(det) >= 5 and int(det[4]) in vehicle_classes:  # class_id в позиции 4

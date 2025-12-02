@@ -25,14 +25,14 @@ def compute_iou(box1: np.ndarray, boxes: np.ndarray) -> np.ndarray:
     y2_2 = boxes[:, 3]
     
     # Вычисление координат пересечения
-    x1_inter = np.maximum(x1_1, x1_2)
-    y1_inter = np.maximum(y1_1, y1_2)
-    x2_inter = np.minimum(x2_1, x2_2)
-    y2_inter = np.minimum(y2_1, y2_2)
+    x_left = np.maximum(x1_1, x1_2)
+    y_top = np.maximum(y1_1, y1_2)
+    x_right = np.minimum(x2_1, x2_2)
+    y_bottom = np.minimum(y2_1, y2_2)
     
-    # Площадь пересечения (только если есть пересечение)
-    width_inter = np.maximum(0, x2_inter - x1_inter)
-    height_inter = np.maximum(0, y2_inter - y1_inter)
+    # Площадь пересечения
+    width_inter = np.maximum(0, x_right - x_left)
+    height_inter = np.maximum(0, y_bottom - y_top)
     intersection_area = width_inter * height_inter
     
     # Площади боксов (проверка на валидность)

@@ -16,7 +16,6 @@ FRCNN_PBTXT_URL = "https://raw.githubusercontent.com/opencv/opencv_extra/master/
 
 RETINANET_ONNX_URL = "https://github.com/onnx/models/raw/main/validated/vision/object_detection_segmentation/retinanet/model/retinanet-9.onnx"
 
-
 SUPPORT_LINKS = [
     ("YOLOv5", "https://github.com/ultralytics/yolov5"),
     ("RetinaNet ONNX", "https://github.com/onnx/models/tree/main/validated/vision/object_detection_segmentation/retinanet"),

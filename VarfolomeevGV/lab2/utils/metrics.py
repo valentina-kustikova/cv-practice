@@ -98,20 +98,6 @@ def load_ground_truth(annotation_file: str, format: str = 'required',
     
     return detections
 
-
-def load_ground_truth_from_dict(annotations: Dict[str, List[List[float]]]) -> Dict[str, List[List[float]]]:
-    """
-    Загрузка разметки из словаря (ключ - имя файла, значение - список детекций).
-    
-    Args:
-        annotations: Словарь с разметкой
-        
-    Returns:
-        Тот же словарь (для совместимости)
-    """
-    return annotations
-
-
 def calculate_metrics(predictions: List[List[float]], ground_truth: List[List[float]], 
                       iou_threshold: float = 0.5) -> Tuple[float, float]:
     """
@@ -129,17 +115,17 @@ def calculate_metrics(predictions: List[List[float]], ground_truth: List[List[fl
         return 1.0, 0.0
     
     if len(ground_truth) == 0:
-        # Если нет истинных объектов, но есть предсказания - все это FP
+        # Если нет истинных объектов, но есть предсказания - это всё FP
         return 0.0, 1.0 if len(predictions) > 0 else 0.0
     
     if len(predictions) == 0:
-        # Если нет предсказаний, но есть истинные объекты - все это FN
+        # Если нет предсказаний, но есть истинные объекты - это всё FN
         return 0.0, 0.0
     
     # Преобразование в numpy массивы
     pred_boxes = np.array([p[:4] for p in predictions])
     pred_classes = np.array([int(p[4]) for p in predictions])
-    pred_scores = np.array([p[5] if len(p) > 5 else 1.0 for p in predictions])
+    pred_scores = np.array([p[5] for p in predictions])
     
     gt_boxes = np.array([g[:4] for g in ground_truth])
     gt_classes = np.array([int(g[4]) for g in ground_truth])

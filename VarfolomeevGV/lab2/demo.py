@@ -70,7 +70,7 @@ def load_annotations(annotations_path: str, image_names: List[str]) -> Dict[str,
                     if len(parts) >= 6:
                         try:
                             frame_id = int(parts[0])
-                            # Это формат 'required', фильтруем по номеру кадра
+                            # формат 'required', фильтруем по номеру кадра
                             # Загружаем разметку для каждого изображения отдельно
                             for idx, img_path in enumerate(image_names):
                                 img_name = os.path.basename(img_path)
@@ -91,14 +91,13 @@ def load_annotations(annotations_path: str, image_names: List[str]) -> Dict[str,
                                                     # Маппинг названий классов в COCO ID
                                                     class_name_to_id = {
                                                         'car': 2, 'CAR': 2, 'Car': 2,
-                                                        'bicycle': 1, 'BICYCLE': 1, 'Bicycle': 1,
-                                                        'motorcycle': 3, 'MOTORCYCLE': 3, 'Motorcycle': 3,
                                                         'bus': 5, 'BUS': 5, 'Bus': 5,
-                                                        'truck': 7, 'TRUCK': 7, 'Truck': 7,
                                                     }
-                                                    class_id = class_name_to_id.get(class_name, -1)
+                                                    # В файле все названия классов в верхнем регистре
+                                                    class_id = class_name_to_id.get(class_name.upper(), -1)
+                                                    # Пробуем другие регистры в случае, если не удалось найти
                                                     if class_id == -1:
-                                                        class_id = class_name_to_id.get(class_name.upper(), -1)
+                                                        class_id = class_name_to_id.get(class_name, -1)
                                                     if class_id == -1:
                                                         class_id = class_name_to_id.get(class_name.lower(), -1)
                                                     
@@ -120,39 +119,11 @@ def load_annotations(annotations_path: str, image_names: List[str]) -> Dict[str,
                             if annotations:
                                 format_loaded = True
                         except ValueError:
-                            pass  # Не формат 'required', пробуем дальше
-            
-            # Если не удалось загрузить как 'required', пробуем как 'simple'
-            if not format_loaded:
-                gt = load_ground_truth(annotations_path, format='simple')
-                if gt:
-                    # Применяем ко всем изображениям
-                    for img_name in image_names:
-                        annotations[img_name] = gt
+                            pass  # Не формат required
         except Exception as e:
             print(f"Ошибка при загрузке разметки: {e}")
             import traceback
             traceback.print_exc()
-    elif os.path.isdir(annotations_path):
-        # Директория с файлами разметки (один файл на изображение)
-        for img_path in image_names:
-            img_name = os.path.basename(img_path)
-            img_name_no_ext = os.path.splitext(img_name)[0]
-            
-            # Поиск файла разметки
-            for ext in ['.txt', '.json', '.xml']:
-                ann_path = os.path.join(annotations_path, img_name_no_ext + ext)
-                if os.path.exists(ann_path):
-                    # Пробуем загрузить как required формат
-                    gt = load_ground_truth(ann_path, format='required')
-                    
-                    # Если пусто, пробуем как простой формат
-                    if not gt:
-                        gt = load_ground_truth(ann_path, format='simple')
-                        
-                    annotations[img_name] = gt
-                    break
-    
     return annotations
 
 
@@ -327,16 +298,16 @@ def main():
         print(f"Ошибка: не найдено изображений в директории {args.images}")
         return
     
-    # Сортировка по имени файла для правильной последовательности в видео
+    # Сортировка по именам файлов для однозначной последовательности 
     image_paths.sort()
     
     # Ограничение количества кадров
-    # Если указан duration > 0, используем его всегда
+    # Если указан duration > 0, используем его
     if args.duration > 0:
         if len(image_paths) > args.duration:
             print(f"Ограничение количества кадров до {args.duration}")
             image_paths = image_paths[:args.duration]
-    # Если duration == 0, но включено видео, ограничиваем до 100 (дефолт для видео)
+    # Если duration == 0 (default), но включено видео, ограничиваем до 100 (дефолт для видео)
     elif args.vid and args.duration == 0:
         default_video_duration = 100
         if len(image_paths) > default_video_duration:
@@ -364,15 +335,6 @@ def main():
             args.conf_threshold,
             args.nms_threshold
         )
-        
-        # Включение диагностического вывода для RetinaNet
-        if args.debug:
-            if hasattr(detector, 'set_debug_logging'):
-                detector.set_debug_logging(True)
-                print("Диагностический вывод включен")
-            else:
-                print("[WARN] Детектор не поддерживает диагностический вывод")
-        
         print("Детектор создан успешно")
     except Exception as e:
         print(f"Ошибка при создании детектора: {e}")
@@ -425,16 +387,6 @@ def main():
         if args.debug:
             print(f"  Найдено транспортных средств: {len(vehicle_detections)}")
         
-        # Если транспортных средств не найдено, но есть другие детекции, показываем их
-        if args.debug and len(vehicle_detections) == 0 and len(detections) > 0:
-            print(f"  [WARN] Транспортных средств не найдено, но найдено других объектов: {len(detections)}")
-            print(f"  Первые 5 детекций:")
-            for i, det in enumerate(detections[:5]):
-                class_id = int(det[4])
-                confidence = det[5] if len(det) > 5 else 1.0
-                class_name = detector.class_names[class_id] if class_id < len(detector.class_names) else f"Class {class_id}"
-                print(f"    - {class_name} (id={class_id}): {confidence:.3f}")
-        
         # Вычисление метрик (если есть разметка)
         tpr, fdr = 0.0, 0.0
         img_name = os.path.basename(image_path)
@@ -451,7 +403,7 @@ def main():
                 if len(det) >= 5 and int(det[4]) in gt_classes
             ]
             
-            # Отладочный вывод для диагностики
+            # Отладочный вывод
             if args.debug and len(vehicle_detections) > 0 and len(gt) > 0:
                 pred_classes = [int(d[4]) for d in vehicle_detections]
                 print(f"  DEBUG: Предсказания - классы: {set(pred_classes)}, количество: {len(vehicle_detections)}")
@@ -488,7 +440,7 @@ def main():
             if args.show:
                 cv2.imshow('Detection', result_image)
                 # Если включен режим quick, используем задержку 100мс
-                # Иначе ждем нажатия клавиши (0)
+                # Иначе ждем нажатия клавиши
                 delay = 100 if args.quick else 0
                 cv2.waitKey(delay)
             

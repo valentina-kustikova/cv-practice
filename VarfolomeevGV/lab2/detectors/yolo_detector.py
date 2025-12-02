@@ -89,12 +89,10 @@ class YOLODetector(BaseDetector):
         h, w = image.shape[:2]
         target_size = self.input_size[0]  # 640
         
-        # Вычисление масштаба с сохранением пропорций
         scale = min(target_size / h, target_size / w, 1.0)  # Не увеличиваем маленькие изображения
         
         new_h, new_w = int(h * scale), int(w * scale)
         
-        # Resize с сохранением пропорций
         resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
         
         # Вычисление padding для получения квадрата 640x640
