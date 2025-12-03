@@ -142,7 +142,6 @@ def add_fancy_border(image, border_width, color, pattern):
         for y in range(border_width):
             x = 0
             while x < width:
-                # Рисуем штрих
                 for i in range(min(dash_length, width - x)):
                     if x + i < width:
                         result[y, x + i] = color
@@ -233,25 +232,20 @@ def add_fancy_border(image, border_width, color, pattern):
             print(f"Ошибка загрузки рамки: {frame_path}")
             return add_border(image, border_width, color)
 
-        # Получаем размеры рамки и фото
         frame_height, frame_width = frame.shape[:2]
         photo_height, photo_width = image.shape[:2]
 
         print(f"Размер рамки: {frame_width}x{frame_height}")
         print(f"Размер фото: {photo_width}x{photo_height}")
 
-        # Используем border_width как процент отступов (если border_width > 100, то как пиксели)
         if border_width <= 100:
-            # border_width как процент
             margin_percent = border_width
             margin_x = int(frame_width * margin_percent / 100)
             margin_y = int(frame_height * margin_percent / 100)
         else:
-            # border_width как абсолютное значение в пикселях
             margin_x = border_width
             margin_y = border_width
 
-        # Вычисляем область для вставки фото
         insert_x = margin_x
         insert_y = margin_y
         insert_width = frame_width - 2 * margin_x
@@ -259,17 +253,14 @@ def add_fancy_border(image, border_width, color, pattern):
 
         if insert_width <= 0 or insert_height <= 0:
             print("Слишком большая рамка для данного изображения")
-            return add_border(image, 10, color)  # fallback
+            return add_border(image, 10, color) 
 
         print(f"Область для вставки: {insert_width}x{insert_height}")
 
-        # Изменяем размер фото чтобы вписать в область рамки
         photo_resized = resize_image(image, insert_width, insert_height)
 
-        # Создаем копию рамки
         result = frame.copy()
 
-        # Вставляем фото в рамку
         result[insert_y:insert_y + insert_height, insert_x:insert_x + insert_width] = photo_resized
 
         return result
@@ -293,7 +284,6 @@ def add_lens_flare(image):
     height, width = image.shape[:2]
     flare_resized = resize_image(flare_img, width, height)
 
-    # Создаем копию исходного изображения
     result = image.copy().astype(np.float32)
     flare_float = flare_resized.astype(np.float32)
 
