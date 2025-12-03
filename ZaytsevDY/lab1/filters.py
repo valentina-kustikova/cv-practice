@@ -226,6 +226,53 @@ def add_fancy_border(image, border_width, color, pattern):
                 wave_offset = int(amplitude * math.sin(y * frequency))
                 if (width - x - 1) == wave_offset % border_width:
                     result[y, x] = color
+    elif pattern == "photo_frame":
+        frame_path = "photo_frame.png"
+        frame = cv2.imread(frame_path)
+        if frame is None:
+            print(f"Ошибка загрузки рамки: {frame_path}")
+            return add_border(image, border_width, color)
+
+        # Получаем размеры рамки и фото
+        frame_height, frame_width = frame.shape[:2]
+        photo_height, photo_width = image.shape[:2]
+
+        print(f"Размер рамки: {frame_width}x{frame_height}")
+        print(f"Размер фото: {photo_width}x{photo_height}")
+
+        # Используем border_width как процент отступов (если border_width > 100, то как пиксели)
+        if border_width <= 100:
+            # border_width как процент
+            margin_percent = border_width
+            margin_x = int(frame_width * margin_percent / 100)
+            margin_y = int(frame_height * margin_percent / 100)
+        else:
+            # border_width как абсолютное значение в пикселях
+            margin_x = border_width
+            margin_y = border_width
+
+        # Вычисляем область для вставки фото
+        insert_x = margin_x
+        insert_y = margin_y
+        insert_width = frame_width - 2 * margin_x
+        insert_height = frame_height - 2 * margin_y
+
+        if insert_width <= 0 or insert_height <= 0:
+            print("Слишком большая рамка для данного изображения")
+            return add_border(image, 10, color)  # fallback
+
+        print(f"Область для вставки: {insert_width}x{insert_height}")
+
+        # Изменяем размер фото чтобы вписать в область рамки
+        photo_resized = resize_image(image, insert_width, insert_height)
+
+        # Создаем копию рамки
+        result = frame.copy()
+
+        # Вставляем фото в рамку
+        result[insert_y:insert_y + insert_height, insert_x:insert_x + insert_width] = photo_resized
+
+        return result
 
     else:
         print(f"Неизвестный паттерн: {pattern}. Используется solid.")
@@ -233,73 +280,72 @@ def add_fancy_border(image, border_width, color, pattern):
 
     return result
 
-def add_lens_flare(image, brightness):
-    result = image.copy().astype(np.float32)
+
+def add_lens_flare(image):
+    flare_path = "flare.png"
+
+    flare_img = cv2.imread(flare_path)
+
+    if flare_img is None:
+        print(f"Файл {flare_path} не найден!")
+        return image
+
     height, width = image.shape[:2]
+    flare_resized = resize_image(flare_img, width, height)
 
-    num_flares = int(brightness * 5) + 1
-    max_radius = min(width, height) // 15
-
-    for _ in range(num_flares):
-        flare_x = np.random.randint(0, width)
-        flare_y = np.random.randint(0, height)
-
-        radius = np.random.randint(max_radius // 3, max_radius)
-        intensity = brightness * np.random.uniform(0.5, 1.5)
-
-        for y in range(max(0, flare_y - radius), min(height, flare_y + radius + 1)):
-            for x in range(max(0, flare_x - radius), min(width, flare_x + radius + 1)):
-                dx = x - flare_x
-                dy = y - flare_y
-                distance = math.sqrt(dx*dx + dy*dy)
-
-                if distance <= radius:
-                    falloff = 1.0 - (distance / radius)
-                    falloff = falloff * falloff
-
-                    glow = falloff * intensity * 100
-
-                    if len(image.shape) == 3:
-                        for c in range(3):
-                            result[y, x, c] = min(255, result[y, x, c] + glow)
-                    else:
-                        result[y, x] = min(255, result[y, x] + glow)
-
-    return np.clip(result, 0, 255).astype(np.uint8)
-
-
-def add_watercolor_texture(image, intensity):
+    # Создаем копию исходного изображения
     result = image.copy().astype(np.float32)
-    height, width = image.shape[:2]
-
-    noise = np.random.randn(height, width).astype(np.float32)
-
-    noise = (noise - noise.min()) / (noise.max() - noise.min()) * 255
-
-    blurred = np.zeros_like(noise, dtype=np.float32)
-    k = 3
+    flare_float = flare_resized.astype(np.float32)
 
     for y in range(height):
         for x in range(width):
-            s = 0.0
-            c = 0
-            for dy in range(-k, k + 1):
-                for dx in range(-k, k + 1):
-                    yy = min(height - 1, max(0, y + dy))
-                    xx = min(width - 1, max(0, x + dx))
-                    s += noise[yy, xx]
-                    c += 1
-            blurred[y, x] = s / c
+            b1, g1, r1 = result[y, x]
 
-    if len(image.shape) == 3:
-        texture = np.dstack([blurred] * 3)
-    else:
-        texture = blurred
+            b2, g2, r2 = flare_float[y, x]
 
-    strength = intensity * 0.4
-    result = result * (1 - strength) + texture * strength
+            new_r = 255 - ((255 - r1) * (255 - r2) / 255)
+            new_g = 255 - ((255 - g1) * (255 - g2) / 255)
+            new_b = 255 - ((255 - b1) * (255 - b2) / 255)
 
-    return np.clip(result, 0, 255).astype(np.uint8)
+            new_r = min(255, max(0, new_r))
+            new_g = min(255, max(0, new_g))
+            new_b = min(255, max(0, new_b))
+
+            result[y, x] = [new_b, new_g, new_r]
+
+    return result.astype(np.uint8)
+
+def add_watercolor_texture(image):
+    paper_path = "water.jpg"
+
+    paper_img = cv2.imread(paper_path)
+
+    if paper_img is None:
+        print(f"Файл {paper_path} не найден!")
+        return image
+
+    height, width = image.shape[:2]
+    paper_resized = resize_image(paper_img, width, height)
+
+    result = image.copy()
+
+    for y in range(height):
+        for x in range(width):
+            paper_b, paper_g, paper_r = paper_resized[y, x]
+
+            img_b, img_g, img_r = result[y, x]
+
+            paper_brightness = (float(paper_b) + float(paper_g) + float(paper_r)) / 765.0
+
+            brightness_factor = 0.6 + 0.4 * paper_brightness
+
+            new_b = min(255, int(img_b * brightness_factor))
+            new_g = min(255, int(img_g * brightness_factor))
+            new_r = min(255, int(img_r * brightness_factor))
+
+            result[y, x] = [new_b, new_g, new_r]
+
+    return result
 
 
 def show_menu():
@@ -388,21 +434,19 @@ def apply_filter(choice, image):
         b = int(input("Синий (0-255): "))
         g = int(input("Зеленый (0-255): "))
         r = int(input("Красный (0-255): "))
-        print("Доступные узоры: solid, dashed, double, wave")
+        print("Доступные узоры: solid, dashed, double, wave, photo_frame")
         pattern = input("Тип узора: ")
         return add_fancy_border(image, width, (b, g, r), pattern)
 
     elif choice == 7:
         # Эффект бликов
         print("\n--- Эффект бликов ---")
-        brightness = float(input("Яркость (например, 1.2 для +20%): "))
-        return add_lens_flare(image, brightness)
+        return add_lens_flare(image)
 
     elif choice == 8:
         # Текстура акварельной бумаги
         print("\n--- Текстура акварельной бумаги ---")
-        intensity = float(input("Интенсивность текстуры: "))
-        return add_watercolor_texture(image, intensity)
+        return add_watercolor_texture(image)
 
     return image
 
