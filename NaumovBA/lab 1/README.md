@@ -160,141 +160,131 @@ new_w = w + 2 * border_width
 bordered = np.full((new_h, new_w, image.shape[2]), color, dtype=image.dtype)
 bordered[border_width:border_width+h, border_width:border_width+w] = image
 ```
-## 6. Фигурная рамка
-**Функция:** ` add_fancy_border(image, border_width=20, color=(0, 0, 0))`
+## 6. Эффект бликов (текстурный)
+**Функция:** ` add_lens_flare_texture(image, position, texture_path=None, intensity=0.7)`
 
 ## Входные параметры:
 - `image`: исходное изображение
-- `border_width`: толщина рамки
-- `color`: цвет рамки
+- `position`: координаты центра блика (x, y)
+- `texture_path`: путь к файлу текстуры блика (если None, используется текстура по умолчанию)
+- `intensity`: интенсивность наложения текстуры
 
 ## Выходные данные:
-- Изображение с волнистой рамкой
+- Изображение с эффектом блика
 
 ## Алгоритм работы:
-**Параметры волны:**
+**Загрузка текстуры:**
 
 ```python
-amplitude = border_width // 3
-frequency = 0.1
+flare_texture = cv2.imread(actual_texture_path, cv2.IMREAD_UNCHANGED)
 ```
 
-**Генерация маски:**
+**Обработка альфа-канала:**
+
+- Если текстура не имеет альфа-канала, преобразуем в оттенки серого и используем как альфа-канал.
+
+**Размещение текстуры:**
 
 ```python
-# Верхняя и нижняя границы
-for x in range(new_w):
-    wave_offset_top = int(amplitude * math.sin(x * frequency))
-    y_top = border_width + wave_offset_top
-    mask[:y_top, x] = 1
-    
-    wave_offset_bottom = int(amplitude * math.sin(x * frequency + math.pi))
-    y_bottom = h + border_width - wave_offset_bottom
-    mask[y_bottom:, x] = 1
-
-# Левая и правая границы
-for y in range(new_h):
-    wave_offset_left = int(amplitude * math.sin(y * frequency))
-    x_left = border_width + wave_offset_left
-    mask[y, :x_left] = 1
-    
-    wave_offset_right = int(amplitude * math.sin(y * frequency + math.pi))
-    x_right = w + border_width - wave_offset_right
-    mask[y, x_right:] = 1
+flare_h, flare_w = flare_texture.shape[:2]
+flare_x, flare_y = position
 ```
-**Применение маски:**
+**Наложение текстуры с учетом альфа-канала:**
 
 ```python
-for y in range(new_h):
-    for x in range(new_w):
-        if mask[y, x] == 1:
-            bordered[y, x] = color
-        else:
-            src_y = y - border_width
-            src_x = x - border_width
-            if 0 <= src_y < h and 0 <= src_x < w:
-                bordered[y, x] = image[src_y, src_x]
-```
-## 7. Эффект бликов
-**Функция:** ` add_lens_flare(image, position, size=50, intensity=0.7)`
-
-### Входные параметры:
-- `image`: исходное изображение
-- `position`: координаты центра (x, y)
-- `size`: размер области
-- `intensity`: интенсивность
-
-### Выходные данные:
-- Изображение с эффектом бликов
-
-### Алгоритм работы:
-**Система бликов:**
-
-```python
-flares = [
-    (size, intensity, position),
-    (size*0.7, intensity*0.6, (position[0]-size//2, position[1]-size//2)),
-    (size*0.4, intensity*0.4, (position[0]+size//3, position[1]+size//3))
-]
-```
-**Гауссово распределение:**
-
-```python
-for flare_size, flare_intensity, flare_pos in flares:
-    flare_x = min(max(flare_pos[0], 0), w-1)
-    flare_y = min(max(flare_pos[1], 0), h-1)
-    
-    for y in range(h):
-        for x in range(w):
-            distance = math.sqrt((x - flare_x)**2 + (y - flare_y)**2)
-            if distance < flare_size:
-                flare_value = math.exp(-(distance**2) / (2*(flare_size/3)**2))
-                flare_value *= flare_intensity
-                
-                for c in range(3):
-                    result[y, x, c] = min(255, result[y, x, c] + flare_value * 255)
-```
-
-## 8. Текстура акварельной бумаги
-**Функция:** ` apply_watercolor_paper(image, texture_intensity=0.3)`
-
-### Входные параметры:
-- `image`: исходное изображение
-- `texture_intensity`: интенсивность текстуры
-
-### Выходные данные:
-- Изображение с текстурой бумаги
-
-### Алгоритм работы:
-**Генерация текстуры:**
-
-```python
-def generate_paper_texture(height, width):
-    texture = np.zeros((height, width))
-    
-    for octave in range(4):
-        scale = 2 ** octave
-        amplitude = 1.0 / (scale + 1)
+for y in range(max(0, flare_y - flare_h//2), min(h, flare_y + flare_h//2)):
+    for x in range(max(0, flare_x - flare_w//2), min(w, flare_x + flare_w//2)):
+        tex_y = y - (flare_y - flare_h//2)
+        tex_x = x - (flare_x - flare_w//2)
         
-        for y in range(height):
-            for x in range(width):
-                value = math.sin(x * 0.01 * scale + y * 0.01 * scale) * 0.5 + 0.5
-                value += math.sin(x * 0.03 * scale) * math.sin(y * 0.03 * scale)
-                texture[y, x] += value * amplitude
-    
-    return (texture - texture.min()) / (texture.max() - texture.min())
+        if 0 <= tex_y < flare_h and 0 <= tex_x < flare_w:
+            tex_color = flare_texture[tex_y, tex_x, :3]
+            tex_alpha = flare_texture[tex_y, tex_x, 3] * intensity
+
+            for c in range(3):
+                result[y, x, c] = min(255, result[y, x, c] * (1 - tex_alpha) + tex_color[c] * tex_alpha)
 ```
+## 7. Фигурная рамка (текстурная)
+**Функция:** ` add_fancy_border_texture(image, border_width, texture_path=None)`
+
+### Входные параметры:
+- `image`: исходное изображение
+- `border_width`: толщина рамки (в текущей реализации не используется явно, но задает размер рамки в текстуре)
+- `texture_path`: путь к файлу текстуры рамки (если None, используется текстура по умолчанию)
+
+### Выходные данные:
+- Изображение с наложенной текстурой рамки
+
+### Алгоритм работы:
+**Загрузка текстуры:**
+
+```python
+border_texture = cv2.imread(actual_texture_path, cv2.IMREAD_UNCHANGED)
+```
+
+**Обработка альфа-канала:**
+
+- Если текстура не имеет альфа-канала, создается простая маска, которая определяет область рамки.
+
+**Изменение размера текстуры:**
+
+```python
+texture_color_resized = cv2.resize(texture_color, (w, h))
+texture_alpha_resized = cv2.resize(texture_alpha, (w, h))
+```
+
 **Наложение текстуры:**
 
 ```python
 for y in range(h):
     for x in range(w):
-        texture_value = paper_texture[y, x]
-        for c in range(3):
-            blended = result[y, x, c] * (1 - texture_intensity) + \
-                     result[y, x, c] * texture_value * texture_intensity
-            result[y, x, c] = blended
+        alpha = texture_alpha_resized[y, x]
+        if alpha > 0:
+            for c in range(3):
+                result[y, x, c] = result[y, x, c] * (1 - alpha) + texture_color_resized[y, x, c] * alpha
 ```
+
+## 8. Текстура акварельной бумаги
+**Функция:** ` apply_watercolor_paper_texture(image, texture_path=None, intensity=0.5)`
+
+### Входные параметры:
+- `image`: исходное изображение
+- `texture_path`: путь к файлу текстуры бумаги (если None, используется текстура по умолчанию)
+- `intensity`: интенсивность наложения текстуры
+
+### Выходные данные:
+- Изображение с текстурой бумаги
+
+### Алгоритм работы:
+**Загрузка текстуры:**
+
+```python
+paper_texture = cv2.imread(actual_texture_path)
+gray_texture = cv2.cvtColor(paper_texture, cv2.COLOR_BGR2GRAY)
+```
+**Изменение размера текстуры под изображение:**
+
+```python
+if gray_texture.shape[0] != h or gray_texture.shape[1] != w:
+    gray_texture = cv2.resize(gray_texture, (w, h))
+```
+
+**Нормализация текстуры:**
+
+```python
+texture_norm = gray_texture.astype(np.float32) / 255.0
+```
+
+**Наложение текстуры:**
+
+```python
+for y in range(h):
+    for x in range(w):
+        tex_val = texture_norm[y, x]
+        blend_val = 1.0 - intensity + tex_val * intensity
+        result[y, x] *= blend_val
+```
+
 ## Интерактивная пикселизация
 **Функция:** ` interactive_pixelation(original_image)`
 
