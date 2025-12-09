@@ -115,107 +115,6 @@ def add_border(image, border_width, color=(0, 0, 0)):
     
     return bordered
 
-def add_fancy_border(image, border_width=20, color=(0, 0, 0)):
-    h, w = image.shape[:2]
-    
-    new_h = h + 2 * border_width
-    new_w = w + 2 * border_width
-    bordered = np.full((new_h, new_w, image.shape[2]), color, dtype=image.dtype)
-    
-    mask = np.zeros((new_h, new_w), dtype=np.uint8)
-    
-    amplitude = border_width // 3
-    frequency = 0.1
-    
-    for x in range(new_w):
-        wave_offset_top = int(amplitude * math.sin(x * frequency))
-        y_top = border_width + wave_offset_top
-        mask[:y_top, x] = 1
-        
-        wave_offset_bottom = int(amplitude * math.sin(x * frequency + math.pi))
-        y_bottom = h + border_width - wave_offset_bottom
-        mask[y_bottom:, x] = 1
-    
-    for y in range(new_h):
-        wave_offset_left = int(amplitude * math.sin(y * frequency))
-        x_left = border_width + wave_offset_left
-        mask[y, :x_left] = 1
-        
-        wave_offset_right = int(amplitude * math.sin(y * frequency + math.pi))
-        x_right = w + border_width - wave_offset_right
-        mask[y, x_right:] = 1
-    
-    for y in range(new_h):
-        for x in range(new_w):
-            if mask[y, x] == 1:
-                bordered[y, x] = color
-            else:
-                src_y = y - border_width
-                src_x = x - border_width
-                if 0 <= src_y < h and 0 <= src_x < w:
-                    bordered[y, x] = image[src_y, src_x]
-    
-    return bordered
-
-def add_lens_flare(image, position, size=50, intensity=0.7):
-    result = image.astype(np.float32).copy()
-    h, w = image.shape[:2]
-    
-    flares = [
-        (size, intensity, position),
-        (size*0.7, intensity*0.6, (position[0]-size//2, position[1]-size//2)),
-        (size*0.4, intensity*0.4, (position[0]+size//3, position[1]+size//3))
-    ]
-    
-    for flare_size, flare_intensity, flare_pos in flares:
-        flare_x = min(max(flare_pos[0], 0), w-1)
-        flare_y = min(max(flare_pos[1], 0), h-1)
-        
-        for y in range(h):
-            for x in range(w):
-                distance = math.sqrt((x - flare_x)**2 + (y - flare_y)**2)
-                if distance < flare_size:
-                    flare_value = math.exp(-(distance**2) / (2*(flare_size/3)**2))
-                    flare_value *= flare_intensity
-                    
-                    for c in range(3):
-                        result[y, x, c] = min(255, result[y, x, c] + flare_value * 255)
-    
-    return np.clip(result, 0, 255).astype(np.uint8)
-
-def apply_watercolor_paper(image, texture_intensity=0.3):
-    h, w = image.shape[:2]
-    result = image.copy().astype(np.float32)
-    
-    paper_texture = generate_paper_texture(h, w)
-    
-    for y in range(h):
-        for x in range(w):
-            texture_value = paper_texture[y, x]
-            for c in range(3):
-                blended = result[y, x, c] * (1 - texture_intensity) + \
-                         result[y, x, c] * texture_value * texture_intensity
-                result[y, x, c] = blended
-    
-    return np.clip(result, 0, 255).astype(np.uint8)
-
-def generate_paper_texture(height, width):
-    texture = np.zeros((height, width))
-    
-    for octave in range(4):
-        scale = 2 ** octave
-        amplitude = 1.0 / (scale + 1)
-        
-        for y in range(height):
-            for x in range(width):
-                value = math.sin(x * 0.01 * scale + y * 0.01 * scale) * 0.5 + 0.5
-                value += math.sin(x * 0.03 * scale) * math.sin(y * 0.03 * scale)
-                texture[y, x] += value * amplitude
-    
-    texture = (texture - texture.min()) / (texture.max() - texture.min())
-    return texture
-
-
 def get_texture_path(texture_type, user_input=None):
 
     if user_input is None or user_input.strip() == "":
@@ -521,49 +420,10 @@ def filter_border(original_image):
     except ValueError:
         print("Ошибка: введите корректные числа")
 
-def filter_fancy_border(original_image):
-    print("\n--- Фигурная рамка ---")
-    try:
-        width = int(input("Введите ширину рамки: "))
-        print("Введите цвет рамки в формате R G B (0-255)")
-        r = int(input("Красный (R): "))
-        g = int(input("Зеленый (G): "))
-        b = int(input("Синий (B): "))
-        
-        result = add_fancy_border(original_image, width, (b, g, r))
-        show_image('Fancy Border Image', result)
-            
-    except ValueError:
-        print("Ошибка: введите корректные числа")
-
-def filter_lens_flare(original_image):
-    print("\n--- Эффект бликов ---")
-    try:
-        x = int(input("Введите X координату центра блика: "))
-        y = int(input("Введите Y координату центра блика: "))
-        size = int(input("Введите размер блика [50]: ").strip() or "50")
-        intensity = float(input("Введите интенсивность (0.1-1.0) [0.7]: ").strip() or "0.7")
-        
-        result = add_lens_flare(original_image, (x, y), size, intensity)
-        show_image('Lens Flare Image', result)
-            
-    except ValueError:
-        print("Ошибка: введите корректные числа")
-
-def filter_watercolor(original_image):
-    print("\n--- Текстура акварельной бумаги ---")
-    try:
-        intensity = float(input("Введите интенсивность текстуры (0.1-1.0) [0.3]: ").strip() or "0.3")
-        result = apply_watercolor_paper(original_image, intensity)
-        show_image('Watercolor Paper Image', result)
-            
-    except ValueError:
-        print("Ошибка: введите корректное число")
 
 
 def filter_lens_flare_texture(original_image):
-    print("\n--- Эффект бликов (текстурный) ---")
-    print("Текстура будет взята из папки 'textur'")
+    print("\n--- Эффект бликов ---")
     
     try:
         x = int(input("Введите X координату центра блика: "))
@@ -582,10 +442,7 @@ def filter_lens_flare_texture(original_image):
         print(f"Ошибка при применении эффекта: {e}")
 
 def filter_fancy_border_texture(original_image):
-    print("\n--- Фигурная рамка (текстурная) ---")
-    print("Текстура будет взята из папки 'textur' и наложена поверх изображения")
-    print("Убедитесь, что текстура имеет альфа-канал (PNG с прозрачностью)")
-    
+    print("\n--- Фигурная рамка ---")
     try:
         texture_input = input("Введите имя файла текстуры (например, 'border.png') или нажмите Enter для текстуры по умолчанию: ")
 
@@ -601,8 +458,7 @@ def filter_fancy_border_texture(original_image):
 
 def filter_watercolor_texture(original_image):
     print("\n--- Текстура акварельной бумаги ---")
-    print("Текстура будет взята из папки 'textur'")
-    
+  
     try:
 
         texture_input = input("Введите имя файла текстуры или нажмите Enter для текстуры по умолчанию: ")
@@ -641,18 +497,15 @@ def main():
         print(" 4. Добавить виньетку")
         print(" 5. Интерактивная пикселизация")
         print(" 6. Добавить простую рамку")
-        print(" 7. Добавить фигурную рамку")
-        print(" 8. Добавить эффект бликов")
-        print(" 9. Наложить текстуру акварельной бумаги")
         
         print("\n=== ФИЛЬТРЫ С ТЕКСТУРАМИ ИЗ ФАЙЛОВ ===")
-        print("10. Добавить эффект бликов (текстурный)")
-        print("11. Добавить фигурную рамку (текстурную)")
-        print("12. Наложить текстуру акварельной бумаги (из файла)")
-        print("13. Выход")
+        print(" 7. Добавить эффект бликов (текстурный)")
+        print(" 8. Добавить фигурную рамку (текстурную)")
+        print(" 9. Наложить текстуру акварельной бумаги (из файла)")
+        print(" 10. Выход")
         print('='*60)
         
-        choice = input("\nВыберите опцию (1-13): ").strip()
+        choice = input("\nВыберите опцию (1-10): ").strip()
         
         if choice == '1':
             show_image('Original Image', original_image)
@@ -667,18 +520,12 @@ def main():
         elif choice == '6':
             filter_border(original_image)
         elif choice == '7':
-            filter_fancy_border(original_image)
-        elif choice == '8':
-            filter_lens_flare(original_image)
-        elif choice == '9':
-            filter_watercolor(original_image)
-        elif choice == '10':
             filter_lens_flare_texture(original_image)
-        elif choice == '11':
+        elif choice == '8':
             filter_fancy_border_texture(original_image)
-        elif choice == '12':
+        elif choice == '9':
             filter_watercolor_texture(original_image)
-        elif choice == '13':
+        elif choice == '10':
             print("До свидания!")
             cv2.destroyAllWindows()
             break
