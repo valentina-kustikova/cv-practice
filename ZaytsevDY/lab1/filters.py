@@ -121,51 +121,28 @@ def add_border(image, border_width, color):
 
     return result
 
-# Функция для фигурной рамки (теперь только photo_frame)
-def add_fancy_border(image, border_width):
-    result = image.copy()
-    height, width = image.shape[:2]
-
-    border_width = max(0, border_width)
-    if border_width == 0:
-        return result
-
-    # Только паттерн photo_frame
-    frame_path = "photo_frame.png"
+def add_fancy_border(image, frame_path="frame.jpg", black_threshold=30):
+    
     frame = cv2.imread(frame_path)
     if frame is None:
-        print(f"Ошибка загрузки рамки: {frame_path}")
-        print("Используется простая черная рамка")
-        return add_border(image, border_width, (0, 0, 0))
-
-    frame_height, frame_width = frame.shape[:2]
-    photo_height, photo_width = image.shape[:2]
-
-    print(f"Размер рамки: {frame_width}x{frame_height}")
-    print(f"Размер фото: {photo_width}x{photo_height}")
-
-    # Используем border_width как процент отступов
-    margin_percent = min(border_width, 100)  # Ограничиваем 100%
-    margin_x = int(frame_width * margin_percent / 100)
-    margin_y = int(frame_height * margin_percent / 100)
-
-    insert_x = margin_x
-    insert_y = margin_y
-    insert_width = frame_width - 2 * margin_x
-    insert_height = frame_height - 2 * margin_y
-
-    if insert_width <= 0 or insert_height <= 0:
-        print("Слишком большая рамка для данного изображения")
-        print("Используется простая черная рамка")
+        print(f"Ошибка загрузки рамки: {frame_path}. Вернул простую черную рамку.")
         return add_border(image, 10, (0, 0, 0))
 
-    print(f"Область для вставки: {insert_width}x{insert_height}")
+    photo_h, photo_w = image.shape[:2]
+    frame_resized = resize_image(frame, photo_w, photo_h)
+    image_bgr = image.copy()
 
-    photo_resized = resize_image(image, insert_width, insert_height)
+    result = frame_resized.copy()
 
-    result = frame.copy()
-
-    result[insert_y:insert_y + insert_height, insert_x:insert_x + insert_width] = photo_resized
+    h, w = photo_h, photo_w
+    for y in range(h):
+        for x in range(w):
+            fb, fg, fr = frame_resized[y, x]
+            if max(int(fb), int(fg), int(fr)) <= black_threshold:
+                pb, pg, pr = image_bgr[y, x]
+                result[y, x] = [pb, pg, pr]
+            else:
+                pass
 
     return result
 
@@ -245,7 +222,7 @@ def show_menu():
     print("3. Эффект виньетки")
     print("4. Пикселизация области")
     print("5. Прямоугольная рамка")
-    print("6. Фигурная рамка (только photo_frame)")
+    print("6. Фигурная рамка ")
     print("7. Эффект бликов")
     print("8. Текстура акварельной бумаги")
     print("0. Выход")
@@ -306,15 +283,18 @@ def apply_filter(choice, image):
         print("\n--- Прямоугольная рамка ---")
         width = int(input("Ширина рамки: "))
         print("Цвет рамки (B G R):")
-        b = int(input("Синий (0-255): "))
-        g = int(input("Зеленый (0-255): "))
-        r = int(input("Красный (0-255): "))
+        try:
+            b = int(input("Синий (0-255): "))
+            g = int(input("Зеленый (0-255): "))
+            r = int(input("Красный (0-255): "))
+        except ValueError:
+            print("Неверный ввод цвета — используется чёрный.")
+            b, g, r = 0, 0, 0
         return add_border(image, width, (b, g, r))
 
     elif choice == 6:
-        print("\n--- Фигурная рамка (photo_frame) ---")
-        width = int(input("Отступ от краев рамки (в процентах 0-100): "))
-        return add_fancy_border(image, width)
+        print("\n--- Фигурная рамка  ---")
+        return add_fancy_border(image, frame_path="frame.jpg", black_threshold=30)
 
     elif choice == 7:
         print("\n--- Эффект бликов ---")
@@ -325,6 +305,7 @@ def apply_filter(choice, image):
         return add_watercolor_texture(image)
 
     return image
+
 
 def main():
     print("Загрузите изображение для начала работы.")
