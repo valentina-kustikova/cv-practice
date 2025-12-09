@@ -1,6 +1,16 @@
 import cv2
 import numpy as np
 import math
+import os
+
+
+TEXTURES_DIR = "textur"
+
+DEFAULT_TEXTURES = {
+    'flare': "flare_texture.png",   
+    'border': "border_texture.png",   
+    'paper': "paper_texture.jpg"     
+}
 
 drawing = False
 ix, iy = -1, -1
@@ -205,6 +215,153 @@ def generate_paper_texture(height, width):
     texture = (texture - texture.min()) / (texture.max() - texture.min())
     return texture
 
+
+def get_texture_path(texture_type, user_input=None):
+
+    if user_input is None or user_input.strip() == "":
+
+        filename = DEFAULT_TEXTURES.get(texture_type, "texture.jpg")
+        texture_path = os.path.join(TEXTURES_DIR, filename)
+    else:
+        texture_path = user_input.strip()
+
+        if not os.path.dirname(texture_path):
+            texture_path = os.path.join(TEXTURES_DIR, texture_path)
+    
+    return texture_path
+
+def add_lens_flare_texture(image, position, texture_path=None, intensity=0.7):
+
+    result = image.astype(np.float32).copy()
+    h, w = image.shape[:2]
+
+    actual_texture_path = get_texture_path('flare', texture_path)
+    
+    if not os.path.exists(actual_texture_path):
+        print(f"Файл текстуры не найден: {actual_texture_path}")
+        return image
+    
+    flare_texture = cv2.imread(actual_texture_path, cv2.IMREAD_UNCHANGED)
+    if flare_texture is None:
+        print(f"Не удалось загрузить текстуру: {actual_texture_path}")
+        return image
+    
+
+    if flare_texture.shape[2] == 3:
+
+        gray = cv2.cvtColor(flare_texture, cv2.COLOR_BGR2GRAY)
+        alpha = gray.astype(np.float32) / 255.0
+        flare_texture = np.dstack([flare_texture, alpha])
+    else:
+
+        flare_texture = flare_texture.astype(np.float32)
+        flare_texture[:, :, 3] /= 255.0
+    
+    flare_h, flare_w = flare_texture.shape[:2]
+    flare_x, flare_y = position
+    
+
+    for y in range(max(0, flare_y - flare_h//2), min(h, flare_y + flare_h//2)):
+        for x in range(max(0, flare_x - flare_w//2), min(w, flare_x + flare_w//2)):
+
+            tex_y = y - (flare_y - flare_h//2)
+            tex_x = x - (flare_x - flare_w//2)
+            
+            if 0 <= tex_y < flare_h and 0 <= tex_x < flare_w:
+
+                tex_color = flare_texture[tex_y, tex_x, :3]
+                tex_alpha = flare_texture[tex_y, tex_x, 3] * intensity
+
+                for c in range(3):
+                    result[y, x, c] = min(255, result[y, x, c] * (1 - tex_alpha) + tex_color[c] * tex_alpha)
+    
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+def add_fancy_border_texture(image, border_width, texture_path=None):
+    h, w = image.shape[:2]
+    
+    actual_texture_path = get_texture_path('border', texture_path)
+
+    if not os.path.exists(actual_texture_path):
+        print(f"Файл текстуры не найден: {actual_texture_path}")
+        print("Проверьте, что в папке 'textur' есть файл 'border_texture.png'")
+        return image
+
+    border_texture = cv2.imread(actual_texture_path, cv2.IMREAD_UNCHANGED)
+    if border_texture is None:
+        print(f"Не удалось загрузить текстуру: {actual_texture_path}")
+        return image
+
+    if border_texture.shape[2] == 3:
+        print("ВНИМАНИЕ: Текстура не имеет альфа-канала. Создаю простую маску.")
+
+        alpha = np.zeros((border_texture.shape[0], border_texture.shape[1]), dtype=np.uint8)
+        
+        border_size = min(h, w) // 10 
+        alpha[:border_size, :] = 255  
+        alpha[-border_size:, :] = 255  
+        alpha[:, :border_size] = 255  
+        alpha[:, -border_size:] = 255  
+        
+        
+        border_texture = np.dstack([border_texture, alpha])
+    
+    
+    texture_color = border_texture[:, :, :3]
+    texture_alpha = border_texture[:, :, 3] / 255.0  
+    
+
+    texture_color_resized = cv2.resize(texture_color, (w, h))
+    texture_alpha_resized = cv2.resize(texture_alpha, (w, h))
+    
+
+    result = image.astype(np.float32).copy()
+    
+    for y in range(h):
+        for x in range(w):
+            alpha = texture_alpha_resized[y, x]
+
+            if alpha > 0:
+                for c in range(3):
+
+                    result[y, x, c] = result[y, x, c] * (1 - alpha) + texture_color_resized[y, x, c] * alpha
+    
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+def apply_watercolor_paper_texture(image, texture_path=None, intensity=0.5):
+
+    h, w = image.shape[:2]
+    
+    actual_texture_path = get_texture_path('paper', texture_path)
+    
+    if not os.path.exists(actual_texture_path):
+        print(f"Файл текстуры не найден: {actual_texture_path}")
+        return image
+    
+    paper_texture = cv2.imread(actual_texture_path)
+    if paper_texture is None:
+        print(f"Не удалось загрузить текстуру: {actual_texture_path}")
+        return image
+    
+    if len(paper_texture.shape) == 3:
+        gray_texture = cv2.cvtColor(paper_texture, cv2.COLOR_BGR2GRAY)
+    else:
+        gray_texture = paper_texture
+    
+    if gray_texture.shape[0] != h or gray_texture.shape[1] != w:
+        gray_texture = cv2.resize(gray_texture, (w, h))
+    
+    texture_norm = gray_texture.astype(np.float32) / 255.0
+    result = image.astype(np.float32).copy()
+    
+    for y in range(h):
+        for x in range(w):
+            tex_val = texture_norm[y, x]
+            blend_val = 1.0 - intensity + tex_val * intensity
+            result[y, x] *= blend_val
+    
+    return np.clip(result, 0, 255).astype(np.uint8)
+
 def load_image():
     image_path = input("Введите путь к изображению (или нажмите Enter для использования test_image.jpg): ").strip()
     if not image_path:
@@ -403,59 +560,128 @@ def filter_watercolor(original_image):
     except ValueError:
         print("Ошибка: введите корректное число")
 
+
+def filter_lens_flare_texture(original_image):
+    print("\n--- Эффект бликов (текстурный) ---")
+    print("Текстура будет взята из папки 'textur'")
+    
+    try:
+        x = int(input("Введите X координату центра блика: "))
+        y = int(input("Введите Y координату центра блика: "))
+        
+        texture_input = input("Введите имя файла текстуры или нажмите Enter для текстуры по умолчанию: ")
+        
+        intensity = float(input("Введите интенсивность (0.1-1.0) [0.7]: ").strip() or "0.7")
+
+        result = add_lens_flare_texture(original_image, (x, y), texture_input, intensity)
+        show_image('Lens Flare (Texture)', result)
+            
+    except ValueError:
+        print("Ошибка: введите корректные числа")
+    except Exception as e:
+        print(f"Ошибка при применении эффекта: {e}")
+
+def filter_fancy_border_texture(original_image):
+    print("\n--- Фигурная рамка (текстурная) ---")
+    print("Текстура будет взята из папки 'textur' и наложена поверх изображения")
+    print("Убедитесь, что текстура имеет альфа-канал (PNG с прозрачностью)")
+    
+    try:
+        texture_input = input("Введите имя файла текстуры (например, 'border.png') или нажмите Enter для текстуры по умолчанию: ")
+
+        result = add_fancy_border_texture(original_image, 20, texture_input)
+        show_image('Fancy Border (Texture Overlay)', result)
+            
+    except ValueError:
+        print("Ошибка: введите корректные числа")
+    except Exception as e:
+        print(f"Ошибка при применении эффекта: {e}")
+        import traceback
+        traceback.print_exc()
+
+def filter_watercolor_texture(original_image):
+    print("\n--- Текстура акварельной бумаги ---")
+    print("Текстура будет взята из папки 'textur'")
+    
+    try:
+
+        texture_input = input("Введите имя файла текстуры или нажмите Enter для текстуры по умолчанию: ")
+        
+        intensity = float(input("Введите интенсивность (0.1-1.0) [0.5]: ").strip() or "0.5")
+
+
+        result = apply_watercolor_paper_texture(original_image, texture_input, intensity)
+        show_image('Watercolor Paper (Texture)', result)
+            
+    except ValueError:
+        print("Ошибка: введите корректное число")
+    except Exception as e:
+        print(f"Ошибка при применении эффекта: {e}")
+
+
 def main():
-    print("=== ФОТОФИЛЬТРЫ ===")
+
+    if not os.path.exists(TEXTURES_DIR):
+        print(f"\nВНИМАНИЕ: Папка '{TEXTURES_DIR}' не найдена!")
+        print("Создайте папку 'textur' и поместите туда текстуры:")
+        print("  - flare_texture.png (для бликов)")
+        print("  - border_texture.jpg (для рамки)")
+        print("  - paper_texture.jpg (для бумаги)")
+        print("Или укажите полный путь к текстурам при запросе.\n")
     
     original_image = load_image()
     
     while True:
-        print(f"\n{'='*50}")
+        print(f"\n{'='*60}")
         print("ГЛАВНОЕ МЕНЮ")
-        print("1. Показать исходное изображение")
-        print("2. Изменить размер")
-        print("3. Применить сепию")
-        print("4. Добавить виньетку")
-        print("5. Интерактивная пикселизация")
-        print("6. Добавить простую рамку")
-        print("7. Добавить фигурную рамку")
-        print("8. Добавить эффект бликов")
-        print("9. Наложить текстуру акварельной бумаги")
-        print("10. Выход")
+        print("\n=== ОСНОВНЫЕ ФИЛЬТРЫ (процедурные) ===")
+        print(" 1. Показать исходное изображение")
+        print(" 2. Изменить размер")
+        print(" 3. Применить сепию")
+        print(" 4. Добавить виньетку")
+        print(" 5. Интерактивная пикселизация")
+        print(" 6. Добавить простую рамку")
+        print(" 7. Добавить фигурную рамку")
+        print(" 8. Добавить эффект бликов")
+        print(" 9. Наложить текстуру акварельной бумаги")
         
-        choice = input("Выберите опцию (1-10): ").strip()
+        print("\n=== ФИЛЬТРЫ С ТЕКСТУРАМИ ИЗ ФАЙЛОВ ===")
+        print("10. Добавить эффект бликов (текстурный)")
+        print("11. Добавить фигурную рамку (текстурную)")
+        print("12. Наложить текстуру акварельной бумаги (из файла)")
+        print("13. Выход")
+        print('='*60)
+        
+        choice = input("\nВыберите опцию (1-13): ").strip()
         
         if choice == '1':
             show_image('Original Image', original_image)
-            
         elif choice == '2':
             filter_resize(original_image)
-            
         elif choice == '3':
             filter_sepia(original_image)
-            
         elif choice == '4':
             filter_vignette(original_image)
-            
         elif choice == '5':
             interactive_pixelation(original_image)
-            
         elif choice == '6':
             filter_border(original_image)
-            
         elif choice == '7':
             filter_fancy_border(original_image)
-            
         elif choice == '8':
             filter_lens_flare(original_image)
-            
         elif choice == '9':
             filter_watercolor(original_image)
-            
         elif choice == '10':
+            filter_lens_flare_texture(original_image)
+        elif choice == '11':
+            filter_fancy_border_texture(original_image)
+        elif choice == '12':
+            filter_watercolor_texture(original_image)
+        elif choice == '13':
             print("До свидания!")
             cv2.destroyAllWindows()
             break
-            
         else:
             print("Неверный выбор. Попробуйте снова.")
 
