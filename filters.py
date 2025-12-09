@@ -1,6 +1,14 @@
-
 import numpy as np
 import cv2
+import os
+
+TEXTURES_DIR = "textures"
+
+def _load_texture(filename):
+    path = os.path.join(TEXTURES_DIR, filename)
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Текстура не найдена: {path}")
+    return cv2.imread(path, cv2.IMREAD_UNCHANGED)
 
 def resize_image(image, width=None, height=None):
     h, w = image.shape[:2]
@@ -85,10 +93,16 @@ def apply_custom_border(image, border_width, border_type='dashed', color=(255, 2
             y += dash + gap
     return img
 
-def apply_lens_flare(image, flare_path, flare_position=(100, 100)):
-    flare = cv2.imread(flare_path, cv2.IMREAD_UNCHANGED)
+def apply_lens_flare(image, flare_position=(100, 100)):
+    flare = None
+    for ext in [".png", ".jpg", ".jpeg"]:
+        try:
+            flare = _load_texture("glare" + ext)
+            break
+        except FileNotFoundError:
+            continue
     if flare is None:
-        raise FileNotFoundError(f"Файл блика не найден: {flare_path}")
+        raise FileNotFoundError(f"Файл блика не найден в папке {TEXTURES_DIR} (glare.png или glare.jpg)")
 
     result = image.copy().astype(np.float32)
     h, w = image.shape[:2]
@@ -110,21 +124,46 @@ def apply_lens_flare(image, flare_path, flare_position=(100, 100)):
 
     return np.clip(result, 0, 255).astype(np.uint8)
 
-def apply_watercolor_texture(image, texture_path):
-    texture = cv2.imread(texture_path, cv2.IMREAD_UNCHANGED)
+def apply_watercolor_texture(image, strength=0.8):
+    texture = None
+    for ext in [".png", ".jpg", ".jpeg"]:
+        try:
+            texture = _load_texture("watercolor_paper" + ext)
+            break
+        except FileNotFoundError:
+            continue
     if texture is None:
-        raise FileNotFoundError(f"Текстура не найдена: {texture_path}")
+        raise FileNotFoundError(f"Файл акварели не найден в папке {TEXTURES_DIR} (watercolor_paper.png или .jpg)")
 
     texture = resize_image(texture, image.shape[1], image.shape[0])
     result = image.astype(np.float32)
+    tex_float = texture.astype(np.float32)
 
     if texture.shape[2] == 4:
-        alpha = texture[:, :, 3:4].astype(np.float32) / 255.0
-        tex_rgb = texture[:, :, :3].astype(np.float32)
-        result = result * (1 - alpha * 0.7) + tex_rgb * (alpha * 0.7)
+        # Текстура с альфа-каналом
+        alpha = tex_float[:, :, 3:4] / 255.0
+        tex_rgb = tex_float[:, :, :3]
+        # Усиливаем влияние текстуры
+        blend = alpha * strength * 1.2
+        blend = np.clip(blend, 0, 1)
+        result = result * (1 - blend) + tex_rgb * blend
     else:
-        gray = np.mean(texture, axis=2, keepdims=True)
+        # Текстура без альфа-канала - используем режим overlay для заметного эффекта
+        tex_rgb = tex_float
+        gray = np.mean(tex_rgb, axis=2, keepdims=True)
         mask = gray / 255.0
-        result = result * (0.9 + 0.1 * mask)
+        
+        # Применяем overlay blend mode для более заметного эффекта
+        for c in range(3):
+            channel = result[:, :, c:c+1]
+            tex_channel = tex_rgb[:, :, c:c+1]
+            # Overlay blend: затемняем темные области, осветляем светлые
+            overlay = np.where(channel < 128,
+                              (2 * channel * tex_channel) / 255.0,
+                              255.0 - 2 * (255.0 - channel) * (255.0 - tex_channel) / 255.0)
+            # Усиливаем смешивание для более заметного эффекта
+            enhanced_strength = strength * 1.1
+            enhanced_strength = min(enhanced_strength, 1.0)
+            result[:, :, c:c+1] = channel * (1 - enhanced_strength) + overlay * enhanced_strength
 
     return np.clip(result, 0, 255).astype(np.uint8)
