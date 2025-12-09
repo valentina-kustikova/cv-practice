@@ -1,9 +1,6 @@
 import os
-
 import cv2
 import numpy as np
-import sys
-import math
 
 # Изменение размера изображения
 def resize_image(image, new_width, new_height):
@@ -95,7 +92,7 @@ def pixelate_region(image, x, y, width, height, pixel_size):
 
     return result
 
-
+# Функция для прямоугольной рамки
 def add_border(image, border_width, color):
     result = image.copy()
 
@@ -124,7 +121,8 @@ def add_border(image, border_width, color):
 
     return result
 
-def add_fancy_border(image, border_width, color, pattern):
+# Функция для фигурной рамки (теперь только photo_frame)
+def add_fancy_border(image, border_width):
     result = image.copy()
     height, width = image.shape[:2]
 
@@ -132,146 +130,46 @@ def add_fancy_border(image, border_width, color, pattern):
     if border_width == 0:
         return result
 
-    if pattern == "solid":
-        return add_border(image, border_width, color)
+    # Только паттерн photo_frame
+    frame_path = "photo_frame.png"
+    frame = cv2.imread(frame_path)
+    if frame is None:
+        print(f"Ошибка загрузки рамки: {frame_path}")
+        print("Используется простая черная рамка")
+        return add_border(image, border_width, (0, 0, 0))
 
-    elif pattern == "dashed":
-        dash_length = min(15, border_width * 3)
-        gap_length = min(10, border_width * 2)
+    frame_height, frame_width = frame.shape[:2]
+    photo_height, photo_width = image.shape[:2]
 
-        for y in range(border_width):
-            x = 0
-            while x < width:
-                for i in range(min(dash_length, width - x)):
-                    if x + i < width:
-                        result[y, x + i] = color
-                x += dash_length + gap_length
+    print(f"Размер рамки: {frame_width}x{frame_height}")
+    print(f"Размер фото: {photo_width}x{photo_height}")
 
-        for y in range(height - border_width, height):
-            x = 0
-            while x < width:
-                for i in range(min(dash_length, width - x)):
-                    if x + i < width:
-                        result[y, x + i] = color
-                x += dash_length + gap_length
+    # Используем border_width как процент отступов
+    margin_percent = min(border_width, 100)  # Ограничиваем 100%
+    margin_x = int(frame_width * margin_percent / 100)
+    margin_y = int(frame_height * margin_percent / 100)
 
-        for x in range(border_width):
-            y = 0
-            while y < height:
-                for i in range(min(dash_length, height - y)):
-                    if y + i < height:
-                        result[y + i, x] = color
-                y += dash_length + gap_length
+    insert_x = margin_x
+    insert_y = margin_y
+    insert_width = frame_width - 2 * margin_x
+    insert_height = frame_height - 2 * margin_y
 
-        for x in range(width - border_width, width):
-            y = 0
-            while y < height:
-                for i in range(min(dash_length, height - y)):
-                    if y + i < height:
-                        result[y + i, x] = color
-                y += dash_length + gap_length
+    if insert_width <= 0 or insert_height <= 0:
+        print("Слишком большая рамка для данного изображения")
+        print("Используется простая черная рамка")
+        return add_border(image, 10, (0, 0, 0))
 
-    elif pattern == "double":
-        inner_offset = max(1, border_width // 3)
+    print(f"Область для вставки: {insert_width}x{insert_height}")
 
-        result = add_border(result, border_width, color)
+    photo_resized = resize_image(image, insert_width, insert_height)
 
-        inner_border_width = max(1, border_width // 2)
-        inner_y_start = border_width + inner_offset
-        inner_y_end = height - border_width - inner_offset
-        inner_x_start = border_width + inner_offset
-        inner_x_end = width - border_width - inner_offset
+    result = frame.copy()
 
-        for y in range(inner_y_start, inner_y_start + inner_border_width):
-            for x in range(inner_x_start, inner_x_end):
-                result[y, x] = color
-
-        for y in range(inner_y_end - inner_border_width, inner_y_end):
-            for x in range(inner_x_start, inner_x_end):
-                result[y, x] = color
-
-        for x in range(inner_x_start, inner_x_start + inner_border_width):
-            for y in range(inner_y_start, inner_y_end):
-                result[y, x] = color
-
-        for x in range(inner_x_end - inner_border_width, inner_x_end):
-            for y in range(inner_y_start, inner_y_end):
-                result[y, x] = color
-
-    elif pattern == "wave":
-        amplitude = max(2, border_width // 2)
-        frequency = 0.1
-
-        for y in range(border_width):
-            for x in range(width):
-                wave_offset = int(amplitude * math.sin(x * frequency))
-                if y == wave_offset % border_width:
-                    result[y, x] = color
-
-        for y in range(height - border_width, height):
-            for x in range(width):
-                wave_offset = int(amplitude * math.sin(x * frequency))
-                if (height - y - 1) == wave_offset % border_width:
-                    result[y, x] = color
-
-        for x in range(border_width):
-            for y in range(height):
-                wave_offset = int(amplitude * math.sin(y * frequency))
-                if x == wave_offset % border_width:
-                    result[y, x] = color
-
-        for x in range(width - border_width, width):
-            for y in range(height):
-                wave_offset = int(amplitude * math.sin(y * frequency))
-                if (width - x - 1) == wave_offset % border_width:
-                    result[y, x] = color
-    elif pattern == "photo_frame":
-        frame_path = "photo_frame.png"
-        frame = cv2.imread(frame_path)
-        if frame is None:
-            print(f"Ошибка загрузки рамки: {frame_path}")
-            return add_border(image, border_width, color)
-
-        frame_height, frame_width = frame.shape[:2]
-        photo_height, photo_width = image.shape[:2]
-
-        print(f"Размер рамки: {frame_width}x{frame_height}")
-        print(f"Размер фото: {photo_width}x{photo_height}")
-
-        if border_width <= 100:
-            margin_percent = border_width
-            margin_x = int(frame_width * margin_percent / 100)
-            margin_y = int(frame_height * margin_percent / 100)
-        else:
-            margin_x = border_width
-            margin_y = border_width
-
-        insert_x = margin_x
-        insert_y = margin_y
-        insert_width = frame_width - 2 * margin_x
-        insert_height = frame_height - 2 * margin_y
-
-        if insert_width <= 0 or insert_height <= 0:
-            print("Слишком большая рамка для данного изображения")
-            return add_border(image, 10, color) 
-
-        print(f"Область для вставки: {insert_width}x{insert_height}")
-
-        photo_resized = resize_image(image, insert_width, insert_height)
-
-        result = frame.copy()
-
-        result[insert_y:insert_y + insert_height, insert_x:insert_x + insert_width] = photo_resized
-
-        return result
-
-    else:
-        print(f"Неизвестный паттерн: {pattern}. Используется solid.")
-        return add_border(image, border_width, color)
+    result[insert_y:insert_y + insert_height, insert_x:insert_x + insert_width] = photo_resized
 
     return result
 
-
+# Функция для наложения бликов
 def add_lens_flare(image):
     flare_path = "flare.png"
 
@@ -305,6 +203,7 @@ def add_lens_flare(image):
 
     return result.astype(np.uint8)
 
+# Функция для наложения текстуры акварельной бумаги
 def add_watercolor_texture(image):
     paper_path = "water.jpg"
 
@@ -337,7 +236,6 @@ def add_watercolor_texture(image):
 
     return result
 
-
 def show_menu():
     print("\n" + "=" * 50)
     print("          ФИЛЬТРЫ ДЛЯ ИЗОБРАЖЕНИЙ")
@@ -347,12 +245,11 @@ def show_menu():
     print("3. Эффект виньетки")
     print("4. Пикселизация области")
     print("5. Прямоугольная рамка")
-    print("6. Фигурная рамка")
+    print("6. Фигурная рамка (только photo_frame)")
     print("7. Эффект бликов")
     print("8. Текстура акварельной бумаги")
     print("0. Выход")
     print("=" * 50)
-
 
 def get_user_choice():
     while True:
@@ -364,7 +261,6 @@ def get_user_choice():
                 print("Пожалуйста, введите число от 0 до 8")
         except ValueError:
             print("Пожалуйста, введите корректное число")
-
 
 def load_image():
     while True:
@@ -378,7 +274,6 @@ def load_image():
                 print("Ошибка загрузки изображения. Попробуйте другой файл.")
         else:
             print("Файл не найден. Попробуйте еще раз.")
-
 
 def apply_filter(choice, image):
     if choice == 1:
@@ -416,30 +311,20 @@ def apply_filter(choice, image):
         r = int(input("Красный (0-255): "))
         return add_border(image, width, (b, g, r))
 
-
     elif choice == 6:
-        print("\n--- Фигурная рамка ---")
-        width = int(input("Ширина рамки: "))
-        print("Цвет рамки (B G R):")
-        b = int(input("Синий (0-255): "))
-        g = int(input("Зеленый (0-255): "))
-        r = int(input("Красный (0-255): "))
-        print("Доступные узоры: solid, dashed, double, wave, photo_frame")
-        pattern = input("Тип узора: ")
-        return add_fancy_border(image, width, (b, g, r), pattern)
+        print("\n--- Фигурная рамка (photo_frame) ---")
+        width = int(input("Отступ от краев рамки (в процентах 0-100): "))
+        return add_fancy_border(image, width)
 
     elif choice == 7:
-        # Эффект бликов
         print("\n--- Эффект бликов ---")
         return add_lens_flare(image)
 
     elif choice == 8:
-        # Текстура акварельной бумаги
         print("\n--- Текстура акварельной бумаги ---")
         return add_watercolor_texture(image)
 
     return image
-
 
 def main():
     print("Загрузите изображение для начала работы.")
@@ -468,11 +353,9 @@ def main():
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
-
         except Exception as e:
             print(f"Произошла ошибка: {str(e)}")
             print("Попробуйте еще раз с другими параметрами.")
-
 
 if __name__ == "__main__":
     main()
