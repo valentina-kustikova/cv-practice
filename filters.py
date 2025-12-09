@@ -140,28 +140,22 @@ def apply_watercolor_texture(image, strength=0.8):
     tex_float = texture.astype(np.float32)
 
     if texture.shape[2] == 4:
-        # Текстура с альфа-каналом
         alpha = tex_float[:, :, 3:4] / 255.0
         tex_rgb = tex_float[:, :, :3]
-        # Усиливаем влияние текстуры
         blend = alpha * strength * 1.2
         blend = np.clip(blend, 0, 1)
         result = result * (1 - blend) + tex_rgb * blend
     else:
-        # Текстура без альфа-канала - используем режим overlay для заметного эффекта
         tex_rgb = tex_float
         gray = np.mean(tex_rgb, axis=2, keepdims=True)
         mask = gray / 255.0
         
-        # Применяем overlay blend mode для более заметного эффекта
         for c in range(3):
             channel = result[:, :, c:c+1]
             tex_channel = tex_rgb[:, :, c:c+1]
-            # Overlay blend: затемняем темные области, осветляем светлые
             overlay = np.where(channel < 128,
                               (2 * channel * tex_channel) / 255.0,
                               255.0 - 2 * (255.0 - channel) * (255.0 - tex_channel) / 255.0)
-            # Усиливаем смешивание для более заметного эффекта
             enhanced_strength = strength * 1.1
             enhanced_strength = min(enhanced_strength, 1.0)
             result[:, :, c:c+1] = channel * (1 - enhanced_strength) + overlay * enhanced_strength

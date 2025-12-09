@@ -28,7 +28,6 @@ def show_menu():
     print("="*50)
 
 def apply_filter(image, filter_name, h, w):
-    """Применяет выбранный фильтр к изображению"""
     try:
         if filter_name == 'resize':
             width = int(input("Введите ширину (по умолчанию 800): ") or "800")
@@ -75,7 +74,6 @@ def apply_filter(image, filter_name, h, w):
         return None
 
 def interactive_mode(image_path):
-    """Интерактивный режим с меню"""
     if not os.path.exists(image_path):
         print(f"Ошибка: файл {image_path} не найден")
         sys.exit(1)
@@ -121,19 +119,14 @@ def interactive_mode(image_path):
         print("Нажмите любую клавишу в окне изображения для закрытия окон...")
         sys.stdout.flush()
         
-        # Ждем нажатия клавиши (блокирующий вызов)
         cv2.waitKey(0)
         
-        # Закрываем все окна
         cv2.destroyAllWindows()
-        # Даем время окнам закрыться
         cv2.waitKey(1)
         time.sleep(0.2)
         
-        # Очищаем буфер вывода
         sys.stdout.flush()
         
-        # Явно запрашиваем подтверждение для возврата в меню
         print("\nОкна закрыты. Нажмите Enter для возврата в меню...")
         sys.stdout.flush()
         try:
@@ -142,7 +135,7 @@ def interactive_mode(image_path):
             print("\nВыход из программы.")
             return
         
-        print()  # Пустая строка для читаемости
+        print()
 
 def main():
     parser = argparse.ArgumentParser(description='Практическая работа №1: фильтры изображений')
@@ -165,17 +158,14 @@ def main():
     
     args = parser.parse_args()
     
-    # Если указано только изображение без фильтра - интерактивный режим
     if args.image and not args.filter:
         interactive_mode(args.image)
         return
     
-    # Если не указано изображение - ошибка
     if not args.image:
         print("Ошибка: необходимо указать путь к изображению через -i или --image")
         sys.exit(1)
     
-    # Режим командной строки (как раньше)
     if not os.path.exists(args.image):
         print(f"Ошибка: файл {args.image} не найден")
         sys.exit(1)
