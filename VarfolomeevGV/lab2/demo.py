@@ -51,79 +51,91 @@ def load_annotations(annotations_path: str, image_names: List[str]) -> Dict[str,
     Returns:
         Словарь {имя_файла: список_детекций}
     """
-    annotations = {}
-    
-    if not annotations_path:
+    # Подготовим словарь с ключами для всех изображений (чтобы не потерять имена)
+    annotations: Dict[str, List[List[float]]] = {os.path.basename(p): [] for p in image_names}
+
+    if not annotations_path or not os.path.isfile(annotations_path):
         return annotations
-    
-    if os.path.isfile(annotations_path):
-        # Один файл с разметкой для всех изображений
-        # Формат может быть 'required' (frame_id class_name x1 y1 x2 y2) или 'simple'
-        try:
-            # Проверяем формат файла по первой строке
-            format_loaded = False
-            with open(annotations_path, 'r', encoding='utf-8') as f:
-                first_line = f.readline().strip()
-                if first_line:
-                    parts = first_line.split()
-                    # Если формат 'required', первая колонка - frame_id (число)
-                    if len(parts) >= 6:
-                        try:
-                            frame_id = int(parts[0])
-                            # формат 'required', фильтруем по номеру кадра
-                            # Загружаем разметку для каждого изображения отдельно
-                            for idx, img_path in enumerate(image_names):
-                                img_name = os.path.basename(img_path)
-                                frame_gt = []
-                                
-                                # Читаем файл и фильтруем строки для текущего кадра
-                                with open(annotations_path, 'r', encoding='utf-8') as f2:
-                                    for line in f2:
-                                        line = line.strip()
-                                        if not line:
-                                            continue
-                                        line_parts = line.split()
-                                        if len(line_parts) >= 6:
-                                            try:
-                                                if int(line_parts[0]) == idx:
-                                                    # Это наш кадр, парсим разметку
-                                                    class_name = line_parts[1]
-                                                    # Маппинг названий классов в COCO ID
-                                                    class_name_to_id = {
-                                                        'car': 2, 'CAR': 2, 'Car': 2,
-                                                        'bus': 5, 'BUS': 5, 'Bus': 5,
-                                                    }
-                                                    # В файле все названия классов в верхнем регистре
-                                                    class_id = class_name_to_id.get(class_name.upper(), -1)
-                                                    # Пробуем другие регистры в случае, если не удалось найти
-                                                    if class_id == -1:
-                                                        class_id = class_name_to_id.get(class_name, -1)
-                                                    if class_id == -1:
-                                                        class_id = class_name_to_id.get(class_name.lower(), -1)
-                                                    
-                                                    if class_id != -1:
-                                                        try:
-                                                            x1 = float(line_parts[2])
-                                                            y1 = float(line_parts[3])
-                                                            x2 = float(line_parts[4])
-                                                            y2 = float(line_parts[5])
-                                                            frame_gt.append([x1, y1, x2, y2, class_id])
-                                                        except ValueError:
-                                                            continue
-                                            except ValueError:
-                                                continue
-                                
-                                annotations[img_name] = frame_gt
-                            
-                            # Если загрузили хотя бы одну разметку, помечаем успех
-                            if annotations:
-                                format_loaded = True
-                        except ValueError:
-                            pass  # Не формат required
-        except Exception as e:
-            print(f"Ошибка при загрузке разметки: {e}")
-            import traceback
-            traceback.print_exc()
+
+    # Определяем формат имени кадра по первому файлу (например, '000046.jpg' -> длина 6, расширение .jpg)
+    pad_len = 0
+    default_ext = ".jpg"
+    if image_names:
+        first_name = os.path.basename(image_names[0])
+        name_root, name_ext = os.path.splitext(first_name)
+        pad_len = len(name_root)
+        default_ext = name_ext or default_ext
+
+    image_name_set = set(annotations.keys())
+
+    # Маппинг названий классов в COCO ID (используем расширенный список из utils.metrics)
+    class_name_to_id = {
+        'car': 2, 'CAR': 2, 'Car': 2,
+        'bicycle': 1, 'BICYCLE': 1, 'Bicycle': 1,
+        'motorcycle': 3, 'MOTORCYCLE': 3, 'Motorcycle': 3,
+        'bus': 5, 'BUS': 5, 'Bus': 5,
+        'truck': 7, 'TRUCK': 7, 'Truck': 7,
+    }
+
+    def resolve_image_name(frame_id: int) -> str:
+        """
+        Подбираем имя файла по номеру кадра с учетом нулевого дополнения.
+        Пробуем варианты: с паддингом (по длине имени первого файла) и без.
+        """
+        candidates = []
+        if pad_len > 0:
+            candidates.append(f"{frame_id:0{pad_len}d}{default_ext}")
+        candidates.append(f"{frame_id}{default_ext}")
+        for candidate in candidates:
+            if candidate in image_name_set:
+                return candidate
+        return ""
+
+    try:
+        with open(annotations_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split()
+                if len(parts) < 6:
+                    continue
+
+                # 0: frame_id, 1: class_name, 2-5: bbox координаты
+                try:
+                    frame_id = int(parts[0])
+                except ValueError:
+                    continue
+
+                class_name = parts[1]
+                class_id = class_name_to_id.get(class_name, -1)
+                if class_id == -1:
+                    class_id = class_name_to_id.get(class_name.upper(), -1)
+                if class_id == -1:
+                    class_id = class_name_to_id.get(class_name.lower(), -1)
+                if class_id == -1:
+                    continue  # неизвестный класс
+
+                try:
+                    x1 = float(parts[2])
+                    y1 = float(parts[3])
+                    x2 = float(parts[4])
+                    y2 = float(parts[5])
+                except ValueError:
+                    continue
+
+                img_name = resolve_image_name(frame_id)
+                if not img_name:
+                    # Нет соответствующего файла среди входных изображений
+                    continue
+
+                annotations.setdefault(img_name, []).append([x1, y1, x2, y2, class_id])
+
+    except Exception as e:
+        print(f"Ошибка при загрузке разметки: {e}")
+        import traceback
+        traceback.print_exc()
+
     return annotations
 
 
