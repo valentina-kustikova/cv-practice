@@ -118,6 +118,23 @@ python main.py --data_path ./data --train_split data/train.txt --test_split data
 ```
 
 ## Сравнение методов
+Результаты были получены при следующих запусках:
+
+**Bag of Words:** 
+```bash
+python main.py --data_path ./data --train_split data/train.txt --test_split data/test.txt --algorithm bow --mode both --visualize_predictions --max_predictions 20
+
+python main.py --mode test --algorithm bow --data_path ./data --train_split data/train.txt --test_split data/test.txt  --visualize_keypoints --max_keypoints 50 --model_path models --model_name bow_SIFT_vocab50_20251124_224329
+```
+**NN с ResNet50:**
+```bash
+python main.py --data_path ./data --train_split data/train.txt --test_split data/test.txt --algorithm nn --mode both --epochs 15 --batch_size 32 --lr 0.001
+
+python main.py --mode test --algorithm nn --data_path ./data --train_split data/train.txt --test_split data/test.txt --model_path models --model_name nn_resnet_20251119_002702
+```
+
+### Результаты
+
 |Метод|Точность|
 |---|---|
 |Bag of Visual Words |**0.9659**|
