@@ -1,0 +1,31 @@
+# Модели нейронных сетей
+models/
+
+# Данные (изображения)
+data/
+
+# Результаты работы
+output/
+
+# Python кэш
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Виртуальное окружение
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Логи
+*.log
