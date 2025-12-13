@@ -36,8 +36,7 @@
 3. **Постобработка**
  - Извлечение детекций из единственного выходного тензора
  - Фильтрация по порогу уверенности $\tau_{conf}$
- - Преобразование нормализованных координат [0,1] в пиксельные:
-$ x = x_{norm} \cdot width, \quad y = y_{norm} \cdot height $
+ - Преобразование нормализованных координат [0,1] в пиксельные: $x = x_{norm} \cdot w, \quad y = y_{norm} \cdot h$
 
 ## Метрики качества
 ### Матрица ошибок
@@ -60,7 +59,7 @@ $$TPR = \frac{TP}{TP + FN}$$ (True Positive Rate / Recall) — полнота
 
 $$FDR = \frac{FP}{TP + FP}$$ (False Discovery Rate) — доля ложных находок
 
-$$IoU = \frac{\text{Площадь пересечения}}{\text{Площадь объединения}} = \frac{|B_p \cap B_g|}{|B_p \cup B_g|}$$ — Intersection over Union
+$$IoU(A,B) = \frac{|A \cap B|}{|A \cup B|} = \frac{|A \cap B|}{|A| + |B| - |A \cap B|}$$ — Intersection over Union
 
 Сопоставление предсказаний и ground truth выполняется жадно: детекции сортируются по уверенности, каждому объекту разметки назначается лучшая подходящая детекция того же класса.
 
@@ -84,7 +83,7 @@ python main.py \
 ### Основные параметры:
 
  - `--images_dir` — директория с изображениями (jpg/png)
- - `--annotation_file` — файл аннотаций в формате: frame_id class_name x1 y1 x2 y2
+ - `--annotation_file` — файл аннотаций
  - `--model` — выбор модели (yolo, yolo_tiny, ssd_mobilenet)
  - `--confidence` — порог уверенности (по умолчанию 0.3)
  - `--iou_threshold` — порог IoU для оценки (по умолчанию 0.45)
