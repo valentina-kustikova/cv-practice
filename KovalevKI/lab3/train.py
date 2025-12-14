@@ -75,7 +75,7 @@ def main():
                 print(f"Загрузка модели из {args.model_save}")
                 model = BoVWClassifier.load(args.model_save)
             preds = model.predict(test_paths)
-            class_names = ["NizhnyNovgorodKremlin", "ArkhangelskCathedral", "PalaceOfLabor"]
+            class_names = ["NizhnyNovgorodKremlin", "ArkhangelskCathedral", "PalaceOfLabor       "]
             _ = compute_and_show_metrics(test_labels, preds, class_names)
             if args.vis_kp:
                 print("\nВизуализация загруженной модели...")
