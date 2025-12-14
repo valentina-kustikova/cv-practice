@@ -18,7 +18,7 @@ def main():
     
     parser = argparse.ArgumentParser()
     parser.add_argument("--images", default="data/images", help="Папка с кадрами (00000.jpg и т.д.)")
-    parser.add_argument("--annotations", default="data/labels.txt", help="Файл labels.txt (не папка!)")
+    parser.add_argument("--annotations", default="data/labels.txt", help="Файл labels.txt")
     parser.add_argument("--detector", choices=["mobilenet_ssd", "yolov5s_onnx"], required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--config", help="Только для SSD и YOLOv4")
@@ -38,7 +38,7 @@ def main():
 
     ann_by_id = load_annotations_custom(args.annotations)
 
-    img_paths = sorted(Path(args.images).glob("*.jpg")) + sorted(Path(args.images).glob("*.png"))
+    img_paths = sorted(Path(args.images).glob("*.jpg"))
     id_to_path = {p.stem: p for p in img_paths}
 
     all_ids = sorted(
@@ -50,12 +50,8 @@ def main():
 
     for fid in all_ids:
         img_path = id_to_path.get(fid)
-        if img_path is None or not img_path.exists():
-            continue
 
         frame = cv2.imread(str(img_path))
-        if frame is None:
-            continue
 
         gt_boxes, gt_labels = [], []
         for ann in ann_by_id.get(fid, []):
