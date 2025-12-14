@@ -75,59 +75,17 @@ def image_read(image):
     return src_image
 
 
-def select_filter(src_image, filter, width, height, roi,
-                  frame_width, frame_color, frame_type,
-                  amplitude, frequency, pattern_size):
-    if filter == 'resize':
-        if not width or not height:
-            raise ValueError("To resize, you must specify --width and --height")
-        result_image = Filters.resize_image(src_image, (width, height))
-        cv.imshow("new image", result_image)
-        cv.waitKey(0)
-    elif filter == 'sepia':
-        result_image = Filters.sepia(src_image)
-        cv.imshow("new image", result_image)
-        cv.waitKey(0)
-    elif filter == 'vignette':
-        result_image = Filters.vignette(src_image)
-        cv.imshow("new image", result_image)
-        cv.waitKey(0)
-    elif filter == 'pixelation_roi':
-        if not roi or len(roi) != 4:
-            raise ValueError("For pixelation_roi you need to specify --roi x1 y1 x2 y2")
-        x1, y1, x2, y2 = roi
-        result_image = Filters.pixelation_of_roi(src_image, x1, y1, x2, y2)
-        cv.imshow("new image", result_image)
-        cv.waitKey(0)
-    elif filter == 'rectangular_frame':
-        result_image = Filters.rectangular_frame(src_image, frame_width, frame_color)
-        cv.imshow("new image", result_image)
-        cv.waitKey(0)
-    elif filter == 'figured_frame':
-        result_image = Filters.figured_frame(src_image, frame_type, frame_width,
-                                     frame_color, amplitude, frequency, pattern_size)
-        cv.imshow("new image", result_image)
-        cv.waitKey(0)
-    elif filter == 'lens_flare':
-        result_image = Filters.lens_flare(src_image)
-        cv.imshow("new image", result_image)
-        cv.waitKey(0)
-    elif filter == 'paper_texture':
-        result_image = Filters.paper_texture(src_image)
-        cv.imshow("new image", result_image)
-        cv.waitKey(0)
-    else:
-        raise ValueError ("Unsupported \'filter\' value")
-    cv.destroyAllWindows()
-
-
 def main():
     args = cli_argument_parser()
     try:
         src_image = image_read(args.image)
-        select_filter(src_image, args.filter, args.width, args.height, args.roi,
+        Filters_instance = Filters()
+        res_image = Filters_instance.apply_filter(src_image, args.filter, args.width, args.height, args.roi,
                   args.frame_width, args.frame_color, args.frame_type,
                   args.amplitude, args.frequency, args.pattern_size)
+        cv.imshow("new image", res_image)
+        cv.waitKey(0)
+        cv.destroyAllWindows()
     except Exception as e:
         logging.error(e)
         sys.exit(1)

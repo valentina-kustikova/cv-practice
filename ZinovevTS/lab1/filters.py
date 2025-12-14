@@ -1,9 +1,15 @@
 import numpy as np
+from abc import ABC, abstractmethod
+import cv2 as cv
+
+class BaseFilter(ABC):
+    @abstractmethod
+    def apply(self, image, **kwargs):
+        pass
 
 
-class Filters:
-    @staticmethod
-    def _bilinear_interpolation(image, x, y):
+class ResizeFilter(BaseFilter):
+    def _bilinear_interpolation(self, image, x, y):
         x1 = np.floor(x).astype(int)
         y1 = np.floor(y).astype(int)
         x2 = np.minimum(x1 + 1, image.shape[1] - 1)
@@ -24,8 +30,8 @@ class Filters:
 
         return result
 
-    @staticmethod
-    def _nearest_neighbor_interpolation(image, x, y):
+
+    def _nearest_neighbor_interpolation(self, image, x, y):
         x = np.floor(x).astype(int)
         y = np.floor(y).astype(int)
         src_x = np.minimum(x, image.shape[1] - 1)
@@ -34,8 +40,14 @@ class Filters:
 
         return dst
 
-    @staticmethod
-    def resize_image(image, new_size, interpolation=_bilinear_interpolation):
+
+    def apply(self, image, **kwargs):
+        new_size = kwargs.get('new_size')
+        interp_type = kwargs.get('interpolation', 'bilinear')
+        if interp_type == 'nearest':
+            interpolation = self._nearest_neighbor_interpolation
+        else:
+            interpolation = self._bilinear_interpolation
         h, w = image.shape[:2]
         new_w, new_h = new_size
         j = np.arange(new_w)
@@ -48,8 +60,9 @@ class Filters:
 
         return resized
 
-    @staticmethod
-    def sepia(image):
+
+class SepiaFilter(BaseFilter):
+    def apply(self, image, **kwargs):
         intensity = 0.299 * image[:, :, 2] + 0.587 * image[:, :, 1] + 0.114 * image[:, :, 0]
         k = 25
         sepia_image = np.zeros_like(image)
@@ -59,8 +72,9 @@ class Filters:
 
         return sepia_image
 
-    @staticmethod
-    def _gaussian_kernel(ksize, sigma):
+
+class VignetteFilter(BaseFilter):
+    def _gaussian_kernel(self, ksize, sigma):
         if sigma <= 0:
             sigma = 0.3 * ((ksize - 1) * 0.5 - 1) + 0.8
         i = np.arange(ksize)
@@ -71,12 +85,12 @@ class Filters:
 
         return kernel
 
-    @staticmethod
-    def vignette(image):
+
+    def apply(self, image, **kwargs):
         h, w = image.shape[:2]
         sigma = max(h, w) * 0.3
-        x_kernel = Filters._gaussian_kernel(w, sigma)
-        y_kernel = Filters._gaussian_kernel(h, sigma)
+        x_kernel = self._gaussian_kernel(w, sigma)
+        y_kernel = self._gaussian_kernel(h, sigma)
         res_kernel = np.outer(y_kernel, x_kernel)
         mask = res_kernel / res_kernel.max()
         vignette_image = np.copy(image)
@@ -88,28 +102,35 @@ class Filters:
 
         return vignette_image
 
-    @staticmethod
-    def pixelation(image):
+
+class PixelationFilter(BaseFilter):
+    def apply(self, image, **kwargs):
         height, width = image.shape[:2]
         pixel_size = 8
         new_width = width // pixel_size
         new_height = height // pixel_size
-        small = Filters.resize_image(image, (new_width, new_height))
-        pixel_image = Filters.resize_image(small, (width, height), interpolation=Filters._nearest_neighbor_interpolation)
+        resize_filter = ResizeFilter()
+        small = resize_filter.apply(image, new_size=(new_width, new_height))
+        pixel_image = resize_filter.apply(small, new_size=(width, height),
+                                           interpolation=ResizeFilter._nearest_neighbor_interpolation)
 
         return pixel_image
 
-    @staticmethod
-    def pixelation_of_roi(image, x1, y1, x2, y2):
+
+class PixelationROIFilter(BaseFilter):
+    def apply(self, image, roi, **kwargs):
+        x1, y1, x2, y2 = roi
         image_roi = image[y1:y2, x1:x2]
-        pixel_image_roi = Filters.pixelation(image_roi)
+        pixelationroi_filter = PixelationFilter()
+        pixel_image_roi = pixelationroi_filter.apply(image_roi)
         res_pixel_image = np.copy(image)
         res_pixel_image[y1:y2, x1:x2] = pixel_image_roi
 
         return res_pixel_image
 
-    @staticmethod
-    def rectangular_frame(image, frame_width=30, frame_color=(0, 0, 255)):
+
+class RectangularFrameFilter(BaseFilter):
+    def apply(self, image, frame_width=30, frame_color=(0, 0, 255), **kwargs):
         if frame_width < 0:
             frame_width = -frame_width
         color_image = np.zeros_like(image)
@@ -119,8 +140,9 @@ class Filters:
 
         return color_image
 
-    @staticmethod
-    def _wavy_frame_mask(mask, frame_width, amplitude, frequency):
+
+class FiguredFrameFilter(BaseFilter):
+    def _wavy_frame_mask(self, mask, frame_width, amplitude, frequency):
         height, width = mask.shape
         y_coords, x_coords = np.indices((height, width))
         top_wave = (amplitude * np.sin(frequency * x_coords)).astype(int)
@@ -143,8 +165,8 @@ class Filters:
         right_mask = x_coords >= right_boundary
         mask[right_mask] = True
 
-    @staticmethod
-    def _zigzag_frame_mask(mask, frame_width, pattern_size):
+
+    def _zigzag_frame_mask(self, mask, frame_width, pattern_size):
         height, width = mask.shape
         y_coords, x_coords = np.indices((height, width))
         segment_pos = (x_coords % pattern_size) / pattern_size
@@ -163,8 +185,8 @@ class Filters:
         mask[:, 0: frame_width] = True
         mask[:, width - frame_width: width + 1] = True
 
-    @staticmethod
-    def _diagonal_frame_mask(mask, frame_width, pattern_size):
+
+    def _diagonal_frame_mask(self, mask, frame_width, pattern_size):
         height, width = mask.shape
         y_coords, x_coords = np.indices((height, width))
         diagonal_value = (x_coords + y_coords) % pattern_size
@@ -176,24 +198,25 @@ class Filters:
                 (y_coords >= height - frame_width * 2))
         mask[diagonal_mask & edge_mask] = True
 
-    @staticmethod
-    def figured_frame(image, frame_type="", frame_width=30, frame_color=(0, 0, 255),
-                      amplitude=10, frequency=0.1, pattern_size=20):
+
+    def apply(self, image, frame_type="", frame_width=30, frame_color=(0, 0, 255),
+                      amplitude=10, frequency=0.1, pattern_size=20, **kwargs):
         height, width = image.shape[:2]
         image_with_frame = image.copy()
         frame_mask = np.zeros((height, width), dtype=bool)
         if frame_type == "wavy":
-            Filters._wavy_frame_mask(frame_mask, frame_width, amplitude, frequency)
+            self._wavy_frame_mask(frame_mask, frame_width, amplitude, frequency)
         elif frame_type == "zigzag":
-            Filters._zigzag_frame_mask(frame_mask, frame_width, pattern_size)
+            self._zigzag_frame_mask(frame_mask, frame_width, pattern_size)
         else:
-            Filters._diagonal_frame_mask(frame_mask, frame_width, pattern_size)
+            self._diagonal_frame_mask(frame_mask, frame_width, pattern_size)
         image_with_frame[frame_mask] = frame_color
 
         return image_with_frame
 
-    @staticmethod
-    def _create_flare(size, color, intensity):
+
+class LensFlareFilter(BaseFilter):
+    def _create_flare(self, size, color, intensity):
         flare = np.zeros((size, size, 3), dtype=np.float32)
         center = size // 2
         y_coords, x_coords = np.indices((size, size))
@@ -206,8 +229,8 @@ class Filters:
 
         return flare
 
-    @staticmethod
-    def _mixing(src1, alpha, src2, beta):
+
+    def _mixing(self, src1, alpha, src2, beta):
         src1_float = src1.astype(np.float32)
         src2_float = src2.astype(np.float32)
         result = src1_float * alpha + src2_float * beta
@@ -215,8 +238,8 @@ class Filters:
         result = result.astype(np.uint8)
         return result
 
-    @staticmethod
-    def lens_flare(image):
+
+    def apply(self, image, **kwargs):
         flare_image = image.copy()
         h, w = image.shape[:2]
         center_x, center_y = w // 2 - w // 5, h // 2 + h // 5
@@ -225,7 +248,7 @@ class Filters:
         flare_color = (255, 255, 255)
         intensity = 0.6
         flare_mask = np.zeros((h, w, 3), dtype=np.float32)
-        flare = Filters._create_flare(flare_size, flare_color, intensity)
+        flare = self._create_flare(flare_size, flare_color, intensity)
         flare_h, flare_w = flare.shape[:2]
         x1 = center_x - flare_w // 2
         y1 = center_y - flare_h // 2
@@ -247,16 +270,73 @@ class Filters:
             actual_h, actual_w = flare_cropped.shape[:2]
             flare_mask[y1:y1 + actual_h, x1:x1 + actual_w] = flare_cropped
         flare_mask = np.clip(flare_mask, 0, 1)
-        flare_image = Filters._mixing(flare_image, 1.0, (flare_mask * 255).astype(np.uint8), 1.0)
+        flare_image = self._mixing(flare_image, 1.0, (flare_mask * 255).astype(np.uint8), 1.0)
 
         return flare_image
 
-    @staticmethod
-    def paper_texture(image):
+
+class PaperTextureFilter(BaseFilter):
+    def _mixing(self, src1, alpha, src2, beta):
+        src1_float = src1.astype(np.float32)
+        src2_float = src2.astype(np.float32)
+        result = src1_float * alpha + src2_float * beta
+        result = np.clip(result, 0, 255)
+        result = result.astype(np.uint8)
+        return result
+
+
+    def apply(self, image, **kwargs):
         h, w = image.shape[:2]
         paper = np.full((h, w, 3), [220, 235, 240], dtype=np.uint8)
         noise = np.random.randint(-80, 80, (h, w, 3), dtype=np.int16)
         paper = np.clip(paper.astype(np.int16) + noise, 0, 255).astype(np.uint8)
-        result = Filters.mixing(image, 0.7, paper, 0.3)
+        result = self._mixing(image, 0.7, paper, 0.3)
 
         return result
+
+
+class Filters:
+    _filters = {
+        'resize': ResizeFilter,
+        'sepia': SepiaFilter,
+        'vignette': VignetteFilter,
+        'pixelation_roi': PixelationROIFilter,
+        'rectangular_frame': RectangularFrameFilter,
+        'figured_frame': FiguredFrameFilter,
+        'lens_flare': LensFlareFilter,
+        'paper_texture': PaperTextureFilter,
+    }
+
+    def select_filter(self, filter_name):
+        filter_class = self._filters.get(filter_name.lower())
+        if not filter_class:
+            raise ValueError(f"Filter '{filter_name}' not found ")
+        return filter_class()
+
+
+    def apply_filter(self, src_image, filter_name, width, height, roi,
+                  frame_width, frame_color, frame_type,
+                  amplitude, frequency, pattern_size):
+        filter_instance = self.select_filter(filter_name)
+        kwargs = {}
+        if filter_name.lower() == 'resize':
+            if width is None or height is None:
+                raise ValueError("To resize, you must specify --width and --height")
+            kwargs['new_size'] = (width, height)
+        elif filter_name.lower() == 'pixelation_roi':
+            if roi is None or len(roi) != 4:
+                raise ValueError("For pixelation_roi you need to specify --roi x1 y1 x2 y2")
+            kwargs['roi'] = roi
+        elif filter_name.lower() == 'rectangular_frame':
+            kwargs['frame_width'] = frame_width
+            kwargs['frame_color'] = frame_color
+        elif filter_name.lower() == 'figured_frame':
+            kwargs['frame_type'] = frame_type
+            kwargs['frame_width'] = frame_width
+            kwargs['frame_color'] = frame_color
+            kwargs['amplitude'] = amplitude
+            kwargs['frequency'] = frequency
+            kwargs['pattern_size'] = pattern_size
+        result_image = filter_instance.apply(src_image, **kwargs)
+        return result_image
+
