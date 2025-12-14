@@ -290,6 +290,7 @@ class PaperTextureFilter(BaseFilter):
         paper = np.full((h, w, 3), [220, 235, 240], dtype=np.uint8)
         noise = np.random.randint(-80, 80, (h, w, 3), dtype=np.int16)
         paper = np.clip(paper.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+<<<<<<< HEAD
         result = self._mixing(image, 0.7, paper, 0.3)
 
         return result
@@ -340,3 +341,8 @@ class Filters:
         result_image = filter_instance.apply(src_image, **kwargs)
         return result_image
 
+=======
+        result = Filters._mixing(image, 0.7, paper, 0.3)
+
+        return result
+>>>>>>> b2ab629e1f16ecb5370b95115d51496e4d57a16b
