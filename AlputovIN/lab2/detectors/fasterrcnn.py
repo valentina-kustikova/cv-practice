@@ -14,7 +14,7 @@ class FasterRCNNDetector(Detector):
         model_path = os.path.join(models_dir, 'frozen_inference_graph.pb')
         config_path = os.path.join(models_dir, 'faster_rcnn_inception_v2_coco.pbtxt')
 
-        # Распаковываем архив, если файл не существует
+        # Распаковка архива (код инициализации без изменений)
         if not os.path.exists(model_path):
             tar_path = os.path.join(models_dir, 'faster_rcnn_inception_v2_coco_2018_01_28.tar.gz')
             if os.path.exists(tar_path):
@@ -22,35 +22,24 @@ class FasterRCNNDetector(Detector):
                 try:
                     import shutil
                     with tarfile.open(tar_path, 'r:gz') as tar:
-                        # Извлекаем только нужный файл
                         tar.extract('faster_rcnn_inception_v2_coco_2018_01_28/frozen_inference_graph.pb', models_dir)
-                        # Перемещаем файл в нужное место
                         extracted_path = os.path.join(models_dir, 'faster_rcnn_inception_v2_coco_2018_01_28', 'frozen_inference_graph.pb')
                         if os.path.exists(extracted_path):
                             shutil.move(extracted_path, model_path)
-                            # Удаляем пустую папку
                             try:
                                 os.rmdir(os.path.join(models_dir, 'faster_rcnn_inception_v2_coco_2018_01_28'))
-                            except OSError:
-                                pass  # Папка не пустая или уже удалена
+                            except OSError: pass
                 except Exception as e:
-                    raise FileNotFoundError(f"Не удалось распаковать архив Faster R-CNN: {e}")
-            else:
-                raise FileNotFoundError(f"Файл модели не найден: {model_path}. Также не найден архив: {tar_path}")
+                    raise FileNotFoundError(f"Не удалось распаковать архив: {e}")
 
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Файл модели не найден: {model_path}")
-        if not os.path.exists(config_path):
-            raise FileNotFoundError(f"Файл конфигурации не найден: {config_path}")
-
-        # Загружаем модель с оптимизацией для CPU
         self.net = cv2.dnn.readNetFromTensorflow(model_path, config_path)
         self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
         self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
 
-        self.conf_th = 0.5
-        # Кэш для валидных индексов классов транспорта (оптимизация)
-        self._vehicle_class_ids = None
+        # Понижаем порог для повышения TPR (старые модели могут быть менее уверены)
+        self.conf_th = 0.3
+
+        # Список классов COCO (стандартный для TF моделей)
         self.class_names = [
             'background', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
             'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat',
@@ -64,94 +53,70 @@ class FasterRCNNDetector(Detector):
             'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier',
             'toothbrush'
         ]
+
+        # Классы, которые мы хотим детектировать
         self.vehicle_classes = {'car', 'bus', 'truck', 'motorcycle'}
-        # Предвычисляем индексы классов транспорта для быстрой фильтрации
-        self._vehicle_class_ids = {i for i, name in enumerate(self.class_names)
-                                   if name in self.vehicle_classes}
+
+        # Создаем set ID классов для быстрой проверки
+        self._vehicle_class_ids = set()
+        for i, name in enumerate(self.class_names):
+            if name in self.vehicle_classes:
+                self._vehicle_class_ids.add(i)
 
     def detect(self, image):
         """
-        Детектирует транспортные средства на изображении.
-
+        Детектирует транспортные средства.
+        Использует упрощенный подход: resize до 600x600 и прямое масштабирование координат.
         """
-        # Валидация входного изображения
         if image is None or image.size == 0:
             return []
-        if len(image.shape) != 3 or image.shape[2] != 3:
-            return []
 
-        h, w = image.shape[:2]
-        if h <= 0 or w <= 0:
-            return []
+        # Сохраняем исходные размеры
+        img_height, img_width = image.shape[:2]
 
-        # Предобработка изображения
+        # Предобработка: просто сжимаем картинку. OpenCV сам разберется с нормализацией для TF моделей.
+        # size=(600, 600) стандарт для этой архитектуры
         blob = cv2.dnn.blobFromImage(image, size=(600, 600), swapRB=True, crop=False)
+
         self.net.setInput(blob)
         outputs = self.net.forward()
 
-        # Валидация вывода модели
+        # Валидация вывода (исправление ошибки ValueError)
         if outputs is None or outputs.size == 0:
             return []
 
-        # Формат вывода Faster R-CNN: [1, 1, N, 7]
-        # где 7 = [batch_id, class_id, confidence, x1, y1, x2, y2]
-        # Координаты нормализованы [0, 1]
-        detections = outputs[0, 0]
+        detections = []
 
-        if detections.size == 0:
-            return []
+        # Проходим по всем детекциям (цикл как в примере)
+        # outputs shape: [1, 1, N, 7]
+        for detection in outputs[0, 0]:
+            confidence = float(detection[2])
+            class_id = int(detection[1])
 
-        # Векторизованная фильтрация (оптимизация)
-        confidences = detections[:, 2].astype(np.float32)
-        class_ids = detections[:, 1].astype(np.int32)
+            # 1. Проверяем класс (входит ли в список нужных)
+            # 2. Проверяем порог уверенности
+            if class_id in self._vehicle_class_ids and confidence > self.conf_th:
+                # Координаты возвращаются нормализованными (0 to 1)
+                # Умножаем их на исходные размеры картинки (как в примере)
+                x1 = int(detection[3] * img_width)
+                y1 = int(detection[4] * img_height)
+                x2 = int(detection[5] * img_width)
+                y2 = int(detection[6] * img_height)
 
-        # Фильтруем по confidence и классам транспорта одновременно
-        valid_mask = (confidences > self.conf_th) & np.isin(class_ids, list(self._vehicle_class_ids))
+                # Клиппинг координат (чтобы не вылезти за пределы)
+                x1 = max(0, min(x1, img_width))
+                y1 = max(0, min(y1, img_height))
+                x2 = max(0, min(x2, img_width))
+                y2 = max(0, min(y2, img_height))
 
-        if not np.any(valid_mask):
-            return []
+                # Проверка на валидность бокса (ширина и высота > 0)
+                if x2 > x1 and y2 > y1:
+                    class_name = self.class_names[class_id] if class_id < len(self.class_names) else str(class_id)
 
-        # Применяем маску
-        valid_detections = detections[valid_mask]
-        valid_confidences = confidences[valid_mask]
-        valid_class_ids = class_ids[valid_mask]
+                    detections.append({
+                        'class': class_name,
+                        'confidence': confidence,
+                        'bbox': [x1, y1, x2, y2]
+                    })
 
-        # Векторизованное преобразование координат (оптимизация)
-        coords = valid_detections[:, 3:7]  # [N, 4] - x1, y1, x2, y2 нормализованные
-        x1 = (coords[:, 0] * w).astype(np.int32)
-        y1 = (coords[:, 1] * h).astype(np.int32)
-        x2 = (coords[:, 2] * w).astype(np.int32)
-        y2 = (coords[:, 3] * h).astype(np.int32)
-
-        # Векторизованный клиппинг
-        x1 = np.clip(x1, 0, w)
-        y1 = np.clip(y1, 0, h)
-        x2 = np.clip(x2, 0, w)
-        y2 = np.clip(y2, 0, h)
-
-        # Фильтруем валидные bbox
-        valid_bbox_mask = (x2 > x1) & (y2 > y1) & (x2 - x1 > 2) & (y2 - y1 > 2)
-
-        if not np.any(valid_bbox_mask):
-            return []
-
-        # Применяем маску
-        x1 = x1[valid_bbox_mask]
-        y1 = y1[valid_bbox_mask]
-        x2 = x2[valid_bbox_mask]
-        y2 = y2[valid_bbox_mask]
-        valid_confidences = valid_confidences[valid_bbox_mask]
-        valid_class_ids = valid_class_ids[valid_bbox_mask]
-
-        # Формируем результаты
-        results = []
-        for i in range(len(x1)):
-            class_id = int(valid_class_ids[i])
-            class_name = self.class_names[class_id] if class_id < len(self.class_names) else str(class_id)
-            results.append({
-                'class': class_name,
-                'confidence': float(valid_confidences[i]),
-                'bbox': [int(x1[i]), int(y1[i]), int(x2[i]), int(y2[i])]
-            })
-
-        return results
+        return detections

@@ -18,7 +18,7 @@ def main():
     if not os.path.exists(args.images):
         print(f"Ошибка: папка с изображениями не найдена: {args.images}", file=sys.stderr)
         sys.exit(1)
-    
+
     if not os.path.exists(args.annotations):
         print(f"Ошибка: файл с аннотациями не найден: {args.annotations}", file=sys.stderr)
         sys.exit(1)
@@ -28,30 +28,52 @@ def main():
     except Exception as e:
         print(f"Ошибка при загрузке детектора: {e}", file=sys.stderr)
         sys.exit(1)
-    
+
+    # 1. Загружаем изображения
     images = load_images(args.images)
     if not images:
         print(f"Ошибка: не найдено изображений в папке {args.images}", file=sys.stderr)
         sys.exit(1)
-    
-    annotations = load_annotations(args.annotations)
+
+    # 2. Загружаем аннотации, передавая путь к изображениям для корректного сопоставления имен
+    # ВАЖНО: Это требует обновленного utils.py
+    annotations = load_annotations(args.annotations, args.images)
 
     all_detections = []
     all_gts = []
 
     total = len(images)
-    print(f"Обработка {total} изображений...")
-    for idx, (img_name, img) in enumerate(images.items(), 1):
+    print(f"Обработка {total} изображений с использованием {args.model}...")
+
+    # Используем sorted keys для детерминированного порядка
+    for idx, img_name in enumerate(sorted(images.keys()), 1):
+        img = images[img_name]
+
         if idx % 100 == 0 or idx == 1:
             print(f"Обработано: {idx}/{total} ({idx*100//total}%)")
+
         detections = detector.detect(img)
+
+        # Получаем GT для текущего файла (если нет - пустой список)
         gt = annotations.get(img_name, [])
+
         all_detections.append(detections)
         all_gts.append(gt)
-        img_vis = draw_boxes(img.copy(), detections)
+
         if args.show:
+            img_vis = draw_boxes(img.copy(), detections)
+
+            # Опционально: Рисуем GT желтым пунктиром для отладки
+            for g in gt:
+                gx1, gy1, gx2, gy2 = g['bbox']
+                cv2.rectangle(img_vis, (gx1, gy1), (gx2, gy2), (0, 255, 255), 1)
+
             cv2.imshow('Detection', img_vis)
-            cv2.waitKey(1)
+            # Если нажата ESC (27) или Q (113) - выход
+            key = cv2.waitKey(1)
+            if key in [27, 113, ord('q')]:
+                break
+
     if args.show:
         cv2.destroyAllWindows()
 
