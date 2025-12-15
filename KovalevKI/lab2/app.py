@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 from detectors import DETECTORS
 from utils.io import load_annotations_custom
-from utils.metrics import compute_tpr_fdr
+from utils.metrics import FrameLevelDetectionEvaluator
 import time
 
 def draw_detection(frame, box, label, conf, color):
@@ -48,11 +48,9 @@ def main():
     
     tpr_list, fdr_list = [], []
 
+    evaluator = FrameLevelDetectionEvaluator(target_class="car", iou_threshold=0.5)
+
     for fid in all_ids:
-        img_path = id_to_path.get(fid)
-
-        frame = cv2.imread(str(img_path))
-
         gt_boxes, gt_labels = [], []
         for ann in ann_by_id.get(fid, []):
             label, x1, y1, w, h = ann
@@ -64,34 +62,31 @@ def main():
         det_boxes, det_labels, det_confs = [], [], []
         for box, conf, cid in zip(boxes, confs, cids):
             name = detector.get_class_name(cid).lower()
-            colo = (255, 0, 0)
-            #print(f"Class ID: {cid}, Name: '{detector.get_class_name(cid)}'")
+            color = (255, 0, 0)
             if name == "car" or cid == 2:
                 det_boxes.append(box)
                 det_labels.append(name)
                 det_confs.append(conf)
-                colo = (0, 255, 0)
-            if (args.show):
-                draw_detection(frame, box, name, conf, colo)
+                color = (0, 255, 0)
+            if args.show:
+                draw_detection(frame, box, name, conf, color)
 
-        tpr, fdr = compute_tpr_fdr(det_boxes, det_labels, gt_boxes, gt_labels,confs=det_confs, iou_thr=0.5)
-        tpr_list.append(tpr)
-        fdr_list.append(fdr)
-        print(f"{fid} → TPR: {tpr:.3f}, FDR: {fdr:.3f}")
+        evaluator.accumulate_frame(det_boxes, det_labels, det_confs, gt_boxes, gt_labels)
 
-        if (args.show):
+        print(f"{fid}") # → TPR: {tpr_frame:.3f}, FDR: {fdr_frame:.3f}
+
+        if args.show:
             cv2.imshow("Vehicle Detection", frame)
             if cv2.waitKey(args.delay) & 0xFF == ord('q'):
                 break
 
-    if (args.show):
+    if args.show:
         cv2.destroyAllWindows()
 
-    mean_tpr = np.mean(tpr_list) if tpr_list else 0
-    mean_fdr = np.mean(fdr_list) if fdr_list else 0
+    tpr, fdr = evaluator.get_metrics()
     elapsed = time.time() - t0
     print(f"Время выполнения: {elapsed:.2f} с ")
-    print(f"\n Итог: TPR = {mean_tpr:.3f}, FDR = {mean_fdr:.3f}")
+    print(f"\n Итог (глобальные): TPR = {tpr:.3f}, FDR = {fdr:.3f}")
 
 if __name__ == "__main__":
     main()
