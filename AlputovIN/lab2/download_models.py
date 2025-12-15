@@ -1,8 +1,9 @@
 import os
 import urllib.request
+import sys
 
 MODELS = [
-    # 1. YOLOv8 (Petrov)
+    # 1. YOLOv8 (ONNX)
     {
         'name': 'YOLOv8',
         'files': [
@@ -12,21 +13,21 @@ MODELS = [
             }
         ]
     },
-    # 2. Faster R-CNN (Korotin)
+    # 2. YOLOv4 (Darknet)
     {
-        'name': 'Faster R-CNN',
+        'name': 'YOLOv4',
         'files': [
             {
-                'url': 'http://download.tensorflow.org/models/object_detection/faster_rcnn_inception_v2_coco_2018_01_28.tar.gz',
-                'filename': 'faster_rcnn_inception_v2_coco_2018_01_28.tar.gz'
+                'url': 'https://github.com/AlexeyAB/darknet/releases/download/darknet_yolo_v3_optimal/yolov4.weights',
+                'filename': 'yolov4.weights'
             },
             {
-                'url': 'https://raw.githubusercontent.com/opencv/opencv_extra/master/testdata/dnn/faster_rcnn_inception_v2_coco_2018_01_28.pbtxt',
-                'filename': 'faster_rcnn_inception_v2_coco.pbtxt'
+                'url': 'https://raw.githubusercontent.com/AlexeyAB/darknet/master/cfg/yolov4.cfg',
+                'filename': 'yolov4.cfg'
             }
         ]
     },
-    # 3. NanoDet-Plus (Smirnov)
+    # 3. NanoDet-Plus (ONNX)
     {
         'name': 'NanoDet-Plus',
         'files': [
@@ -45,14 +46,22 @@ def download_file(url, dest):
     if os.path.exists(dest):
         print(f"[✓] {os.path.basename(dest)} уже загружен.")
         return
+    
     print(f"[→] Скачивание {url} ...")
-    urllib.request.urlretrieve(url, dest)
-    print(f"[✓] Сохранено: {dest}")
+    try:
+        urllib.request.urlretrieve(url, dest)
+        print(f"[✓] Сохранено: {dest}")
+    except Exception as e:
+        print(f"[X] Ошибка скачивания {url}: {e}")
+        if os.path.exists(dest):
+            os.remove(dest)
+        sys.exit(1)
 
 if __name__ == '__main__':
+    print(f"Папка для моделей: {MODELS_DIR}")
     for model in MODELS:
-        print(f"\nМодель: {model['name']}")
+        print(f"\nПроверка модели: {model['name']}")
         for file in model['files']:
             dest = os.path.join(MODELS_DIR, file['filename'])
             download_file(file['url'], dest)
-    print("\nВсе модели скачаны!")
+    print("\nВсе модели проверены и готовы к работе!")

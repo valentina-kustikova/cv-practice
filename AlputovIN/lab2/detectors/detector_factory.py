@@ -1,12 +1,12 @@
 from .yolov8 import YOLOv8Detector
-from .fasterrcnn import FasterRCNNDetector
+from .yolov4 import YOLOv4Detector
 from .nanodet import NanoDetDetector
 
 def get_detector(name):
     if name == 'yolov8':
         return YOLOv8Detector()
-    elif name == 'fasterrcnn':
-        return FasterRCNNDetector()
+    elif name == 'yolov4':
+        return YOLOv4Detector()
     elif name == 'nanodet':
         return NanoDetDetector()
     else:
