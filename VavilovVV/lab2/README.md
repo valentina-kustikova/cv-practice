@@ -15,7 +15,7 @@
 ├── yolo_detector.py         # Реализация постпроцессинга для YOLO
 ├── ssd_detector.py          # Реализация постпроцессинга для SSD MobileNet
 ├── rcnn_detector.py         # Реализация постпроцессинга для Faster R-CNN
-├── utils.py                 # Утилиты для загрузки аннотаций, оценки метрик и визуализации
+├── annotations.py; eval.py; metrics_display.py; visualization.py         # Утилиты для загрузки аннотаций, оценки метрик и визуализации
 └── main.py                  # Основной исполняемый файл приложения
 ```
 
@@ -56,7 +56,7 @@
       * `@staticmethod get_available_models()`: Возвращает список доступных моделей с кратким описанием.
       * `@staticmethod create_detector(model_type: str, confidence_threshold: float = 0.5) -> BaseDetector`: Создает и возвращает соответствующий объект детектора (`YOLODetector`, `SSDMobileNetDetector` или `FasterRCNNDetector`), используя конфигурацию из `_MODELS` и обертывая ее в `ModelConfig`.
 
-### Утилиты (`utils.py`)
+### Утилиты (`annotations.py; eval.py;`)
 
   * **`class AnnotationLoader`**: Загружает аннотации Ground Truth из файла.
       * `_load_annotations()`: Читает файл аннотаций и фильтрует только класс **"car"**, сохраняя ограничивающие прямоугольники в словарь, где ключ — ID изображения.
