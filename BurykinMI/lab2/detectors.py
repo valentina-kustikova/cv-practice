@@ -88,6 +88,7 @@ class SSDDetector(BaseDetector):
 
 class YOLODetector(BaseDetector):
     def preprocess(self, image):
+        # YOLO: 416x416, деление на 255, swapRB
         return cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416), swapRB=True, crop=False)
 
     def postprocess(self, image, outputs):
@@ -104,10 +105,10 @@ class YOLODetector(BaseDetector):
 
                 if confidence > self.conf_threshold:
 
-                    # В COCO: car=2, bus=5
-                    if classID not in [2, 5]:
+                    if classID not in [2, 5, 7]:
                         continue
 
+                    # Координаты
                     box = detection[0:4] * np.array([W, H, W, H])
                     (centerX, centerY, width, height) = box.astype("int")
                     x = int(centerX - (width / 2))
@@ -117,12 +118,23 @@ class YOLODetector(BaseDetector):
                     confidences.append(float(confidence))
                     classIDs.append(classID)
 
+        # NMS (удаление дублей)
         idxs = cv2.dnn.NMSBoxes(boxes, confidences, self.conf_threshold, self.nms_threshold)
 
         results = []
         if len(idxs) > 0:
             for i in idxs.flatten():
-                label_str = self.classes[classIDs[i]]
+                cid = classIDs[i]
+
+                if cid == 7:  # Если TRUCK
+                    label_str = "car"
+                elif cid == 2:
+                    label_str = "car"
+                elif cid == 5:
+                    label_str = "bus"
+                else:
+                    label_str = self.classes[cid]
+
                 results.append([label_str, confidences[i], boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][3]])
 
         return results
