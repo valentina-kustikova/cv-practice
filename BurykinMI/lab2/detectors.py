@@ -54,7 +54,6 @@ class BaseDetector(ABC):
 class SSDDetector(BaseDetector):
     def __init__(self, config_path, weights_path, classes_path=None):
         super().__init__(config_path, weights_path, classes_path)
-        # Если классы не переданы, используем стандарт VOC
         if not self.classes:
             self.classes = ["background", "aeroplane", "bicycle", "bird", "boat",
                             "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
@@ -62,7 +61,6 @@ class SSDDetector(BaseDetector):
                             "sheep", "sofa", "train", "tvmonitor"]
 
     def preprocess(self, image):
-        # SSD: 300x300, вычитание среднего, масштаб
         return cv2.dnn.blobFromImage(image, 0.007843, (300, 300), (127.5, 127.5, 127.5), False)
 
     def postprocess(self, image, outputs):
@@ -74,15 +72,15 @@ class SSDDetector(BaseDetector):
             confidence = detections[0, 0, i, 2]
             if confidence > self.conf_threshold:
                 idx = int(detections[0, 0, i, 1])
-                # Фильтр VOC IDs для транспорта: bus(6), car(7), motorbike(14), train(19)
-                if idx not in [6, 7, 14, 19]:
+
+                # В VOC: bus=6, car=7
+                if idx not in [6, 7]:
                     continue
 
                 box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
                 (startX, startY, endX, endY) = box.astype("int")
 
                 label_str = self.classes[idx]
-                # width = endX - startX, height = endY - startY
                 results.append([label_str, confidence, startX, startY, endX - startX, endY - startY])
 
         return results
@@ -90,7 +88,6 @@ class SSDDetector(BaseDetector):
 
 class YOLODetector(BaseDetector):
     def preprocess(self, image):
-        # YOLO: 416x416, деление на 255, swapRB
         return cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416), swapRB=True, crop=False)
 
     def postprocess(self, image, outputs):
@@ -106,8 +103,9 @@ class YOLODetector(BaseDetector):
                 confidence = scores[classID]
 
                 if confidence > self.conf_threshold:
-                    # Фильтр COCO IDs: car(2), motorbike(3), bus(5), train(6), truck(7)
-                    if classID not in [2, 3, 5, 6, 7]:
+
+                    # В COCO: car=2, bus=5
+                    if classID not in [2, 5]:
                         continue
 
                     box = detection[0:4] * np.array([W, H, W, H])
@@ -119,7 +117,6 @@ class YOLODetector(BaseDetector):
                     confidences.append(float(confidence))
                     classIDs.append(classID)
 
-        # NMS (удаление дублей)
         idxs = cv2.dnn.NMSBoxes(boxes, confidences, self.conf_threshold, self.nms_threshold)
 
         results = []
