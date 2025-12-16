@@ -23,52 +23,50 @@ def resize_image(image, new_width, new_height):
 
     return resized
 
-# Фильтр - сепия
+# Фильтр - сепия (матричная версия)
 def sepia_filter(image, k):
-    height, width = image.shape[:2]
-    sepia_image = np.zeros_like(image)
+    b = image[:, :, 0].astype(np.float32)
+    g = image[:, :, 1].astype(np.float32)
+    r = image[:, :, 2].astype(np.float32)
+    
+    intensity = 0.299 * r + 0.587 * g + 0.114 * b
+    
+    new_r = np.clip(intensity + 2 * k, 0, 255)
+    new_g = np.clip(intensity + 0.5 * k, 0, 255)
+    new_b = np.clip(intensity - k, 0, 255)
+    
+    sepia_image = np.stack([new_b, new_g, new_r], axis=2).astype(np.uint8)
+    
+    return sepia_image
 
-    for y in range(height):
-        for x in range(width):
-            b, g, r = image[y, x]
-
-            intensity = 0.299 * r + 0.587 * g + 0.114 * b
-
-            new_r = np.clip(intensity + 2 * k, 0, 255)
-            new_g = np.clip(intensity + 0.5 * k, 0, 255)
-            new_b = np.clip(intensity - k, 0, 255)
-
-            sepia_image[y, x] = [new_b, new_g, new_r]
-
-    return sepia_image.astype(np.uint8)
-
-# Фильтр - виньетка
+# Фильтр - виньетка (матричная версия)
 def vignette_filter(image, strength):
-    output = image.copy().astype(np.float32)
-
+    output = image.astype(np.float32)
     height, width = image.shape[:2]
-
+    
     center_x = width // 2
     center_y = height // 2
-
+    
+    x_coords = np.arange(width)
+    y_coords = np.arange(height)
+    x_grid, y_grid = np.meshgrid(x_coords, y_coords)
+    
+    distances = np.sqrt((x_grid - center_x)**2 + (y_grid - center_y)**2)
+    
     max_distance = np.sqrt(center_x**2 + center_y**2)
-
-    for y in range(height):
-        for x in range(width):
-            distance = np.sqrt((x - center_x)**2 + (y - center_y)**2)
-
-            darken = 1 - strength * (distance / max_distance)
-
-            if len(image.shape) == 3:
-                output[y, x] = image[y, x] * darken
-            else:
-                output[y, x] = image[y, x] * darken
-
+    
+    darken_matrix = 1 - strength * (distances / max_distance)
+    if len(image.shape) == 3:
+        for i in range(3):
+            output[:, :, i] = output[:, :, i] * darken_matrix
+    else:
+        output = output * darken_matrix
+    
     output = np.clip(output, 0, 255).astype(np.uint8)
-
+    
     return output
 
-# Фильтр - пикселизация
+# Фильтр - пикселизация 
 def pixelate_region(image, x, y, width, height, pixel_size):
     result = image.copy()
 
@@ -92,33 +90,24 @@ def pixelate_region(image, x, y, width, height, pixel_size):
 
     return result
 
-# Функция для прямоугольной рамки
+# Функция для прямоугольной рамки 
 def add_border(image, border_width, color):
     result = image.copy()
-
     height, width = image.shape[:2]
-
+    
     border_width = max(0, border_width)
-
+    
     if border_width == 0:
         return result
-
-    for y in range(border_width):
-        for x in range(width):
-            result[y, x] = color
-
-    for y in range(height - border_width, height):
-        for x in range(width):
-            result[y, x] = color
-
-    for x in range(border_width):
-        for y in range(height):
-            result[y, x] = color
-
-    for x in range(width - border_width, width):
-        for y in range(height):
-            result[y, x] = color
-
+    
+    top_mask = np.arange(height) < border_width
+    bottom_mask = np.arange(height) >= height - border_width
+    left_mask = np.arange(width) < border_width
+    right_mask = np.arange(width) >= width - border_width
+    result[top_mask, :, :] = color
+    result[bottom_mask, :, :] = color
+    result[:, left_mask, :] = color
+    result[:, right_mask, :] = color
     return result
 
 def add_fancy_border(image, frame_path="frame.jpg", black_threshold=30):
@@ -133,20 +122,18 @@ def add_fancy_border(image, frame_path="frame.jpg", black_threshold=30):
     image_bgr = image.copy()
 
     result = frame_resized.copy()
-
-    h, w = photo_h, photo_w
-    for y in range(h):
-        for x in range(w):
-            fb, fg, fr = frame_resized[y, x]
-            if max(int(fb), int(fg), int(fr)) <= black_threshold:
-                pb, pg, pr = image_bgr[y, x]
-                result[y, x] = [pb, pg, pr]
-            else:
-                pass
-
+    max_channels = np.max(frame_resized, axis=2)
+    black_mask = max_channels <= black_threshold
+    
+    if len(image.shape) == 3:
+        for i in range(3):
+            result[:, :, i][black_mask] = image_bgr[:, :, i][black_mask]
+    else:
+        result[black_mask] = image_bgr[black_mask]
+    
     return result
 
-# Функция для наложения бликов
+# Функция для наложения бликов 
 def add_lens_flare(image):
     flare_path = "flare.png"
 
@@ -159,28 +146,19 @@ def add_lens_flare(image):
     height, width = image.shape[:2]
     flare_resized = resize_image(flare_img, width, height)
 
-    result = image.copy().astype(np.float32)
+    result_float = image.astype(np.float32)
     flare_float = flare_resized.astype(np.float32)
+    
+    new_r = 255 - ((255 - result_float[:, :, 2]) * (255 - flare_float[:, :, 2]) / 255)
+    new_g = 255 - ((255 - result_float[:, :, 1]) * (255 - flare_float[:, :, 1]) / 255)
+    new_b = 255 - ((255 - result_float[:, :, 0]) * (255 - flare_float[:, :, 0]) / 255)
 
-    for y in range(height):
-        for x in range(width):
-            b1, g1, r1 = result[y, x]
+    result = np.stack([new_b, new_g, new_r], axis=2)
+    result = np.clip(result, 0, 255).astype(np.uint8)
+    
+    return result
 
-            b2, g2, r2 = flare_float[y, x]
-
-            new_r = 255 - ((255 - r1) * (255 - r2) / 255)
-            new_g = 255 - ((255 - g1) * (255 - g2) / 255)
-            new_b = 255 - ((255 - b1) * (255 - b2) / 255)
-
-            new_r = min(255, max(0, new_r))
-            new_g = min(255, max(0, new_g))
-            new_b = min(255, max(0, new_b))
-
-            result[y, x] = [new_b, new_g, new_r]
-
-    return result.astype(np.uint8)
-
-# Функция для наложения текстуры акварельной бумаги
+# Функция для наложения текстуры акварельной бумаги 
 def add_watercolor_texture(image):
     paper_path = "water.jpg"
 
@@ -193,24 +171,16 @@ def add_watercolor_texture(image):
     height, width = image.shape[:2]
     paper_resized = resize_image(paper_img, width, height)
 
-    result = image.copy()
-
-    for y in range(height):
-        for x in range(width):
-            paper_b, paper_g, paper_r = paper_resized[y, x]
-
-            img_b, img_g, img_r = result[y, x]
-
-            paper_brightness = (float(paper_b) + float(paper_g) + float(paper_r)) / 765.0
-
-            brightness_factor = 0.6 + 0.4 * paper_brightness
-
-            new_b = min(255, int(img_b * brightness_factor))
-            new_g = min(255, int(img_g * brightness_factor))
-            new_r = min(255, int(img_r * brightness_factor))
-
-            result[y, x] = [new_b, new_g, new_r]
-
+    result = image.copy().astype(np.float32)
+    
+    paper_brightness = (paper_resized[:, :, 0] + paper_resized[:, :, 1] + paper_resized[:, :, 2]) / 765.0
+    
+    brightness_factor = 0.6 + 0.4 * paper_brightness
+    
+    for i in range(3):
+        result[:, :, i] = result[:, :, i] * brightness_factor
+    
+    result = np.clip(result, 0, 255).astype(np.uint8)
     return result
 
 def show_menu():
