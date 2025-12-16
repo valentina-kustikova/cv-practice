@@ -25,7 +25,7 @@ def draw_boxes(image, results, colors=None, is_gt=False):
     for res in results:
         x, y, w, h = res['box']
         if is_gt:
-            color = (0, 255, 0)  # зелёный для ground truth
+            color = (0, 255, 0)
             label = "CAR"
             cv2.putText(image, label, (x, y - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
         else:

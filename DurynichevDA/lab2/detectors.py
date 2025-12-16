@@ -59,7 +59,6 @@ class SSDDetector(Detector):
             confidences.append(float(confidence))
             class_ids.append(class_id)
 
-        # NMS — работает во всех версиях OpenCV
         indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_threshold, nms_threshold)
 
         results = []
@@ -89,7 +88,6 @@ class YOLODetector(Detector):
 
         self.net = cv2.dnn.readNetFromDarknet(self.config_path, self.model_path)
         layer_names = self.net.getLayerNames()
-        # Поддержка как старых, так и новых версий OpenCV
         unconnected = self.net.getUnconnectedOutLayers()
         if unconnected.ndim == 1:
             unconnected = unconnected.flatten()
@@ -124,7 +122,6 @@ class YOLODetector(Detector):
                     confidences.append(float(confidence))
                     class_ids.append(class_id)
 
-        # NMS — работает во всех версиях
         indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_threshold, nms_threshold)
 
         results = []
