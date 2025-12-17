@@ -11,25 +11,13 @@ from nn_strategy import NeuralNetworkStrategy
 
 
 # ============================================================================
-# Главный модуль приложения. Содержит:
-# - LandmarkClassifier: фасад для удобного использования стратегий классификации
-# - StrategyFactory: фабрика для создания конкретных стратегий (паттерн Factory)
-# - main(): обработка аргументов командной строки, координация обучения/тестирования
-# Поддерживает режимы train, test, train_test для алгоритмов bow и neural.
-# ============================================================================
-
-# ============================================================================
 # Фасад классификатора
+# Паттерн Facade: Скрывает сложную логику стратегий за простыми методами.
 # ============================================================================
-
 class LandmarkClassifier:
-    """Фасад для классификации достопримечательностей"""
-
     def __init__(self, strategy: ClassificationStrategy):
-        """
-        Args:
-            strategy: Стратегия классификации
-        """
+        # Паттерн Strategy: Мы принимаем любой алгоритм, реализующий интерфейс.
+        # Это позволяет менять 'bow' на 'neural' без изменения кода этого класса.
         self.strategy = strategy
 
     def train(self, train_data: List[str], train_labels: List[str]) -> None:
@@ -58,31 +46,22 @@ class LandmarkClassifier:
 
 # ============================================================================
 # Фабрика стратегий
+# Паттерн Factory: Инкапсулирует создание объектов стратегий.
+# Главная программа не знает, как именно создается SIFT или BoW, она просто просит.
 # ============================================================================
-
 class StrategyFactory:
-    """Фабрика для создания стратегий классификации"""
-
     @staticmethod
     def create_strategy(algorithm: str, **kwargs) -> ClassificationStrategy:
-        """
-        Создать стратегию классификации
-
-        Args:
-            algorithm: Тип алгоритма ('bow' или 'neural')
-            **kwargs: Дополнительные параметры
-
-        Returns:
-            Стратегия классификации
-        """
         if algorithm == 'bow':
             detector_type = kwargs.get('detector_type', 'sift')
             n_clusters = kwargs.get('n_clusters', 300)
 
+            # Сборка компонентов для BoW
             feature_extractor = OpenCVFeatureExtractor(detector_type)
             return BagOfWordsStrategy(feature_extractor, n_clusters)
 
         elif algorithm == 'neural':
+            # Пока нет
             model_architecture = kwargs.get('model_architecture', 'resnet')
             return NeuralNetworkStrategy(model_architecture)
 
