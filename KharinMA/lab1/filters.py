@@ -239,12 +239,103 @@ def add_watercolor_texture(image, intensity=0.3):
     return result.astype(np.uint8)
 
 
+def interactive_pixelate(image, pixel_size=10):
+    """
+    Интерактивная пикселизация области с выбором мышью.
+    
+    Инструкции:
+    - Зажмите ЛКМ и выделите область для пикселизации
+    - Отпустите ЛКМ для применения эффекта
+    - '+' / '-': Увеличить/уменьшить размер пикселя
+    - 'r': Сбросить изменения
+    - 's': Сохранить результат
+    - ESC: Выйти без сохранения
+    """
+    state = {
+        'start_point': None,
+        'end_point': None,
+        'drawing': False,
+        'original': image.copy(),
+        'current': image.copy(),
+        'pixel_size': pixel_size
+    }
+    
+    def mouse_callback(event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            state['start_point'] = (x, y)
+            state['end_point'] = (x, y)
+            state['drawing'] = True
+        
+        elif event == cv2.EVENT_MOUSEMOVE and state['drawing']:
+            state['end_point'] = (x, y)
+            temp = state['current'].copy()
+            cv2.rectangle(temp, state['start_point'], state['end_point'], (0, 255, 0), 2)
+            cv2.imshow("Pixelate - выберите область", temp)
+        
+        elif event == cv2.EVENT_LBUTTONUP:
+            state['drawing'] = False
+            state['end_point'] = (x, y)
+            
+            x1, y1 = state['start_point']
+            x2, y2 = state['end_point']
+            
+            px = min(x1, x2)
+            py = min(y1, y2)
+            pw = abs(x2 - x1)
+            ph = abs(y2 - y1)
+            
+            if pw > 0 and ph > 0:
+                state['current'] = pixelate_region(
+                    state['current'], px, py, pw, ph, state['pixel_size']
+                )
+                cv2.imshow("Pixelate - выберите область", state['current'])
+            
+            state['start_point'] = None
+            state['end_point'] = None
+    
+    cv2.namedWindow("Pixelate - выберите область")
+    cv2.setMouseCallback("Pixelate - выберите область", mouse_callback)
+    cv2.imshow("Pixelate - выберите область", state['current'])
+    
+    print("=== Интерактивная пикселизация ===")
+    print("- Зажмите ЛКМ и выделите область")
+    print(f"- '+' / '-': Изменить размер пикселя (текущий: {state['pixel_size']})")
+    print("- 'r': Сбросить изменения")
+    print("- 's': Сохранить и выйти")
+    print("- ESC: Выйти без сохранения")
+    
+    while True:
+        key = cv2.waitKey(1) & 0xFF
+        
+        if key == 27:  # ESC
+            cv2.destroyAllWindows()
+            return state['original']
+        
+        elif key == ord('s'):
+            cv2.destroyAllWindows()
+            return state['current']
+        
+        elif key == ord('r'):
+            state['current'] = state['original'].copy()
+            cv2.imshow("Pixelate - выберите область", state['current'])
+            print("Изменения сброшены")
+        
+        elif key == ord('+') or key == ord('='):
+            state['pixel_size'] = min(50, state['pixel_size'] + 2)
+            print(f"Размер пикселя: {state['pixel_size']}")
+        
+        elif key == ord('-') or key == ord('_'):
+            state['pixel_size'] = max(2, state['pixel_size'] - 2)
+            print(f"Размер пикселя: {state['pixel_size']}")
+
+
 # Словарь доступных фильтров для удобного использования
 FILTERS = {
     'resize': resize_image,
     'sepia': apply_sepia,
     'vignette': apply_vignette,
     'pixelate': pixelate_region,
+    'pixelate_interactive': interactive_pixelate,  # Добавить эту строку
     'simple_frame': add_simple_frame,
     'decorative_frame': add_decorative_frame,
     'lens_flare': add_lens_flare,

@@ -124,6 +124,8 @@ def apply_single_filter(image_path, filter_name, **kwargs):
         filtered = apply_vignette(original, **kwargs)
     elif filter_name == 'pixelate':
         filtered = pixelate_region(original, **kwargs)
+    elif filter_name == 'pixelate_interactive':
+        filtered = interactive_pixelate(original, **kwargs)
     elif filter_name == 'simple_frame':
         filtered = add_simple_frame(original, **kwargs)
     elif filter_name == 'decorative_frame':
@@ -163,7 +165,8 @@ def print_usage():
     resize          - изменение разрешения
     sepia           - эффект сепии
     vignette        - эффект виньетки
-    pixelate        - пикселизация области
+    pixelate             - пикселизация области (по координатам)
+    pixelate_interactive - интерактивная пикселизация (выбор мышью)
     simple_frame    - простая рамка
     decorative_frame - фигурная рамка
     lens_flare      - эффект бликов
