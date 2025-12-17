@@ -60,7 +60,7 @@ class BOWClassifier(BaseClassifier):
         if descriptors is None:
             return np.zeros(self.n_clusters)
 
-        predictions = self.kmeans.predict(descriptors)
+        predictions = self.kmeans.predict(descriptors) # от 0 до 99
         histogram = np.bincount(predictions, minlength=self.n_clusters)
 
         # Нормализация гистограммы
