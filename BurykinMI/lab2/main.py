@@ -54,6 +54,11 @@ def main():
         print("Изображения не найдены. Проверьте путь.")
         return
 
+    window_name = "Object Detection Lab"
+
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(window_name, 1280, 720)
+
     # 4. Главный цикл
     for img_path in image_paths:
         frame = cv2.imread(img_path)
