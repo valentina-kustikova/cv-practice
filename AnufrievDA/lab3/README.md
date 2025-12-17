@@ -30,6 +30,40 @@
 
 ---
 
+## Установка и Запуск
+
+Для работы проекта необходимы следующие библиотеки:
+```bash
+pip install opencv-python opencv-contrib-python numpy scikit-learn torch torchvision matplotlib seaborn
+```
+
+### 1. Запуск нейросети (CNN ResNet18)
+Наилучший результат. Обучает модель 5 эпох и сохраняет веса в `resnet18.pth`.
+```bash
+python train.py --data_dir dataset --train_list train.txt --algo cnn --cnn_model resnet18 --epochs 5 --model_save resnet18.pth
+```
+
+### 2. Запуск BoVW с детектором ORB
+Быстрый классический метод. Сохраняет модель в `bovw_orb.pkl`.
+```bash
+python train.py --data_dir dataset --train_list train.txt --algo bovw --bovw_detector ORB --bovw_clusters 100 --model_save bovw_orb.pkl
+```
+
+### 3. Запуск BoVW с детектором SIFT
+Более точный (обычно) классический метод. Сохраняет модель в `bovw_sift.pkl`.
+```bash
+python train.py --data_dir dataset --train_list train.txt --algo bovw --bovw_detector SIFT --bovw_clusters 100 --model_save bovw_sift.pkl
+```
+
+**Аргументы командной строки:**
+*   `--data_dir`: Путь к папке с датасетом.
+*   `--train_list`: Путь к файлу со списком изображений.
+*   `--algo`: Выбор алгоритма (`cnn` или `bovw`).
+*   `--model_save`: Имя файла для сохранения обученной модели.
+
+---
+
+
 ## Результаты экспериментов
 
 ### 1. Нейросеть (CNN: ResNet18)

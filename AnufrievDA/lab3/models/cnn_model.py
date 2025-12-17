@@ -59,17 +59,6 @@ class CNNClassifier:
                 model = models.resnet18(weights='DEFAULT')
                 
             model.fc = nn.Linear(model.fc.in_features, self.num_classes)
-            
-        elif self.model_name == 'mobilenet_v2':
-            if os.path.exists(local_path):
-                model = models.mobilenet_v2(weights=None)
-                state_dict = torch.load(local_path, map_location='cpu')
-                if 'model_state_dict' in state_dict: state_dict = state_dict['model_state_dict']
-                model.load_state_dict(state_dict, strict=False)
-            else:
-                model = models.mobilenet_v2(weights='DEFAULT')
-                
-            model.classifier[1] = nn.Linear(model.classifier[1].in_features, self.num_classes)
         else:
             raise ValueError(f"Unknown model: {self.model_name}")
 
