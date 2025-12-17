@@ -4,6 +4,31 @@ import os
 import argparse
 import filters
 
+# --- Глобальные переменные для callback-функции ---
+drawing = False  # True, если кнопка мыши зажата
+ix, iy = -1, -1  # Начальные координаты
+x, y = -1, -1    # Текущие координаты
+
+# --- Callback-функция для обработки событий мыши ---
+def draw_rectangle(event, current_x, current_y, flags, param):
+    global ix, iy, x, y, drawing
+
+    # Событие: кнопка мыши нажата
+    if event == cv2.EVENT_LBUTTONDOWN:
+        drawing = True
+        ix, iy = current_x, current_y
+        x, y = current_x, current_y # Сбрасываем текущие координаты
+
+    # Событие: мышь двигается
+    elif event == cv2.EVENT_MOUSEMOVE:
+        if drawing:
+            x, y = current_x, current_y
+
+    # Событие: кнопка мыши отпущена
+    elif event == cv2.EVENT_LBUTTONUP:
+        drawing = False
+        x, y = current_x, current_y
+        
 def main():
     parser = argparse.ArgumentParser(
         description="Применяет выбранный фильтр к изображению и показывает результат.",
@@ -43,26 +68,52 @@ def main():
 
     try:
         if filter_name == 'pixelate':
+            window_name = "Select area: Drag mouse, press ENTER to apply, ESC to cancel"
+            cv2.namedWindow(window_name)
+            cv2.setMouseCallback(window_name, draw_rectangle)
+            
+            roi_x, roi_y, roi_w, roi_h = -1, -1, -1, -1
+
+            while True:
+                # Создаем копию, чтобы рисовать на ней, не затирая оригинал
+                temp_image = original_image.copy()
+                
+                # Если пользователь рисует, отображаем прямоугольник
+                if drawing or (ix != -1 and x != -1):
+                    cv2.rectangle(temp_image, (ix, iy), (x, y), (0, 255, 0), 2)
+                
+                cv2.imshow(window_name, temp_image)
+                
+                key = cv2.waitKey(10) & 0xFF
+                
+                # Нажат ESC - отмена
+                if key == 27:
+                    result_image = original_image.copy() # Возвращаем оригинал
+                    break
+                # Нажат Enter - применяем фильтр
+                elif key == 13:
+                    # Определяем правильные координаты (x, y, w, h)
+                    roi_x = min(ix, x)
+                    roi_y = min(iy, y)
+                    roi_w = abs(ix - x)
+                    roi_h = abs(iy - y)
+                    
+                    if roi_w > 0 and roi_h > 0:
+                        result_image = filters.pixelate_area(original_image, x=roi_x, y=roi_y, w=roi_w, h=roi_h, pixel_size=args.pixel_size)
+                    else:
+                        result_image = original_image.copy()
+                    break
+            
+            cv2.destroyWindow(window_name)
+
+        # ... (остальные вызовы elif без изменений) ...
+        elif filter_name == 'pixelate':
             center_x = args.center_x if args.center_x is not None else w // 2
             center_y = args.center_y if args.center_y is not None else h // 2
             roi_size = args.roi_size if args.roi_size is not None else min(w, h) // 2
-            
-            # Вычисляем координаты левого верхнего угла из центра и размера
             roi_x = center_x - roi_size // 2
             roi_y = center_y - roi_size // 2
-            
             result_image = filters.pixelate_area(original_image, x=roi_x, y=roi_y, w=roi_size, h=roi_size, pixel_size=args.pixel_size)
-        
-        elif filter_name == 'flare':
-            center_x = args.center_x if args.center_x is not None else w // 2
-            center_y = args.center_y if args.center_y is not None else h // 2
-            result_image = filters.add_image_flare(original_image, 
-                                                   flare_path=FLARE_PATH, 
-                                                   center_x=center_x, 
-                                                   center_y=center_y, 
-                                                   scale=args.flare_scale)
-        
-        # ... (остальные вызовы elif без изменений) ...
         elif filter_name == 'resize':
             target_width = args.width if args.width is not None else w // 2
             target_height = args.height if args.height is not None else h // 2
@@ -81,8 +132,17 @@ def main():
             result_image = filters.add_simple_frame(original_image, thickness=args.thickness, color=frame_color)
         elif filter_name == 'image_frame':
             result_image = filters.add_image_frame(original_image, frame_path=FRAME_PATH)
+        elif filter_name == 'flare':
+            center_x = args.center_x if args.center_x is not None else w // 2
+            center_y = args.center_y if args.center_y is not None else h // 2
+            result_image = filters.add_image_flare(original_image, 
+                                                   flare_path=FLARE_PATH, 
+                                                   center_x=center_x, 
+                                                   center_y=center_y, 
+                                                   scale=args.flare_scale)
         elif filter_name == 'paper':
             result_image = filters.apply_paper_texture(original_image, paper_path=PAPER_PATH)
+
 
     except FileNotFoundError as e:
         print(f"Ошибка: Не найден необходимый файл ассета! {e}")
