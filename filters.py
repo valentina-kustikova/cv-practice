@@ -20,25 +20,44 @@ def resize_image(image, width=None, height=None):
     if height is None:
         ratio = width / w
         height = int(h * ratio)
-    resized = np.zeros((height, width, image.shape[2]), dtype=image.dtype)
-    for i in range(height):
-        for j in range(width):
-            src_i = min(int(i * h / height), h - 1)
-            src_j = min(int(j * w / width), w - 1)
-            resized[i, j] = image[src_i, src_j]
+    
+    # Матричный подход: создаем сетку координат и используем индексацию
+    y_coords = np.arange(height, dtype=np.float32) * (h / height)
+    x_coords = np.arange(width, dtype=np.float32) * (w / width)
+    
+    # Ограничиваем координаты границами изображения
+    y_coords = np.clip(y_coords, 0, h - 1).astype(np.int32)
+    x_coords = np.clip(x_coords, 0, w - 1).astype(np.int32)
+    
+    # Создаем матрицы индексов для всех пикселей одновременно
+    y_indices, x_indices = np.meshgrid(y_coords, x_coords, indexing='ij')
+    
+    # Матричная индексация для получения всех пикселей сразу
+    resized = image[y_indices, x_indices]
+    
     return resized
 
 def apply_sepia(image):
     sepia_filter = np.array([[0.272, 0.534, 0.131],
                              [0.349, 0.686, 0.168],
                              [0.393, 0.769, 0.189]])
-    result = np.zeros_like(image)
-    for i in range(image.shape[0]):
-        for j in range(image.shape[1]):
-            pixel = image[i, j].astype(np.float32)
-            new_pixel = sepia_filter @ pixel[:3]
-            result[i, j] = np.clip(new_pixel, 0, 255)
-    return result.astype(np.uint8)
+    
+    # Матричный подход: преобразуем изображение в формат (height*width, 3)
+    # и применяем матричное умножение ко всем пикселям одновременно
+    h, w = image.shape[:2]
+    image_float = image.astype(np.float32)
+    
+    # Преобразуем изображение в матрицу (h*w, 3)
+    pixels = image_float.reshape(-1, 3)
+    
+    # Применяем матричное умножение: (h*w, 3) @ (3, 3) = (h*w, 3)
+    sepia_pixels = pixels @ sepia_filter.T
+    
+    # Ограничиваем значения и преобразуем обратно в форму изображения
+    sepia_pixels = np.clip(sepia_pixels, 0, 255)
+    result = sepia_pixels.reshape(h, w, 3).astype(np.uint8)
+    
+    return result
 
 def apply_vignette(image, strength=0.6):
     h, w = image.shape[:2]
@@ -95,14 +114,24 @@ def apply_custom_border(image, border_width, border_type='dashed', color=(255, 2
 
 def apply_lens_flare(image, flare_position=(100, 100)):
     flare = None
-    for ext in [".png", ".jpg", ".jpeg"]:
-        try:
-            flare = _load_texture("glare" + ext)
+    # Список путей для поиска файла блика
+    search_paths = [TEXTURES_DIR, "."]  # Сначала в textures, потом в корневой папке
+    # Приоритет: сначала PNG (может иметь альфа-канал), потом JPG
+    extensions = [".png", ".jpg", ".jpeg"]
+    
+    for search_path in search_paths:
+        for ext in extensions:
+            filename = "glare" + ext
+            path = os.path.join(search_path, filename)
+            if os.path.exists(path):
+                flare = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+                if flare is not None:
+                    break
+        if flare is not None:
             break
-        except FileNotFoundError:
-            continue
+    
     if flare is None:
-        raise FileNotFoundError(f"Файл блика не найден в папке {TEXTURES_DIR} (glare.png или glare.jpg)")
+        raise FileNotFoundError(f"Файл блика не найден (glare.png или glare.jpg в папке {TEXTURES_DIR} или в корневой папке)")
 
     result = image.copy().astype(np.float32)
     h, w = image.shape[:2]
@@ -116,11 +145,23 @@ def apply_lens_flare(image, flare_position=(100, 100)):
 
     flare_crop = flare[:y2-y1, :x2-x1]
     if flare_crop.shape[2] == 4:
+        # Обработка изображения с альфа-каналом (PNG с прозрачностью)
         alpha = flare_crop[:, :, 3:4].astype(np.float32) / 255.0
         flare_rgb = flare_crop[:, :, :3].astype(np.float32)
         result[y1:y2, x1:x2] = result[y1:y2, x1:x2] * (1 - alpha) + flare_rgb * alpha
     else:
-        result[y1:y2, x1:x2] = flare_crop
+        # Обработка изображения без альфа-канала (JPG)
+        # Используем screen blend mode для бликов (более естественное наложение)
+        flare_rgb = flare_crop.astype(np.float32)
+        base = result[y1:y2, x1:x2].astype(np.float32)
+        # Screen blend: 1 - (1 - base) * (1 - overlay)
+        blended = 255.0 - (255.0 - base) * (255.0 - flare_rgb) / 255.0
+        # Смешиваем с исходным изображением для более мягкого эффекта
+        blend_factor = 0.8
+        result[y1:y2, x1:x2] = np.clip(
+            base * (1 - blend_factor) + blended * blend_factor,
+            0, 255
+        ).astype(np.uint8)
 
     return np.clip(result, 0, 255).astype(np.uint8)
 
