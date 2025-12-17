@@ -39,12 +39,12 @@
 Модель показала наилучший результат, допустив всего одну ошибку (один раз спутала Кремль с Собором).
 
 **Confusion Matrix:**
-```
-                      Kremlin  Cathedral    Palace
-Kremlin      13                        1                        0
-Cathedral       0                        4                        0
-Palace       0                        0                        9
-```
+
+| | Kremlin (Pred) | Cathedral (Pred) | Palace (Pred) |
+| :--- | :---: | :---: | :---: |
+| **Kremlin (True)** | 13 | 1 | 0 |
+| **Cathedral (True)** | 0 | 4 | 0 |
+| **Palace (True)** | 0 | 0 | 9 |
 
 ### 2. Мешок слов (BoVW + ORB)
 *   **Параметры:** `clusters=100`, `nfeatures=500`
@@ -53,12 +53,12 @@ Palace       0                        0                        9
 Детектор ORB показал неожиданно высокий результат для классического метода, корректно классифицировав большинство объектов. Основные ошибки возникли при распознавании Собора и Дворца.
 
 **Confusion Matrix:**
-```
-                      Kremlin  Cathedral    Palace
-Kremlin      14                        0                        0
-Cathedral       0                        2                        2
-Palace       2                        0                        7
-```
+
+| | Kremlin (Pred) | Cathedral (Pred) | Palace (Pred) |
+| :--- | :---: | :---: | :---: |
+| **Kremlin (True)** | 14 | 0 | 0 |
+| **Cathedral (True)** | 0 | 2 | 2 |
+| **Palace (True)** | 2 | 0 | 7 |
 
 ### 3. Мешок слов (BoVW + SIFT)
 *   **Параметры:** `clusters=100`, `nfeatures=500`
@@ -67,12 +67,12 @@ Palace       2                        0                        7
 Метод SIFT показал достойную точность, но в данном эксперименте уступил ORB и нейросети. Ошибки распределены равномерно между классами.
 
 **Confusion Matrix:**
-```
-                      Kremlin  Cathedral    Palace
-Kremlin      13                        1                        0
-Cathedral       1                        2                        1
-Palace       1                        2                        6
-```
+
+| | Kremlin (Pred) | Cathedral (Pred) | Palace (Pred) |
+| :--- | :---: | :---: | :---: |
+| **Kremlin (True)** | 13 | 1 | 0 |
+| **Cathedral (True)** | 1 | 2 | 1 |
+| **Palace (True)** | 1 | 2 | 6 |
 
 ---
 
