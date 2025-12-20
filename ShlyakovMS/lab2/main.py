@@ -1,9 +1,9 @@
 import os
 import cv2
-import numpy as np
 import argparse
 import sys
 from detector import YOLOv3Detector, YOLOv4TinyDetector, MobileNetSSDDetector
+from metrics import DetectionEvaluator, SimpleDetection
 
 def parse_labels(label_file):
     labels = {}
@@ -23,44 +23,12 @@ def parse_labels(label_file):
             labels[frame_id].append({'class_name': class_name, 'box': box})
     return labels
 
-def iou(box1, box2):
-    x1, y1, w1, h1 = box1
-    x2, y2, w2, h2 = box2
-    xi1 = max(x1, x2); yi1 = max(y1, y2)
-    xi2 = min(x1 + w1, x2 + w2); yi2 = min(y1 + h1, y2 + h2)
-    inter = max(0, xi2 - xi1) * max(0, yi2 - yi1)
-    union = w1 * h1 + w2 * h2 - inter
-    return inter / union if union > 0 else 0
-
-def evaluate_detections(detections, gt_boxes, iou_thr=0.5):
-    if not gt_boxes:
-        return (1.0 if not detections else 0.0), (0.0 if not detections else 1.0)
-    tp = fp = 0
-    matched = [False] * len(gt_boxes)
-    for det in detections:
-        best_iou = 0
-        best_idx = -1
-        for i, gt in enumerate(gt_boxes):
-            if matched[i] or gt['class_name'] != det['class_name']: continue
-            curr_iou = iou(det['box'], gt['box'])
-            if curr_iou > best_iou:
-                best_iou = curr_iou
-                best_idx = i
-        if best_iou >= iou_thr:
-            tp += 1
-            matched[best_idx] = True
-        else:
-            fp += 1
-    fn = len(gt_boxes) - sum(matched)
-    tpr = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    fdr = fp / (fp + tp) if (fp + tp) > 0 else 0.0
-    return tpr, fdr
 
 def draw_detections(image, detections, class_to_color):
     for det in detections:
         x, y, w, h = det['box']
         class_name = det['class_name']
-        conf = det['confidence']
+        conf = det.get('confidence', 0.0)
         color = class_to_color.get(class_name, (0, 255, 0))
         cv2.rectangle(image, (x, y), (x + w, y + h), color, 3)
         cv2.putText(image, f"{class_name} {conf:.3f}", (x, y - 10),
@@ -94,7 +62,7 @@ def main():
         args = parser.parse_args([
             '--image_dir', r'C:\Users\maxsl\lab2\imgs_MOV03478',
             '--label_file', r'C:\Users\maxsl\lab2\mov03478.txt',
-            '--model', 'yolov4tiny',
+            '--model', 'yolov3',
             '--output_dir', 'results'
         ])
     else:
@@ -119,26 +87,46 @@ def main():
     class_to_color = {cls: tuple(map(int, col)) for cls, col in zip(detector.classes, detector.colors)}
     all_labels = parse_labels(args.label_file)
 
+    evaluator = DetectionEvaluator(target_class="car")
+
     images = sorted([f for f in os.listdir(args.image_dir) if f.lower().endswith(('.jpg', '.png'))])
     results = []
     video_frames = []
 
     print("Обработка кадров...")
     for i, img_file in enumerate(images, 1):
-        frame_id = int(os.path.splitext(img_file)[0])
+        try:
+            frame_id = int(os.path.splitext(img_file)[0])
+        except ValueError:
+            continue
         img_path = os.path.join(args.image_dir, img_file)
         img = cv2.imread(img_path)
-        if img is None: continue
+        if img is None:
+            continue
 
         detections = detector.detect(img, conf_threshold=0.5, nms_threshold=0.4)
         for d in detections:
             d['color'] = class_to_color.get(d['class_name'], (0, 255, 0))
+            if 'confidence' not in d:
+                d['confidence'] = float(d.get('prob', 0.0))
 
-        gt = all_labels.get(frame_id, [])
-        tpr, fdr = evaluate_detections(detections, gt)
+        gt_all = all_labels.get(frame_id, [])
+        gt_boxes_for_eval = []
+        for gt in gt_all:
+            if 'box' in gt and gt.get('class_name', '').lower() == evaluator.target_class.lower():
+                x, y, w, h = gt['box']
+                gt_boxes_for_eval.append([x, y, x + w, y + h])
+
+        det_objects = []
+        for d in detections:
+            x, y, w, h = map(int, d['box'])
+            bbox_xyxy = [x, y, x + w, y + h]
+            det_objects.append(SimpleDetection(d['class_name'], float(d.get('confidence', 0.0)), bbox_xyxy))
+
+        frame_tpr, frame_fdr = evaluator.evaluate_frame(det_objects, gt_boxes_for_eval)
 
         frame_out = draw_detections(img.copy(), detections, class_to_color)
-        txt = f"Frame {frame_id:06d} | TPR={tpr:.4f} | FDR={fdr:.4f} | Detections={len(detections)}"
+        txt = f"Frame {frame_id:06d} | TPR={frame_tpr:.4f} | FDR={frame_fdr:.4f} | Detections={len(detections)}"
         cv2.putText(frame_out, txt, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
         video_frames.append(frame_out)
 
@@ -147,11 +135,11 @@ def main():
             'filename': img_file,
             'image': img.copy(),
             'detections': detections,
-            'tpr': tpr,
-            'fdr': fdr
+            'tpr': frame_tpr,
+            'fdr': frame_fdr
         })
 
-        print(f"  [{i}/{len(images)}] {img_file}  TPR={tpr:.4f}; FDR={fdr:.4f}")
+        print(f"  [{i}/{len(images)}] {img_file}  TPR={frame_tpr:.4f}; FDR={frame_fdr:.4f}")
 
     results.sort(key=lambda x: x['tpr'], reverse=True)
     best = results[:5]
@@ -172,13 +160,12 @@ def main():
     video_path = os.path.join(args.output_dir, f"detection_result_{args.model}.mp4")
     create_video(video_frames, video_path, fps=30.0)
 
-    avg_tpr = np.mean([r['tpr'] for r in results])
-    avg_fpr = np.mean([r['fpr'] for r in results])
+    overall_tpr, overall_fdr = evaluator.get_metrics()
 
     print("\n" + "="*70)
     print(f"ГОТОВО! Обработано кадров: {len(results)}")
-    print(f"Средний TPR  = {avg_tpr:.4f} → +{10*avg_tpr:.1f} баллов!")
-    print(f"Средний FPR  = {avg_fpr:.4f}")
+    print(f"TPR  = {overall_tpr:.4f} → +{10*overall_tpr:.1f} баллов!")
+    print(f"FDR  = {overall_fdr:.4f}")
     print(f"Видео из всех кадров: {video_path}")
     print(f"Лучшие кадры {best_dir}")
     print(f"Худшие кадры {worst_dir}")
@@ -192,8 +179,8 @@ def main():
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("="*70 + "\n")
         f.write(f"Модель: {args.model}\n")
-        f.write(f"Средний TPR  = {avg_tpr:.4f} \n")
-        f.write(f"Средний FPR  = {avg_fpr:.4f}\n")
+        f.write(f"TPR  = {overall_tpr:.4f} \n")
+        f.write(f"FDR  = {overall_fdr:.4f}\n")
  
     
     print(f"Отчёт сохранён: {report_path}")
