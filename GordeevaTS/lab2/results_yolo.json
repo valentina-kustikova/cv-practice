@@ -1,0 +1,13 @@
+{
+    "model": "yolo",
+    "confidence_threshold": 0.3,
+    "iou_threshold": 0.45,
+    "total_images": 3456,
+    "total_tp": 19412,
+    "total_fp": 9038,
+    "total_fn": 880,
+    "global_tpr": 0.9566331559235166,
+    "global_fdr": 0.3176801405975395,
+    "avg_tpr": 0.9354450943860685,
+    "avg_fdr": 0.33477306576903
+}

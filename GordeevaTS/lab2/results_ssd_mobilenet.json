@@ -1,0 +1,13 @@
+{
+    "model": "ssd_mobilenet",
+    "confidence_threshold": 0.3,
+    "iou_threshold": 0.45,
+    "total_images": 3456,
+    "total_tp": 16679,
+    "total_fp": 930,
+    "total_fn": 3613,
+    "global_tpr": 0.8219495367632564,
+    "global_fdr": 0.05281390198194105,
+    "avg_tpr": 0.7954115457587695,
+    "avg_fdr": 0.05601365182528403
+}
