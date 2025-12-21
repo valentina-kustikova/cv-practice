@@ -17,7 +17,7 @@ def calculate_iou(box1, box2):
     return inter_area / union_area if union_area > 0 else 0
 
 
-def calculate_metrics(detections, ground_truths, iou_threshold=0.5):
+def calculate_frame_metrics(detections, ground_truths, iou_threshold=0.5):
     if len(ground_truths) == 0:
         tp = 0
         fp = len(detections)
@@ -62,4 +62,10 @@ def calculate_metrics(detections, ground_truths, iou_threshold=0.5):
     tpr = tp / total_positives if total_positives > 0 else 0.0
     fdr = fp / total_detections if total_detections > 0 else 0.0
 
-    return tpr, fdr
+    return {
+        'tp': tp,
+        'fp': fp,
+        'fn': fn,
+        'tpr': tpr,
+        'fdr': fdr
+    }
