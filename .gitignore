@@ -1,0 +1,16 @@
+*.zip
+*.pkl
+*.h5
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+visualizations/
+*.jpg
+*.jpeg
+*.png
+NNClassification.zip
+bow_model.pkl
+nn_model.h5
+
