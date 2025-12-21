@@ -221,8 +221,3 @@ python main.py --images data/imgs_MOV03478 --ann data/mov03478.txt --model ssd_m
 ```bash
 python main.py --images data/imgs_MOV03478 --ann data/mov03478.txt --model yolo_v4_coco
 ```
-
-### Управление при визуализации
-
-- **Esc** — завершить работу
-- **Крестик окна** — завершить работу
