@@ -114,7 +114,11 @@ def calculate_metrics(detections: List[Detection],
     
     gt_matched = [False] * len(ground_truth)
     
-    for det in detections:
+    # Сортируем детекции по confidence в порядке убывания,
+    # чтобы лучшие предсказания обрабатывались первыми
+    sorted_detections = sorted(detections, key=lambda d: d.confidence, reverse=True)
+    
+    for det in sorted_detections:
         det_box = (det.x1, det.y1, det.x2, det.y2)
         det_class = det.class_name.upper()
         
