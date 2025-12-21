@@ -71,11 +71,6 @@ def load_annotations(path, image_folder=None):
                 val1, val2, val3, val4 = map(float, parts[2:6]) # float для универсальности
                 val1, val2, val3, val4 = int(val1), int(val2), int(val3), int(val4)
 
-                # ЭВРИСТИКА ОПРЕДЕЛЕНИЯ ФОРМАТА
-                # Если 3-е значение (x2/w) больше, чем 1-е значение (x1) + небольшой порог,
-                # и при этом оно похоже на координату (большое число), то это скорее всего x2, а не ширина.
-                # В видео датасетах ширина машины редко превышает координату X.
-
                 if val3 > val1 and val4 > val2:
                     # Похоже на формат: x1, y1, x2, y2
                     x1, y1, x2, y2 = val1, val2, val3, val4
@@ -164,9 +159,10 @@ def normalize_class_name(class_name):
 def calculate_metrics(detections, gts, iou_threshold=0.5):
     TP, FP, FN = 0, 0, 0
 
-    # Списки для дебага (можно раскомментировать print внутри)
-
     for dets, gt_boxes in zip(detections, gts):
+# Это гарантирует, что лучшие предсказания обрабатываются первыми
+        dets = sorted(dets, key=lambda x: x['confidence'], reverse=True)
+
         matched_gt = set()
 
         for det in dets:
@@ -178,7 +174,6 @@ def calculate_metrics(detections, gts, iou_threshold=0.5):
                 gt_class = normalize_class_name(gt['class'])
 
                 # Сверяем классы и IoU
-                # Можно ослабить проверку классов, если названия совсем разные
                 if gt_class == det_class:
                     score = iou(det['bbox'], gt['bbox'])
                     if score > iou_threshold:

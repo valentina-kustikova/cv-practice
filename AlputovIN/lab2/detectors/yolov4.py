@@ -25,7 +25,7 @@ class YOLOv4Detector(Detector):
             self.output_layers = [layers[i - 1] for i in self.net.getUnconnectedOutLayers()]
 
         self.input_size = (608, 608)
-        self.conf_th = 0.3  # Чуть снизил порог
+        self.conf_th = 0.3
         self.nms_th = 0.4
 
         # Стандартные COCO классы
@@ -88,7 +88,7 @@ class YOLOv4Detector(Detector):
         if len(boxes) > 0:
             idxs = cv2.dnn.NMSBoxes(boxes, confidences, self.conf_th, self.nms_th)
             if len(idxs) > 0:
-                for i in idxs.flatten():
+                for i in idxs.flatten():# переводит в 1D массив
                     x, y, w, h = boxes[i]
                     # Коррекция выхода за границы
                     x = max(0, x)
