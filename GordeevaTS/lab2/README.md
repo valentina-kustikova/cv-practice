@@ -93,11 +93,23 @@ python main.py \
 ## Результаты:
 Датасет: 3456 изображений, confidence_threshold = 0.3, iou_threshold = 0.45
 
-|     Модель    | Global TPR | Global FDR |  TPR |  FDR |  FN |
-|---------------|------------|------------|------------|------------|------------|
-| **YOLOv4** | 0.9566 | 0.3177 | 19412 | 9038 | 880 | 
-| **YOLOv4YOLOv4-tiny** | 0.8885 | 0.1710 | 18029 | 3719 | 2263 | 
-| **SSD MobileNet** | 0.8219 | 0.0528 | 16679 | 930 | 3613 | 
+Запуск:
+```bash
+# Yolo:
+python main.py --images_dir data/images --annotation_file data/annotations.txt --model yolo --display
+
+# Yolo-tiny:
+python main.py --images_dir data/images --annotation_file data/annotations.txt --model yolo_tiny  --display
+
+# ssd: 
+python main.py --images_dir data/images --annotation_file data/annotations.txt --model ssd_mobilenet --display
+```
+
+|     Модель    | Global TPR | Global FDR | Average TPR | Average FDR |  TPR |  FDR |  FN |
+|---------------|------------|------------|------------|------------|------------|------------|------------|
+| **YOLOv4** | 0.9566 | 0.3177 | 0.9354 | 0.3348 | 19412 | 9038 | 880 | 
+| **YOLOv4YOLOv4-tiny** | 0.8885 | 0.1710 | 0.8632 | 0.1952 | 18029 | 3719 | 2263 | 
+| **SSD MobileNet** | 0.8219 | 0.0528 | 0.7954 | 0.5601 | 16679 | 930 | 3613 | 
 
 ### Сравнение результатов моделей
 
