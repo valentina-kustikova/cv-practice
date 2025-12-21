@@ -1,5 +1,3 @@
-# src/metrics.py
-
 import numpy as np
 
 def calculate_iou(box1, box2):
@@ -25,17 +23,7 @@ def calculate_iou(box1, box2):
     iou = inter_area / union_area
     return iou
 
-def calculate_tpr_fdr(detections, ground_truths, iou_threshold=0.5):
-    if len(ground_truths) == 0:
-        if len(detections) == 0:
-             return 1.0, 0.0 # Нет объектов - все "нашли"
-        else:
-             return 0.0, 1.0 # Нашли то, чего нет
-
-    if len(detections) == 0:
-        # Не нашли, что нужно, но и ложно не находили
-        return 0.0, 0.0
-
+def calculate_tp_fn(detections, ground_truths, iou_threshold=0.5):
     detections_sorted = sorted(detections, key=lambda x: x['confidence'], reverse=True)
 
     matched_gt = set()
@@ -59,8 +47,6 @@ def calculate_tpr_fdr(detections, ground_truths, iou_threshold=0.5):
             false_positives += 1
 
     false_negatives = len(ground_truths) - true_positives
-
     tpr = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0.0
-    fdr = false_positives / (false_positives + true_positives) if (false_positives + true_positives) > 0 else 0.0
-
-    return tpr, fdr
+    #   fdr = false_positives / (false_positives + true_positives) if (false_positives + true_positives) > 0 else 0.0
+    return true_positives, false_positives, false_negatives

@@ -128,8 +128,8 @@ FDR = FP / (TP + FP)
 ### Метрики качества реализованной модели
 
 #### YOLOv3
-- **Average TPR**: 0.919
-- **Average FDR**: 0.231
+- **Average TPR**: 0.944
+- **Average FDR**: 0.223
 
 ### Выводы
 
