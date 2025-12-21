@@ -4,7 +4,7 @@ import argparse
 import json
 from detectors.yolo_detector import YOLODetector
 from detectors.ssd_detector import SSDMobileNetDetector
-from utils.metrics import calculate_metrics
+from utils.metrics import calculate_frame_metrics
 import config
 from utils.visualization import draw_detections as draw_detections_vis
 
@@ -145,9 +145,7 @@ def main():
         vehicle_classes=VEHICLE_CLASSES
     )
     
-    total_tpr = 0
-    total_fdr = 0
-    image_count = 0
+    frame_metrics_list = []
     total_tp = 0
     total_fp = 0
     total_fn = 0
@@ -161,8 +159,8 @@ def main():
         if image is None:
             print(f"Ошибка: не удалось загрузить изображение {image_path}")
             continue
-        current_ground_truths = ground_truths.get(i, [])
         
+        current_ground_truths = ground_truths.get(i, [])
         detections = detector.detect(image)
         
         if args.model == 'ssd_mobilenet':
@@ -187,66 +185,30 @@ def main():
         else:
             vehicle_detections = [d for d in detections if d['class_name'] in VEHICLE_CLASSES]
             vehicle_ground_truths = [gt for gt in current_ground_truths if gt['class_name'] in VEHICLE_CLASSES]
-            
-        tpr, fdr = calculate_metrics(vehicle_detections, vehicle_ground_truths, args.iou_threshold)
-        total_tpr += tpr
-        total_fdr += fdr
-        image_count += 1
+        
+        frame_metrics = calculate_frame_metrics(
+            vehicle_detections, 
+            vehicle_ground_truths, 
+            args.iou_threshold
+        )
+        
+        frame_metrics_list.append({
+            'frame_id': i,
+            'image_file': image_file,
+            'detections_count': len(vehicle_detections),
+            'ground_truth_count': len(vehicle_ground_truths),
+            **frame_metrics
+        })
+        
+        total_tp += frame_metrics['tp']
+        total_fp += frame_metrics['fp']
+        total_fn += frame_metrics['fn']
         
         print(f"Всего детекций: {len(detections)}")
         print(f"Транспортных средств в детекциях: {len(vehicle_detections)}")
         print(f"Транспортных средств в GT: {len(vehicle_ground_truths)}")
-        
-        if len(vehicle_ground_truths) == 0:
-            if len(vehicle_detections) == 0:
-                tp, fp, fn = 0, 0, 0
-            else:
-                tp, fp, fn = 0, len(vehicle_detections), 0
-        else:
-            tp = 0
-            fp = 0
-            fn = 0
-            
-            if len(vehicle_detections) > 0:
-                used_gt = [False] * len(vehicle_ground_truths)
-                vehicle_detections_sorted = sorted(vehicle_detections, 
-                                                  key=lambda x: x['confidence'], 
-                                                  reverse=True)
-                
-                for det in vehicle_detections_sorted:
-                    det_box = det['bbox']
-                    det_class = det['class_name']
-                    best_iou = 0
-                    best_idx = -1
-                    
-                    for i_gt, gt in enumerate(vehicle_ground_truths):
-                        if used_gt[i_gt]:
-                            continue
-                        if gt['class_name'] != det_class:
-                            continue
-                        
-                        from utils.metrics import calculate_iou
-                        iou = calculate_iou(det_box, gt['bbox'])
-                        if iou > best_iou:
-                            best_iou = iou
-                            best_idx = i_gt
-                    
-                    if best_iou >= args.iou_threshold and best_idx != -1:
-                        used_gt[best_idx] = True
-                        tp += 1
-                    else:
-                        fp += 1
-                
-                fn = len([x for x in used_gt if not x])
-            else:
-                tp, fp, fn = 0, 0, len(vehicle_ground_truths)
-        
-        total_tp += tp
-        total_fp += fp
-        total_fn += fn
-        
-        print(f"TP: {tp}, FP: {fp}, FN: {fn}")
-        print(f"TPR: {tpr:.4f}, FDR: {fdr:.4f}")
+        print(f"TP: {frame_metrics['tp']}, FP: {frame_metrics['fp']}, FN: {frame_metrics['fn']}")
+        print(f"TPR: {frame_metrics['tpr']:.4f}, FDR: {frame_metrics['fdr']:.4f}")
         
         if args.display:
             vis_detections = []
@@ -264,7 +226,7 @@ def main():
                 ])
             
             result_image = draw_detections_vis(image.copy(), vis_detections, VEHICLE_CLASSES)
-            metrics_text = f"Frame: {i} | TPR: {tpr:.3f} | FDR: {fdr:.3f}"
+            metrics_text = f"Frame: {i} | TPR: {frame_metrics['tpr']:.3f} | FDR: {frame_metrics['fdr']:.3f}"
             cv2.putText(result_image, metrics_text, (10, 30), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
             
@@ -301,48 +263,49 @@ def main():
         
         print("-" * 50)
     
-    if image_count > 0:
-        avg_tpr = total_tpr / image_count
-        avg_fdr = total_fdr / image_count
+    # Вычисление итоговых метрик
+    if frame_metrics_list:
+        global_tpr = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0.0
+        global_fdr = total_fp / (total_tp + total_fp) if (total_tp + total_fp) > 0 else 0.0
         
-        if total_tp + total_fn > 0:
-            global_tpr = total_tp / (total_tp + total_fn)
-        else:
-            global_tpr = 0.0
-            
-        if total_tp + total_fp > 0:
-            global_fdr = total_fp / (total_tp + total_fp)
-        else:
-            global_fdr = 0.0
+        avg_tpr = sum(fm['tpr'] for fm in frame_metrics_list) / len(frame_metrics_list)
+        avg_fdr = sum(fm['fdr'] for fm in frame_metrics_list) / len(frame_metrics_list)
         
         print(f"\n" + "="*70)
         print(f"=== ИТОГОВЫЕ РЕЗУЛЬТАТЫ ===")
-        print(f"Обработано изображений: {image_count}")
+        print(f"Обработано изображений: {len(frame_metrics_list)}")
         print(f"Общее количество объектов: TP={total_tp}, FP={total_fp}, FN={total_fn}")
         print(f"Глобальный TPR (Recall): {global_tpr:.4f}")
         print(f"Глобальный FDR: {global_fdr:.4f}")
         print(f"Средний TPR по кадрам: {avg_tpr:.4f}")
         print(f"Средний FDR по кадрам: {avg_fdr:.4f}")
         
+        print(f"\n=== ДЕТАЛЬНАЯ СТАТИСТИКА ПО КАДРАМ ===")
+        for fm in frame_metrics_list[:10]:  
+            print(f"Кадр {fm['frame_id']}: TPR={fm['tpr']:.4f}, FDR={fm['fdr']:.4f}, "
+                  f"TP={fm['tp']}, FP={fm['fp']}, FN={fm['fn']}")
+        if len(frame_metrics_list) > 10:
+            print(f"... и еще {len(frame_metrics_list) - 10} кадров")
+        
         results = {
             'model': args.model,
             'confidence_threshold': args.confidence,
             'iou_threshold': args.iou_threshold,
-            'total_images': image_count,
+            'total_images': len(frame_metrics_list),
             'total_tp': total_tp,
             'total_fp': total_fp,
             'total_fn': total_fn,
             'global_tpr': float(global_tpr),
             'global_fdr': float(global_fdr),
             'avg_tpr': float(avg_tpr),
-            'avg_fdr': float(avg_fdr)
+            'avg_fdr': float(avg_fdr),
+            'frame_metrics': frame_metrics_list
         }
         
         output_file = f"results_{args.model}.json"
         with open(output_file, 'w') as f:
             json.dump(results, f, indent=4)
-        print(f"Результаты сохранены в {output_file}")
-        
+        print(f"\nРезультаты сохранены в {output_file}")
         print("="*70)
     else:
         print("Не обработано ни одного изображения. Проверьте пути и форматы файлов.")
