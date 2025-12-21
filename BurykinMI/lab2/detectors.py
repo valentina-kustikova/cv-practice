@@ -14,6 +14,10 @@ class BaseDetector(ABC):
     def __init__(self, config_path, weights_path, classes_path=None, conf_threshold=0.5, nms_threshold=0.4):
         # cv2.dnn.readNet автоматически определяет фреймворк (Caffe или Darknet) по расширению файлов
         self.net = cv2.dnn.readNet(weights_path, config_path)
+        # Включаем оптимизации
+        self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+        self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+
         self.conf_threshold = conf_threshold
         self.nms_threshold = nms_threshold  # Порог для Non-Maximum Suppression
         self.classes = []
@@ -97,6 +101,12 @@ class SSDDetector(BaseDetector):
                 box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
                 (startX, startY, endX, endY) = box.astype("int")
 
+                # Защита от выхода за границы
+                startX = max(0, startX)
+                startY = max(0, startY)
+                endX = min(w, endX)
+                endY = min(h, endY)
+
                 label_str = self.classes[idx]
                 results.append([label_str, confidence, startX, startY, endX - startX, endY - startY])
 
@@ -104,6 +114,10 @@ class SSDDetector(BaseDetector):
 
 
 class YOLODetector(BaseDetector):
+    def __init__(self, config_path, weights_path, classes_path=None, input_size=(416, 416)):
+        super().__init__(config_path, weights_path, classes_path)
+        self.input_size = input_size
+
     def preprocess(self, image):
         # Scale 1/255 приводит пиксели в диапазон [0, 1].
         return cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416), swapRB=True, crop=False)
@@ -159,3 +173,16 @@ class YOLODetector(BaseDetector):
                 results.append([label_str, confidences[i], boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][3]])
 
         return results
+
+
+class YOLOv4TinyDetector(YOLODetector):
+    """
+    Специализированный класс для YOLOv4-Tiny.
+    Хотя логика препроцессинга схожа с v3, выделение в отдельный класс
+    позволяет гибко менять input_size или параметры якорей в будущем.
+    """
+
+    def __init__(self, config_path, weights_path, classes_path=None):
+        # Tiny версии часто хорошо работают и на 416x416, но работают быстрее.
+        # Можно поставить (320, 320) для еще большей скорости, но упадет точность.
+        super().__init__(config_path, weights_path, classes_path, input_size=(416, 416))
