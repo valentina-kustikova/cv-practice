@@ -61,9 +61,9 @@ class StrategyFactory:
             return BagOfWordsStrategy(feature_extractor, n_clusters)
 
         elif algorithm == 'neural':
-            # Пока нет
             model_architecture = kwargs.get('model_architecture', 'resnet')
-            return NeuralNetworkStrategy(model_architecture)
+            epochs = kwargs.get('epochs', 10)  # Добавили параметр эпох
+            return NeuralNetworkStrategy(model_architecture, epochs=epochs)
 
         else:
             raise ValueError(f"Неизвестный алгоритм: {algorithm}")
@@ -93,6 +93,8 @@ def main():
                         help='Тип детектора признаков (для BoW)')
     parser.add_argument('--n_clusters', type=int, default=300,
                         help='Количество кластеров (для BoW)')
+    parser.add_argument('--epochs', type=int, default=10,
+                        help='Количество эпох обучения (для neural)')
     parser.add_argument('--models_dir', type=str, default='models',
                         help='Директория для сохранения моделей')
 
@@ -108,7 +110,8 @@ def main():
         model_name = f"{args.detector}_clusters{args.n_clusters}.pkl"
         results_name = f"{args.detector}_clusters{args.n_clusters}_results.json"
     else:
-        model_name = "neural_model.pkl"
+        # Для нейросети имя файла модели другое (обычно .pth или .pt, но оставим .pkl или .pth)
+        model_name = "resnet_model.pth"
         results_name = "neural_results.json"
 
     model_path = os.path.join(model_subdir, model_name)
@@ -122,7 +125,8 @@ def main():
     strategy = StrategyFactory.create_strategy(
         args.algorithm,
         detector_type=args.detector,
-        n_clusters=args.n_clusters
+        n_clusters=args.n_clusters,
+        epochs=args.epochs
     )
 
     classifier = LandmarkClassifier(strategy)
@@ -136,6 +140,9 @@ def main():
     if args.mode in ['test', 'train_test']:
         if args.mode == 'test':
             classifier.load_model(model_path)
+
+        if args.algorithm == 'neural':
+            print("Запуск оценки на тестовом наборе...")
 
         accuracy = classifier.evaluate(test_data, test_labels, results_path)
 
