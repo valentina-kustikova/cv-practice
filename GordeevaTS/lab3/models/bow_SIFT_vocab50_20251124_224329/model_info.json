@@ -1,0 +1,21 @@
+{
+  "algorithm": "bow",
+  "created_at": "2025-11-24T22:48:37.779715",
+  "parameters": {
+    "detector": "SIFT",
+    "vocab_size": 50,
+    "epochs": 15,
+    "batch_size": 32,
+    "lr": 0.001,
+    "device": "auto"
+  },
+  "data_info": {
+    "train_split": "data/train.txt",
+    "test_split": "data/test.txt",
+    "data_path": "./data"
+  },
+  "performance": {
+    "accuracy": 1.0,
+    "test_accuracy": null
+  }
+}
