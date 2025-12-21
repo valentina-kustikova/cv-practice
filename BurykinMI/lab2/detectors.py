@@ -120,7 +120,7 @@ class YOLODetector(BaseDetector):
 
     def preprocess(self, image):
         # Scale 1/255 приводит пиксели в диапазон [0, 1].
-        return cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416), swapRB=True, crop=False)
+        return cv2.dnn.blobFromImage(image, 1 / 255.0, self.input_size, swapRB=True, crop=False)
 
     def postprocess(self, image, outputs):
         (H, W) = image.shape[:2]
@@ -128,7 +128,7 @@ class YOLODetector(BaseDetector):
         confidences = []
         classIDs = []
 
-        # Проходим по всем 3 выходным слоям
+        # Проходим по всем 3 (или 2) выходным слоям
         for output in outputs:
             for detection in output:
                 # Первые 5 чисел - координаты и objectness, остальные - вероятности классов
