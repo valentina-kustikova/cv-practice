@@ -63,7 +63,7 @@ class SsdMobilenetV2CocoDetector(BaseDetector, model_name="ssd_mobilenet_v2_coco
 
     def _postprocess(self, image, outputs, meta=None):
         h, w = image.shape[:2]
-
+        print(f"Размер выхода SSD: {outputs.shape}")
         boxes_xywh = []
         scores = []
         class_ids = []

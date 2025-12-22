@@ -115,7 +115,7 @@ class YoloV4CocoDetector(BaseDetector, model_name="yolo_v4_coco"):
             idxs_c = [i for i, cid in enumerate(class_ids) if cid == c]
             boxes_c = [boxes_xywh[i] for i in idxs_c]
             scores_c = [scores[i] for i in idxs_c]
-
+            # Это список номеров (индексов) тех рамок из исходного списка boxes_c, которые выжили после чистки.
             indices = cv2.dnn.NMSBoxes(
                 bboxes=boxes_c,
                 scores=scores_c,
