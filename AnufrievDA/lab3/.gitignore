@@ -1,0 +1,33 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.env
+.venv/
+
+# IDE settings
+.idea/
+.vscode/
+*.swp
+
+# Dataset (картинки весят много, их в git не льют)
+dataset/
+NNSUDataset/
+ExtDataset/
+
+# Trained models (веса нейросетей и сохраненные SVM)
+*.pth
+*.pkl
+*.joblib
+
+# Generated images (визуализация)
+*.jpg
+*.png
+
+# Logs and system files
+.DS_Store
+Thumbs.db
