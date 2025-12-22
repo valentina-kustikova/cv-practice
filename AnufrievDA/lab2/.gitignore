@@ -1,0 +1,39 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Виртуальные окружения ---
+venv/
+env/
+.venv/
+cv_lab2/
+
+# --- Настройки IDE (Spyder, VS Code, PyCharm) ---
+.spyproject/
+.vscode/
+.idea/
+.ipynb_checkpoints
+
+# --- Данные (Картинки и разметка) ---
+# Игнорируем папку data, так как там лежат тысячи картинок
+data/
+
+# --- Модели и Веса ---
+# Игнорируем содержимое папки models, так как оно скачивается скриптом setup_models.py
+# и весит сотни мегабайт.
+models/ssd_mobilenet_v2_coco_2018_03_29/
+models/faster_rcnn_resnet50_coco_2018_01_28/
+models/yolo/
+models/coco_names.txt
+
+# Игнорируем архивы и веса, если они случайно попали в корень
+*.tar.gz
+*.pb
+*.pbtxt
+*.weights
+*.cfg
+
+# --- Системные файлы ---
+.DS_Store
+Thumbs.db
