@@ -45,8 +45,8 @@ def parse_arguments():
     parser.add_argument(
         '--bow_vocab_size',
         type=int,
-        default=50,
-        help='Размер словаря для Bag of Words (по умолчанию: 50, рекомендуется 50-100 для экономии памяти)'
+        default=200,
+        help='Размер словаря для Bag of Words (по умолчанию: 200, рекомендуется 200-500 для лучшей точности)'
     )
     
     parser.add_argument(
@@ -121,7 +121,8 @@ def train_bow(data_loader, args):
     bow = BagOfWords(
         vocab_size=args.bow_vocab_size,
         detector_type=args.bow_detector,
-        descriptor_type=args.bow_detector
+        descriptor_type=args.bow_detector,
+        use_tfidf=True
     )
     
     bow.train(train_images, train_labels, visualize=args.visualize)
@@ -143,7 +144,8 @@ def test_bow(data_loader, args):
     bow = BagOfWords(
         vocab_size=args.bow_vocab_size,
         detector_type=args.bow_detector,
-        descriptor_type=args.bow_detector
+        descriptor_type=args.bow_detector,
+        use_tfidf=True
     )
     bow.load(args.bow_model_path)
     

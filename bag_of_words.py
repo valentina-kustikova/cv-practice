@@ -8,22 +8,28 @@ from sklearn.cluster import KMeans
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from collections import Counter
 
 
 class BagOfWords:
     
     def __init__(self, 
-                 vocab_size: int = 100,
+                 vocab_size: int = 200,
                  detector_type: str = 'SIFT',
-                 descriptor_type: str = 'SIFT'):
+                 descriptor_type: str = 'SIFT',
+                 use_tfidf: bool = True,
+                 use_spatial_pyramid: bool = False):
         self.vocab_size = vocab_size
         self.detector_type = detector_type
         self.descriptor_type = descriptor_type
+        self.use_tfidf = use_tfidf
+        self.use_spatial_pyramid = use_spatial_pyramid
         self.detector = None
         self.descriptor = None
         self.kmeans = None
         self.classifier = None
         self.scaler = StandardScaler()
+        self.idf = None  # Inverse Document Frequency для TF-IDF
         self._init_detector_descriptor()
     
     def _init_detector_descriptor(self):
@@ -39,7 +45,7 @@ class BagOfWords:
         else:
             raise ValueError(f"Неподдерживаемый тип детектора: {self.detector_type}")
     
-    def extract_features(self, images: List[np.ndarray], max_descriptors_per_image: int = 200) -> np.ndarray:
+    def extract_features(self, images: List[np.ndarray], max_descriptors_per_image: int = 500) -> np.ndarray:
         descriptors_list = []
         
         for i, img in enumerate(images):
@@ -49,7 +55,18 @@ class BagOfWords:
                 else:
                     gray = img
                 
-                keypoints = self.detector.detect(gray, None)
+                # Применение улучшенной предобработки для лучшего извлечения признаков
+                # Улучшение контраста
+                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+                gray = clahe.apply(gray)
+                
+                # Увеличение количества ключевых точек
+                if self.detector_type == 'SIFT':
+                    # Для SIFT можно увеличить количество точек
+                    keypoints = self.detector.detect(gray, None)
+                else:
+                    keypoints = self.detector.detect(gray, None)
+                
                 if len(keypoints) > 0:
                     if len(keypoints) > max_descriptors_per_image:
                         keypoints = sorted(keypoints, key=lambda x: x.response, reverse=True)[:max_descriptors_per_image]
@@ -74,7 +91,7 @@ class BagOfWords:
         
         return all_descriptors
     
-    def build_vocabulary(self, images: List[np.ndarray], max_samples: int = 3000, max_descriptors_per_image: int = 200):
+    def build_vocabulary(self, images: List[np.ndarray], max_samples: int = 5000, max_descriptors_per_image: int = 500):
         print("Извлечение признаков для построения словаря...")
         all_descriptors = self.extract_features(images, max_descriptors_per_image=max_descriptors_per_image)
         
@@ -89,11 +106,11 @@ class BagOfWords:
             all_descriptors = all_descriptors[indices]
         
         print(f"Кластеризация {len(all_descriptors)} дескрипторов в {self.vocab_size} кластеров...")
-        self.kmeans = KMeans(n_clusters=self.vocab_size, random_state=42, n_init=10, max_iter=300)
+        self.kmeans = KMeans(n_clusters=self.vocab_size, random_state=42, n_init=20, max_iter=500)
         self.kmeans.fit(all_descriptors)
         print("Словарь построен!")
     
-    def image_to_histogram(self, image: np.ndarray, max_keypoints: int = 200) -> np.ndarray:
+    def image_to_histogram(self, image: np.ndarray, max_keypoints: int = 500) -> np.ndarray:
         if self.kmeans is None:
             raise ValueError("Словарь не построен. Сначала вызовите build_vocabulary()")
         
@@ -101,6 +118,10 @@ class BagOfWords:
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         else:
             gray = image
+        
+        # Улучшенная предобработка
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        gray = clahe.apply(gray)
         
         keypoints = self.detector.detect(gray, None)
         if len(keypoints) == 0:
@@ -115,12 +136,26 @@ class BagOfWords:
         
         labels = self.kmeans.predict(descriptors)
         
-        histogram = np.zeros(self.vocab_size)
-        for label in labels:
-            histogram[label] += 1
+        # Использование cv2.calcHist() для создания более точной гистограммы
+        # Преобразуем labels в формат, подходящий для calcHist
+        labels_uint8 = labels.astype(np.uint8)
         
+        # Создаем гистограмму с помощью OpenCV
+        histogram = cv2.calcHist(
+            [labels_uint8],
+            [0],
+            None,
+            [self.vocab_size],
+            [0, self.vocab_size]
+        ).flatten()
+        
+        # Нормализация гистограммы
         if histogram.sum() > 0:
             histogram = histogram / histogram.sum()
+        
+        # Применение TF-IDF взвешивания, если включено
+        if self.use_tfidf and self.idf is not None:
+            histogram = histogram * self.idf
         
         return histogram
     
@@ -172,10 +207,32 @@ class BagOfWords:
         
         histograms = np.array(histograms)
         
+        # Вычисление IDF для TF-IDF взвешивания
+        if self.use_tfidf:
+            print("Вычисление IDF для TF-IDF взвешивания...")
+            # Подсчитываем, в скольких изображениях встречается каждое слово
+            document_frequency = np.zeros(self.vocab_size)
+            for hist in histograms:
+                # Слово считается присутствующим, если его частота > 0
+                document_frequency += (hist > 0).astype(float)
+            
+            # Избегаем деления на ноль
+            document_frequency = np.maximum(document_frequency, 1.0)
+            num_documents = len(histograms)
+            
+            # IDF = log(N / df), где N - количество документов, df - частота документа
+            self.idf = np.log(num_documents / document_frequency)
+            # Нормализуем IDF
+            self.idf = self.idf / (self.idf.max() + 1e-10)
+            
+            # Применяем TF-IDF к гистограммам
+            histograms = histograms * self.idf
+        
         histograms = self.scaler.fit_transform(histograms)
         
         print("Обучение классификатора SVM...")
-        self.classifier = SVC(kernel='rbf', C=1.0, gamma='scale', random_state=42)
+        # Оптимизированные параметры SVM для лучшей точности
+        self.classifier = SVC(kernel='rbf', C=10.0, gamma='scale', random_state=42, probability=True)
         self.classifier.fit(histograms, labels)
         print("Обучение завершено!")
     
@@ -204,9 +261,12 @@ class BagOfWords:
             'vocab_size': self.vocab_size,
             'detector_type': self.detector_type,
             'descriptor_type': self.descriptor_type,
+            'use_tfidf': self.use_tfidf,
+            'use_spatial_pyramid': self.use_spatial_pyramid,
             'kmeans': self.kmeans,
             'classifier': self.classifier,
-            'scaler': self.scaler
+            'scaler': self.scaler,
+            'idf': self.idf
         }
         with open(filepath, 'wb') as f:
             pickle.dump(model_data, f)
@@ -219,8 +279,11 @@ class BagOfWords:
         self.vocab_size = model_data['vocab_size']
         self.detector_type = model_data['detector_type']
         self.descriptor_type = model_data['descriptor_type']
+        self.use_tfidf = model_data.get('use_tfidf', True)
+        self.use_spatial_pyramid = model_data.get('use_spatial_pyramid', False)
         self.kmeans = model_data['kmeans']
         self.classifier = model_data['classifier']
         self.scaler = model_data['scaler']
+        self.idf = model_data.get('idf', None)
         self._init_detector_descriptor()
         print(f"Модель загружена из {filepath}")
