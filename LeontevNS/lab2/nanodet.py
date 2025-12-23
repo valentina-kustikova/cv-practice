@@ -1,8 +1,29 @@
 import numpy as np
 import cv2
 import asyncio
+from abc import ABC, abstractmethod
 
-class NanoDet:
+class Detector(ABC):
+    """Абстрактный класс детектора"""
+    
+    @abstractmethod
+    def __init__(self, modelPath, **kwargs):
+        pass
+    
+    @abstractmethod
+    async def infer(self, srcimg):
+        pass
+    
+    @property
+    @abstractmethod
+    def name(self):
+        pass
+    
+    @abstractmethod
+    def setBackendAndTarget(self, backendId, targetId):
+        pass
+
+class NanoDet(Detector):
     def __init__(self, modelPath, prob_threshold=0.35, iou_threshold=0.6, backend_id=0, target_id=0):
         self.strides = (8, 16, 32, 64)
         self.image_shape = (416, 416)
@@ -30,7 +51,6 @@ class NanoDet:
             yv = yv.flatten()
             cx = xv + 0.5 * (stride-1)
             cy = yv + 0.5 * (stride - 1)
-            #anchors = np.stack((cx, cy), axis=-1)
             anchors = np.column_stack((cx, cy))
             self.anchors_mlvl.append(anchors)
 
@@ -55,7 +75,7 @@ class NanoDet:
         self.net.setInput(blob)
         outs = self.net.forward(self.net.getUnconnectedOutLayersNames())
         preds = self.post_process(outs)
-        return preds
+        return self._convert_to_standard_format(preds)
 
     def post_process(self, preds):
         cls_scores, bbox_preds = preds[::2], preds[1::2]
@@ -97,7 +117,6 @@ class NanoDet:
                 x2 = np.clip(x2, 0, max_shape[1])
                 y2 = np.clip(y2, 0, max_shape[0])
 
-            #bboxes = np.stack([x1, y1, x2, y2], axis=-1)
             bboxes = np.column_stack([x1, y1, x2, y2])
             bboxes_mlvl.append(bboxes)
             scores_mlvl.append(cls_score)
@@ -117,7 +136,11 @@ class NanoDet:
             det_bboxes = bboxes_mlvl[indices]
             det_conf = confidences[indices]
             det_classid = classIds[indices]
-
             return np.concatenate([det_bboxes, det_conf.reshape(-1, 1), det_classid.reshape(-1, 1)], axis=1)
         else:
             return np.array([])
+    
+    def _convert_to_standard_format(self, preds):
+        if len(preds) == 0:
+            return np.array([])
+        return preds 

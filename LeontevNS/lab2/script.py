@@ -4,14 +4,17 @@ import glob
 import argparse
 import asyncio
 import threading
+import time
+from collections import defaultdict
 
 # Check OpenCV version
 opencv_python_version = lambda str_version: tuple(map(int, (str_version.split("."))))
 assert opencv_python_version(cv.__version__) >= opencv_python_version("4.10.0"), \
        "Please install latest opencv-python for benchmark: python3 -m pip install --upgrade opencv-python"
 
-from nanodet import NanoDet
+from nanodet import NanoDet, Detector
 from yolox import YoloX
+from yolov5 import YOLOv5
 
 # Valid combinations of backends and targets
 backend_target_pairs = [
@@ -28,8 +31,8 @@ class TPRCalculator:
         self.false_negatives = 0
         self.false_positives = 0
         self.threshold = threshold
+        
     def calculate_from_boxes(self, box1, box2):
-        # Let classes be equal
         x1, y1, x2, y2 = box1
         x3, y3, x4, y4 = box2
 
@@ -76,109 +79,85 @@ classes = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
            'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
            'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush')
 
-def get_tpr_on_frame(preds, frameid, tprcalc, letterbox_scale):
-    flag = False
-    flag2 = False
-    with open('mov03478.txt', 'r') as file:
-        content = file.readlines()
-        for i in range(len(content)):
-            data = content[i].split(sep=' ')
-            data[-1] = data[-1][:-1]
-            if (frameid == int(data[0])):
-                flag2 = False
-                flag = True
-                className = data[1].lower()
-                for pred in preds:
-                    box1 = unletterbox(pred[:4], letterbox_scale).astype(np.int32)
-                    x1 = box1[0]
-                    x2 = box1[0] + box1[2]
-                    y1 = box1[1]
-                    y2 = box1[1] + box1[3]
-                    box1 = np.array([x1, y1, x2, y2])
-                    box2 = np.array([data[2], data[3], data[4], data[5]]).astype(np.int32)
-                    if tprcalc.append_to_tp(tprcalc.calculate_from_boxes(box1, box2), classes[int(pred[5])], className):
-                        flag2 = True
-                if not flag2:
-                    tprcalc.false_negatives += 1
-            if (frameid != int(data[0]) and flag):
-                break
+def load_ground_truths(file_path):
+    ground_truths = defaultdict(list)
+    with open(file_path, 'r') as file:
+        for line in file:
+            data = line.strip().split()
+            if len(data) < 6:
+                continue
+            frameid = int(data[0])
+            class_name = data[1].lower()
+            bbox = list(map(float, data[2:6]))
+            ground_truths[frameid].append({
+                'class': class_name,
+                'bbox': bbox
+            })
+    return ground_truths
 
-def get_fdr_on_frame(preds, frameid, fdrcalc, letterbox_scale):
-    flag = False
-    flag2 = False
-    lines = []
-    with open('mov03478.txt', 'r') as file:
-        content = file.readlines()
-        for i in range(len(content)):
-            data = content[i].split(sep=' ')
-            data[-1] = data[-1][:-1]
-            if (frameid == int(data[0])):
-                lines.append(data)
-                flag = True
-            if (frameid != int(data[0]) and flag):
-                break
-    for pred in preds:
-        flag2 = False
-        box1 = unletterbox(pred[:4], letterbox_scale).astype(np.int32)
-        x1 = box1[0]
-        x2 = box1[0] + box1[2]
-        y1 = box1[1]
-        y2 = box1[1] + box1[3]
-        box1 = np.array([x1, y1, x2, y2])
-        for data in lines:
-            className = data[1].lower()
-            box2 = np.array([data[2], data[3], data[4], data[5]]).astype(np.int32)
-            if fdrcalc.append_to_tp(fdrcalc.calculate_from_boxes(box1, box2), className, classes[int(pred[5])]):
-                flag2 = True
-        if not flag2:
-            fdrcalc.false_positives += 1
+def calculate_metrics_batch(all_predictions, ground_truths, tpr_calc, fdr_calc, 
+                            model_type='yolo', img_shapes=None, letterbox_scales=None,
+                            start_frame_index=0):
+    
+    for frame_idx, preds in enumerate(all_predictions):
+        frame_id = start_frame_index + frame_idx
+        
+        gt_data = ground_truths.get(frame_id, [])
+        
+        if len(preds) > 0:
+            preds = preds[preds[:, 4].argsort()[::-1]]
+        
+        gt_matched = [False] * len(gt_data)
+        
+        pred_matched = [False] * len(preds) if len(preds) > 0 else []
+        
+        for pred_idx, pred in enumerate(preds):
+            if len(pred) < 6:
+                continue
+                
+            best_iou = 0
+            best_gt_idx = -1
 
-def get_tpr_on_frame_nano(preds, frameid, tprcalc, imgshape, letterbox_scale):
-    flag = False
-    flag2 = False
-    with open('mov03478.txt', 'r') as file:
-        content = file.readlines()
-        for i in range(len(content)):
-            data = content[i].split(sep=' ')
-            data[-1] = data[-1][:-1]
-            if (frameid == int(data[0])):
-                flag2 = False
-                flag = True
-                className = data[1].lower()
-                for pred in preds:
-                    box1 = unletterbox_nano(pred[:4], imgshape, letterbox_scale).astype(np.int32)
-                    box2 = np.array([data[2], data[3], data[4], data[5]]).astype(np.int32)
-                    if tprcalc.append_to_tp(tprcalc.calculate_from_boxes(box1, box2), classes[int(pred[5])], className):
-                        flag2 = True
-                if not flag2:
-                    tprcalc.false_negatives += 1
-            if (frameid != int(data[0]) and flag):
-                break
+            if model_type == 'nano' and img_shapes is not None and letterbox_scales is not None:
+                pred_bbox = unletterbox_nano(pred[:4], img_shapes[frame_idx], 
+                                            letterbox_scales[frame_idx]).astype(np.int32)
+            elif model_type in ['yolo', 'yolov5'] and letterbox_scales is not None:
+                pred_bbox = unletterbox(pred[:4], letterbox_scales[frame_idx]).astype(np.int32)
+            else:
+                pred_bbox = pred[:4].astype(np.int32)
+            
+            pred_class = classes[int(pred[5])] if int(pred[5]) < len(classes) else 'unknown'
+            
+            for gt_idx, gt in enumerate(gt_data):
+                if gt_matched[gt_idx]:
+                    continue
+                    
+                gt_bbox = gt['bbox']
+                gt_class = gt['class']
+                
+                if pred_class != gt_class:
+                    continue
+                
+                iou = tpr_calc.calculate_from_boxes(pred_bbox, gt_bbox)
+                
+                if iou > best_iou and iou >= tpr_calc.threshold:
+                    best_iou = iou
+                    best_gt_idx = gt_idx
+            
+            if best_gt_idx != -1:
+                gt_matched[best_gt_idx] = True
+                pred_matched[pred_idx] = True
+                tpr_calc.true_positives += 1
+        
+        for is_matched in gt_matched:
+            if not is_matched:
+                tpr_calc.false_negatives += 1
 
-def get_fdr_on_frame_nano(preds, frameid, fdrcalc, imgshape, letterbox_scale):
-    flag = False
-    flag2 = False
-    lines = []
-    with open('mov03478.txt', 'r') as file:
-        content = file.readlines()
-        for i in range(len(content)):
-            data = content[i].split(sep=' ')
-            data[-1] = data[-1][:-1]
-            if (frameid == int(data[0])):
-                lines.append(data)
-                flag = True
-            if (frameid != int(data[0]) and flag):
-                break
-    for pred in preds:
-        flag2 = False
-        box1 = unletterbox_nano(pred[:4], imgshape, letterbox_scale).astype(np.int32)
-        for data in lines:
-            className = data[1].lower()
-            box2 = np.array([data[2], data[3], data[4], data[5]]).astype(np.int32)
-            if fdrcalc.append_to_tp(fdrcalc.calculate_from_boxes(box1, box2), className, classes[int(pred[5])]):
-                flag2 = True
-        if not flag2:
-            fdrcalc.false_positives += 1
+        for is_matched in pred_matched:
+            if not is_matched:
+                fdr_calc.false_positives += 1
+        
+        fdr_calc.true_positives = tpr_calc.true_positives
 
 async def letterbox_nano(srcimg, target_size=(416, 416)):
     img = srcimg.copy()
@@ -190,7 +169,7 @@ async def letterbox_nano(srcimg, target_size=(416, 416)):
             newh, neww = target_size[0], int(target_size[1] / hw_scale)
             img = cv.resize(img, (neww, newh), interpolation=cv.INTER_AREA)
             left = int((target_size[1] - neww) * 0.5)
-            img = cv.copyMakeBorder(img, 0, 0, left, target_size[1] - neww - left, cv.BORDER_CONSTANT, value=0)  # add border
+            img = cv.copyMakeBorder(img, 0, 0, left, target_size[1] - neww - left, cv.BORDER_CONSTANT, value=0)
         else:
             newh, neww = int(target_size[0] * hw_scale), target_size[1]
             img = cv.resize(img, (neww, newh), interpolation=cv.INTER_AREA)
@@ -224,7 +203,6 @@ def unletterbox_nano(bbox, original_image_shape, letterbox_scale):
 async def vis_nano(preds, res_img, letterbox_scale):
     ret = res_img.copy()
 
-    # draw bboxes and labels
     for pred in preds:
         bbox = pred[:4]
         conf = pred[-2]
@@ -236,11 +214,9 @@ async def vis_nano(preds, res_img, letterbox_scale):
         else:
             color = (0, 255, 0)
 
-        # bbox
         xmin, ymin, xmax, ymax = unletterbox_nano(bbox, ret.shape[:2], letterbox_scale)
         cv.rectangle(ret, (xmin, ymin), (xmax, ymax), color, thickness=2)
 
-        # label
         label = "{:s}: {:.3f}".format(classes[classid], conf)
         cv.putText(ret, label, (xmin, ymin - 10), cv.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), thickness=2)
 
@@ -266,20 +242,22 @@ async def vis(dets, srcimg, letterbox_scale):
         box = unletterbox(det[:4], letterbox_scale).astype(np.int32)
         score = det[-2]
         cls_id = int(det[-1])
+        
+        x1, y1, x2, y2 = box
+        
         if cls_id == 2:
             color = (255, 0, 0)
         elif cls_id == 5:
             color = (0, 0, 255)
         else:
             color = (0, 255, 0)
-        x0, y0, w, h = box
 
-        text = '{}:{:.3f}%'.format(classes[cls_id], score * 100)
+        text = '{}:{:.3f}%'.format(classes[cls_id], score)
         font = cv.FONT_HERSHEY_SIMPLEX
         txt_size = cv.getTextSize(text, font, 0.4, 1)[0]
-        cv.rectangle(res_img, (x0, y0 , w, h), color, 2)
-        cv.rectangle(res_img, (x0, y0 + 1), (x0 + txt_size[0] + 1, y0 + int(1.5 * txt_size[1])), (0, 0, 0), -1)
-        cv.putText(res_img, text, (x0, y0 + txt_size[1]), font, 0.4, (255, 255, 255), thickness=1)
+        cv.rectangle(res_img, (x1, y1), (x2, y2), color, 2)
+        cv.rectangle(res_img, (x1, y1 + 1), (x1 + txt_size[0] + 1, y1 + int(1.5 * txt_size[1])), (0, 0, 0), -1)
+        cv.putText(res_img, text, (x1, y1 + txt_size[1]), font, 0.4, (255, 255, 255), thickness=1)
 
     return res_img
 
@@ -290,7 +268,6 @@ def show_func(inp, img, time):
         cv.imshow(inp, pic)
         cv.waitKey(time)
     cv.destroyAllWindows()
-    #cv.waitKey(0)
 
 async def main():
     parser = argparse.ArgumentParser(description='Nanodet/Yolo inference')
@@ -309,7 +286,9 @@ async def main():
                         help='Enter nms IOU threshold')
     parser.add_argument('--obj', default=0.5, type=float,
                         help='Enter object threshold')
-    parser.add_argument('--nano', '-n', action='store_true', help='Should we use nano, false -> yolo')
+    parser.add_argument('--model', '-m', type=str, default='yolo', 
+                        choices=['nano', 'yolo', 'yolov5'],
+                        help='Model type: nano, yolo, or yolov5')
     parser.add_argument('--start', '-s', default=0, type=int, help='Starting frame')
     parser.add_argument('--batch', '-b', default=50, type=int, help='Batch size')
     parser.add_argument('--threshold', '-t', default=0.5, type=float, help='Threshold for TP evaluation')
@@ -317,19 +296,28 @@ async def main():
 
     backend_id = backend_target_pairs[args.backend_target][0]
     target_id = backend_target_pairs[args.backend_target][1]
-    if args.nano:
-    	model = NanoDet(modelPath= 'object_detection_nanodet_2022nov.onnx',
-                    	prob_threshold=args.confidence,
-                    	iou_threshold=args.nms,
-                    	backend_id=backend_id,
-                    	target_id=target_id)
-    else:
-        model = YoloX(modelPath= 'object_detection_yolox_2022nov.onnx',
+    
+    if args.model == 'nano':
+        model = NanoDet(modelPath='object_detection_nanodet_2022nov.onnx',
+                        prob_threshold=args.confidence,
+                        iou_threshold=args.nms,
+                        backend_id=backend_id,
+                        target_id=target_id)
+    elif args.model == 'yolo':
+        model = YoloX(modelPath='object_detection_yolox_2022nov.onnx',
                       confThreshold=args.confidence,
                       nmsThreshold=args.nms,
                       objThreshold=args.obj,
                       backendId=backend_id,
                       targetId=target_id)
+    elif args.model == 'yolov5':
+        model = YOLOv5(modelPath='yolov5s.onnx',
+                       confThreshold=args.confidence,
+                       nmsThreshold=args.nms,
+                       backendId=backend_id,
+                       targetId=target_id)
+    else:
+        raise ValueError(f"Unknown model type: {args.model}")
 
     tm = cv.TickMeter()
     tm_est = cv.TickMeter()
@@ -340,25 +328,35 @@ async def main():
     eps = 0.5
     timer_est = 0
     thread = None
+    
+    ground_truths = load_ground_truths('mov03478.txt')
+    
     tpr_calc = TPRCalculator(args.threshold)
     tpr_calc_f = TPRCalculator(args.threshold)
     fdr_calc = TPRCalculator(args.threshold)
     fdr_calc_f = TPRCalculator(args.threshold)
+    
+    all_predictions = []  # Для хранения всех предсказаний
+    
     for count_batch in range(args.start, len(files), step):
         tm.reset()
         tm_est.reset()
         iter = (count_batch-args.start)//step + 1
         print(f"Batch #{iter} ({step} pictures)")
         tm_est.start()
+        
         if (count_batch + step > len(files)):
             end = len(files)
         else:
             end = count_batch + step
+            
         image = [cv.imread(file) for file in files[count_batch:end]]
         input_blob = [cv.cvtColor(file, cv.COLOR_BGR2RGB) for file in image]
         letterbox_scale = [None] * len(input_blob)
+        img_shapes = [img.shape[:2] for img in image]
+        
         # Letterbox transformation
-        if args.nano:
+        if args.model == 'nano':
             for index, blob in enumerate(input_blob):
                 input_blob[index], letterbox_scale[index] = await letterbox_nano(blob)
         else:
@@ -371,34 +369,63 @@ async def main():
         for index, file in enumerate(input_blob):
             preds[index] = await model.infer(file)
         tm.stop()
+        
         print("Inference time: {:.2f} ms".format(tm.getTimeMilli()))
+        
+        all_predictions.extend(preds)
+        
+        calculate_metrics_batch(
+            preds, 
+            ground_truths, 
+            tpr_calc_f, 
+            fdr_calc_f,
+            model_type=args.model,
+            img_shapes=img_shapes if args.model == 'nano' else None,
+            letterbox_scales=letterbox_scale,
+            start_frame_index=count_batch
+        )
+        
+        tpr_calc.true_positives += tpr_calc_f.true_positives
+        tpr_calc.false_negatives += tpr_calc_f.false_negatives
+        fdr_calc.true_positives += fdr_calc_f.true_positives
+        fdr_calc.false_positives += fdr_calc_f.false_positives
+        
         img = [None] * len(image)
-        if args.nano:
+        
+        if args.model == 'nano':
             for index, file in enumerate(image):
-                get_tpr_on_frame_nano(preds[index], index+count_batch, tpr_calc, file.shape[:2], letterbox_scale[index])
-                get_tpr_on_frame_nano(preds[index], index+count_batch, tpr_calc_f, file.shape[:2], letterbox_scale[index])
-                get_fdr_on_frame_nano(preds[index], index+count_batch, fdr_calc, file.shape[:2], letterbox_scale[index])
-                get_fdr_on_frame_nano(preds[index], index+count_batch, fdr_calc_f, file.shape[:2], letterbox_scale[index])
                 img[index] = await vis_nano(preds[index], file, letterbox_scale[index])
         else:
             for index, file in enumerate(image):
-                get_tpr_on_frame(preds[index], index+count_batch, tpr_calc, letterbox_scale[index])
-                get_tpr_on_frame(preds[index], index+count_batch, tpr_calc_f, letterbox_scale[index])
-                get_fdr_on_frame(preds[index], index+count_batch, fdr_calc, letterbox_scale[index])
-                get_fdr_on_frame(preds[index], index+count_batch, fdr_calc_f, letterbox_scale[index])
                 img[index] = await vis(preds[index], file, letterbox_scale[index])
+                
         tm_est.stop()
         timer_est += tm_est.getTimeMilli()
-        print(f'TPR For all frames: {tpr_calc.get_tpr()}')
-        print(f'TPR For these {step} frames: {tpr_calc_f.get_tpr()}')
-        print(f'FDR For all frames: {fdr_calc.get_fdr()}')
-        print(f'FDR For these {step} frames: {fdr_calc_f.get_fdr()}')
+        
+        print(f'TPR For all frames: {tpr_calc.get_tpr():.4f}')
+        print(f'TPR For these {step} frames: {tpr_calc_f.get_tpr():.4f}')
+        print(f'FDR For all frames: {fdr_calc.get_fdr():.4f}')
+        print(f'FDR For these {step} frames: {fdr_calc_f.get_fdr():.4f}')
+        
         tpr_calc_f = TPRCalculator(args.threshold)
         fdr_calc_f = TPRCalculator(args.threshold)
+        
         if thread != None:
             thread.join()
+            
         thread = threading.Thread(target=show_func, args=(f"Image batch [{count_batch+1}-{end}]", img, int(((eps+1)*timer_est/(iter+1))//step),))
         thread.start()
+    
+    # Итоговые метрики
+
+    print("\n" + "="*50)
+    print("FINAL METRICS:")
+    print(f"Total TPR: {tpr_calc.get_tpr():.4f}")
+    print(f"Total FDR: {fdr_calc.get_fdr():.4f}")
+    print(f"Total True Positives: {tpr_calc.true_positives}")
+    print(f"Total False Negatives: {tpr_calc.false_negatives}")
+    print(f"Total False Positives: {fdr_calc.false_positives}")
+    print("="*50)
 
 if __name__ == '__main__':
     asyncio.run(main())

@@ -1,8 +1,10 @@
 import numpy as np
 import cv2
 import asyncio
+from abc import ABC, abstractmethod
+from nanodet import Detector
 
-class YoloX:
+class YoloX(Detector):
     def __init__(self, modelPath, confThreshold=0.35, nmsThreshold=0.5, objThreshold=0.5, backendId=0, targetId=0):
         self.num_classes = 80
         self.net = cv2.dnn.readNet(modelPath)
@@ -41,7 +43,7 @@ class YoloX:
         outs = self.net.forward(self.net.getUnconnectedOutLayersNames())
 
         predictions = self.postprocess(outs[0])
-        return predictions
+        return self._convert_to_standard_format(predictions)
 
     def postprocess(self, outputs):
         dets = outputs[0]
@@ -68,6 +70,19 @@ class YoloX:
         if len(keep) == 0:
             return np.array([])
         return candidates[keep]
+
+    def _convert_to_standard_format(self, preds):
+        if len(preds) == 0:
+            return np.array([])
+        
+        standard_preds = preds.copy()
+        
+        standard_preds[:, 0] = preds[:, 0]
+        standard_preds[:, 1] = preds[:, 1]
+        standard_preds[:, 2] = preds[:, 0] + preds[:, 2]
+        standard_preds[:, 3] = preds[:, 1] + preds[:, 3]
+        
+        return standard_preds
 
     def generateAnchors(self):
         self.grids = []
