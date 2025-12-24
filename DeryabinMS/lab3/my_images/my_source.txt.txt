@@ -1,0 +1,31 @@
+# Источники дополнительных изображений
+# Практическая работа №3. Классификация изображений с использованием библиотеки OpenCV
+# Студент: Дерябин Максим Сергеевич, группа 3822Б1ПМоп3
+# Дата: 25.12.2024
+
+## Нижегородский Кремль
+1. IMG_1063.jpg - https://www.bigtranstour.ru/assets/images/tours/nizhnij/IMG_1063.jpg
+2. c7aae124-4b9d-4f38-90c3-9dad2ab15830.jpg - https://resize.tripster.ru/uls2w5YOu4by-z_T0DUAYcAy7lI=/fit-in/1220x600/filters:no_upscale()/https://cdn.tripster.ru/photos/c7aae124-4b9d-4f38-90c3-9dad2ab15830.jpg
+3. NcV4RR9.jpeg - https://vz-nn.ru/upload/iblock/66e/nnwfcw3qetlm59m8v7qe584k48ek4591/NcV4RR9.jpeg
+4. caption.jpg - https://media-cdn.tripadvisor.com/media/photo-s/2d/21/39/a8/caption.jpg
+5. refa7e1e2ec86-2024-04-24-14-05-11.jpg - https://static-basket-02.wbbasket.ru/vol22/travel/refa7e1e2ec86-2024-04-24-14-05-11.jpg
+
+## Дворец труда
+1. shutterstock_499029421-min-1.jpg - https://blog.ufs-online.ru/media/5811/shutterstock_499029421-min-1.jpg
+2. v042f445-2048x1365.jpg - https://files.pravda-nn.ru/2022/04/v042f445-2048x1365.jpg
+3. 40cabbfa97b65dddd54dc67438f67008.jpg - https://www.komandirovka.ru/upload/save_file24/40c/40cabbfa97b65dddd54dc67438f67008.jpg
+4. v037f781-scaled.jpg - https://files.pravda-nn.ru/2022/01/v037f781-scaled.jpg
+5. 16.12.2024-2-52e88bfcb64a0370ca872409892ec415.jpg - https://strategy.nobl.ru/assets/content/assets/crops/16.12.2024-2-52e88bfcb64a0370ca872409892ec415.jpg
+6. 1200px-Большая_Покровская_1.jpg - https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Большая_Покровская_1.jpg/1200px-Большая_Покровская_1.jpg
+
+## Архангельский собор
+1. de6412ff488861ba741f3ad24958cce6.jpg - https://i.pinimg.com/736x/de/64/12/de6412ff488861ba741f3ad24958cce6.jpg
+2. img-0851.jpg - https://turbazy.ru/uploads/content/202510/img-0851.jpg
+3. Михайло-Архангельский_собор_-_panoramio_(2).jpg - https://upload.wikimedia.org/wikipedia/commons/5/52/Михайло-Архангельский_собор_-_panoramio_%282%29.jpg?20170328232338
+4. 38ea970d-52f3-420c-b8e0-348da0a1b6ec.jpg - https://resize.tripster.ru/JOQOAg-4pTfYnxxGvWB1lLPDlV0=/fit-in/1600x900/filters:no_upscale()/https://cdn.tripster.ru/photos/38ea970d-52f3-420c-b8e0-348da0a1b6ec.jpg?width=1200&height=630
+5. Sobor-v-chest-Arhangela-Mihaila.jpg - https://nne.ru/wp-content/uploads/2015/07/Sobor-v-chest-Arhangela-Mihaila.jpg
+
+# Всего изображений: 16
+# Дата скачивания: 25.12.2024
+# Примечание: изображения собраны для учебных целей в рамках выполнения практической работы №3
+
