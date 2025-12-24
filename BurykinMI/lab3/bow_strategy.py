@@ -14,6 +14,7 @@ class BagOfWordsStrategy(ClassificationStrategy):
 
     def __init__(self, feature_extractor: FeatureExtractor, n_clusters: int = 300):
         self.feature_extractor = feature_extractor
+        # n_clusters - размер словаря. Описываем картинки набором из 300 "типичных" признаков.
         self.n_clusters = n_clusters
         self.kmeans = None
         self.classifier = None
@@ -21,57 +22,53 @@ class BagOfWordsStrategy(ClassificationStrategy):
 
     def _build_vocabulary(self, image_paths: List[str]) -> None:
         """Построить словарь визуальных слов (обучение K-Means)"""
-        print("Извлечение дескрипторов из тренировочных изображений...")
+        print("Извлечение дескрипторов...")
         all_descriptors = []
 
         for i, img_path in enumerate(image_paths):
             if i % 10 == 0:
                 print(f"Обработано {i}/{len(image_paths)} изображений")
-
-            # Получаем матрицу (N, 128) для SIFT, где N - кол-во точек на одной картинке
+            # Извлекаем дескрипторы (SIFT).
+            # descriptors shape: [N, 128], где N - кол-во найденных точек (разное для каждой картинки)
             descriptors = self.feature_extractor.extract(img_path)
             if descriptors is not None:
                 all_descriptors.append(descriptors)
 
-        # Сваливаем дескрипторы со всех картинок в одну кучу (вертикальный стек).
-        # Мы теряем информацию о том, какой картинке принадлежала точка.
-        # Получаем матрицу (Total_Points, 128).
+        # np.vstack: Объединяем дескрипторы всех картинок в одну общую матрицу.
+        # Shape: [Total_Points, 128]. Мы теряем связь с конкретными картинками,
+        # чтобы найти общие паттерны во всем датасете.
         all_descriptors = np.vstack(all_descriptors)
         print(f"Всего дескрипторов: {len(all_descriptors)}")
 
-        print(f"Построение словаря из {self.n_clusters} визуальных слов...")
-        # Алгоритм ищет сгустки точек в 128-мерном пространстве признаков.
-        self.kmeans = MiniBatchKMeans(
-            n_clusters=self.n_clusters,
-            random_state=42,
-            batch_size=1000,
-            verbose=1
-        )
-        # Центры найденных кластеров становятся нашими "визуальными словами"
+        print(f"Построение словаря из {self.n_clusters} слов...")
+        # Кластеризация: находим 300 центров сгустков в 128-мерном пространстве.
+        # Эти центры (centroids) становятся нашими "Визуальными словами".
+        self.kmeans = MiniBatchKMeans(n_clusters=self.n_clusters, batch_size=1000)
         self.kmeans.fit(all_descriptors)
         print("Словарь построен!")
 
     def _get_bow_representation(self, image_path: str) -> np.ndarray:
-        """Получить BoW-представление изображения (Векторизация)"""
-        descriptors = self.feature_extractor.extract(image_path)
+        """Получить BoW-представление (Векторизация изображения)"""
+        descriptors = self.feature_extractor.extract(image_path) # [N, 128]
 
-        # Защита от черных квадратов или ошибок чтения
         if descriptors is None or len(descriptors) == 0:
             return np.zeros(self.n_clusters)
 
         # КВАНТОВАНИЕ:
-        # Для каждого дескриптора находим ближайшее "визуальное слово" (номер кластера).
-        # Сложный вектор из 128 чисел заменяется одним числом (ID кластера).
+        # Каждому из N дескрипторов сопоставляем индекс ближайшего кластера (0..299).
+        # Мы заменяем сложные векторы [128] на простые числа (ID слова).
         labels = self.kmeans.predict(descriptors)
 
-        # Строим гистограмму частот.
-        # Вектор длиной n_clusters, где каждое число - сколько раз встретилось "слово".
+        # Построение гистограммы:
+        # Считаем, сколько раз встретилось каждое "слово".
+        # Результат: вектор фиксированной длины [300,].
         histogram = np.zeros(self.n_clusters)
         for label in labels:
             histogram[label] += 1
 
-        # НОРМАЛИЗАЦИЯ:
-        # Делим на сумму, чтобы получить вероятности (частоты), а не абсолютные числа.
+        # НОРМАЛИЗАЦИЯ (L1-norm):
+        # Делим на общее число точек. Получаем частоты (вероятности).
+        # Это делает результат независимым от разрешения картинки и кол-ва найденных точек.
         if np.sum(histogram) > 0:
             histogram = histogram / np.sum(histogram)
 
@@ -81,31 +78,32 @@ class BagOfWordsStrategy(ClassificationStrategy):
         """Обучить модель BoW + SVM"""
         self.class_names = sorted(list(set(train_labels)))
 
-        # 1. Формируем словарь признаков на основе всей выборки
+        # 1. Строим словарь признаков (обучаем K-Means)
         self._build_vocabulary(train_data)
 
-        # 2. Переводим все картинки в векторы фиксированной длины (гистограммы)
+        # 2. Преобразуем картинки в векторы-гистограммы
         print("Извлечение BoW-признаков...")
         X_train = []
-        for i, img_path in enumerate(train_data):
-            if i % 10 == 0:
-                print(f"Обработано {i}/{len(train_data)} изображений")
+        for img_path in train_data:
+            # Превращаем картинку в вектор [300,]
             bow_features = self._get_bow_representation(img_path)
             X_train.append(bow_features)
 
+        # Итоговая матрица обучения X_train shape: [M_samples, 300]
         X_train = np.array(X_train)
 
-        # 3. Обучаем классификатор разделять векторы гистограмм.
-        print("Обучение SVM классификатора...")
-        self.classifier = SVC(kernel='rbf', C=10, gamma='scale', verbose=True)
+        # 3. Обучаем SVM разделять эти 300-мерные векторы по классам.
+        # kernel='rbf' позволяет строить нелинейные границы.
+        print("Обучение SVM...")
+        self.classifier = SVC(kernel='rbf', C=10, gamma='scale')
         self.classifier.fit(X_train, train_labels)
         print("Обучение завершено!")
 
     def predict(self, image_path: str) -> str:
-        """Предсказать класс изображения"""
-        # Превращаем новую картинку в такой же вектор-гистограмму
+        """Предсказать класс"""
+        # Превращаем новую картинку в вектор [300,] используя тот же словарь
         bow_features = self._get_bow_representation(image_path)
-        # SVM определяет, по какую сторону гиперплоскости лежит этот вектор
+        # SVM определяет, к какому классу относится точка в 300-мерном пространстве
         prediction = self.classifier.predict([bow_features])[0]
         return prediction
 
