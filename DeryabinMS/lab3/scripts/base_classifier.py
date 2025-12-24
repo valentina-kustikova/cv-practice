@@ -1,3 +1,8 @@
+"""
+Базовый класс классификатора изображений
+Реализует общий функционал для всех алгоритмов классификации
+"""
+
 import os
 import json
 import numpy as np
@@ -6,20 +11,16 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 import matplotlib.pyplot as plt
 
 class BaseClassifier(ABC):
-    """Базовый абстрактный класс для всех классификаторов изображений."""
+    """Абстрактный базовый класс для классификаторов изображений."""
     
-    def __init__(self, algorithm, image_size=(224, 224), class_names=None):
+    def __init__(self, algorithm, image_size=(224, 224)):
         self.algorithm = algorithm
         self.image_size = image_size
-        
-        if class_names is None:
-            self.class_names = ['Архангельский собор', 'Дворец труда', 'Нижегородский Кремль']
-        else:
-            self.class_names = class_names
-            
+        self.class_names = ['Архангельский собор', 'Дворец труда', 'Нижегородский Кремль']
         self.label_to_id = {name: i for i, name in enumerate(self.class_names)}
         self.id_to_label = {i: name for name, i in self.label_to_id.items()}
-        
+        self.model = None
+    
     def detect_label_from_path(self, file_path):
         """Определяет метку класса из пути к файлу."""
         file_path_lower = file_path.lower()
@@ -30,33 +31,14 @@ class BaseClassifier(ABC):
             return 'Дворец труда'
         elif '04_arkhangelskcathedral' in file_path_lower or 'архангельский собор' in file_path_lower:
             return 'Архангельский собор'
-        else:
-            print(f"Предупреждение: не удалось определить метку для файла: {file_path}")
-            return None
-
-    def load_data(self, file_list_path, images_dir="."):
-        """
-        Загружает данные из файла со списком изображений.
+        return None
+    
+    def load_data(self, file_list_path, images_dir):
+        """Загружает данные из файла со списком изображений."""
+        with open(file_list_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
         
-        Args:
-            file_list_path: путь к файлу со списком изображений (train.txt или test.txt)
-            images_dir: корневая директория с изображениями
-            
-        Returns:
-            image_paths: список путей к изображениям
-            labels: список текстовых меток
-            label_ids: список числовых идентификаторов меток
-        """
-        try:
-            with open(file_list_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-        except FileNotFoundError:
-            print(f"Ошибка: файл {file_list_path} не найден!")
-            return [], [], []
-        
-        image_paths = []
-        labels = []
-        label_ids = []
+        image_paths, labels, label_ids = [], [], []
         
         for line in lines:
             line = line.strip()
@@ -64,77 +46,38 @@ class BaseClassifier(ABC):
                 continue
             
             full_path = os.path.join(images_dir, line)
+            label = self.detect_label_from_path(full_path)
             
-            if os.path.exists(full_path):
-                label = self.detect_label_from_path(full_path)
-                if label is not None:
-                    image_paths.append(full_path)
-                    labels.append(label)
-                    label_ids.append(self.label_to_id[label])
-                else:
-                    print(f"Пропущен файл (не определена метка): {full_path}")
-            else:
-                print(f"Предупреждение: файл не найден: {full_path}")
+            if label is not None and os.path.exists(full_path):
+                image_paths.append(full_path)
+                labels.append(label)
+                label_ids.append(self.label_to_id[label])
         
-        print(f"Загружено {len(image_paths)} изображений из {file_list_path}")
-        
-        if len(image_paths) > 0:
-            print("Распределение по классам:")
-            for label_name in self.class_names:
-                count = labels.count(label_name)
-                if count > 0:
-                    print(f"  {label_name}: {count} изображений")
+        print(f"Загружено {len(image_paths)} изображений")
+        for label_name in self.class_names:
+            count = labels.count(label_name)
+            print(f"  {label_name}: {count} изображений")
         
         return image_paths, labels, label_ids
-
-    def save_model(self, model_dir="models"):
-        """Сохраняет метаданные модели в указанную директорию."""
-        os.makedirs(model_dir, exist_ok=True)
-        
-        metadata = {
-            'algorithm': self.algorithm,
-            'image_size': self.image_size,
-            'class_names': self.class_names,
-            'label_to_id': self.label_to_id
-        }
-        
-        metadata_path = os.path.join(model_dir, 'metadata.json')
-        with open(metadata_path, 'w', encoding='utf-8') as f:
-            json.dump(metadata, f, ensure_ascii=False, indent=2)
-        
-        print(f"Метаданные модели сохранены в: {metadata_path}")
-
-    def load_model(self, model_dir="models"):
-        """Загружает метаданные модели из указанной директории."""
-        metadata_path = os.path.join(model_dir, 'metadata.json')
-        
-        try:
-            with open(metadata_path, 'r', encoding='utf-8') as f:
-                metadata = json.load(f)
-        except FileNotFoundError:
-            print(f"Ошибка: файл метаданных не найден в {model_dir}")
-            return False
-        
-        self.algorithm = metadata['algorithm']
-        self.class_names = metadata['class_names']
-        self.image_size = tuple(metadata['image_size'])
-        self.label_to_id = metadata['label_to_id']
-        self.id_to_label = {int(i): name for name, i in self.label_to_id.items()}
-        
-        print(f"Метаданные модели загружены из: {metadata_path}")
-        print(f"Алгоритм: {self.algorithm}, Классы: {self.class_names}")
-        return True
-
+    
+    def evaluate(self, true_labels, pred_labels, dataset_type="выборке"):
+        """Оценка качества классификации."""
+        accuracy = accuracy_score(true_labels, pred_labels)
+        print(f"Accuracy на {dataset_type}: {accuracy:.4f} ({accuracy*100:.1f}%)")
+        print("\nДетальный отчет:")
+        print(classification_report(true_labels, pred_labels, target_names=self.class_names))
+        return accuracy
+    
     def plot_confusion_matrix(self, y_true, y_pred, title="Матрица ошибок"):
-        """Визуализирует матрицу ошибок классификации."""
+        """Визуализация матрицы ошибок."""
         cm = confusion_matrix(y_true, y_pred)
         
         fig, ax = plt.subplots(figsize=(8, 6))
         im = ax.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
         ax.figure.colorbar(im, ax=ax)
         
-        ax.set(xticks=np.arange(cm.shape[1]),
-               yticks=np.arange(cm.shape[0]),
+        ax.set(xticks=np.arange(len(self.class_names)),
+               yticks=np.arange(len(self.class_names)),
                xticklabels=self.class_names,
                yticklabels=self.class_names,
                title=title,
@@ -152,19 +95,47 @@ class BaseClassifier(ABC):
         
         fig.tight_layout()
         plt.show()
-        
         return cm
-
+    
+    def save_model(self, model_dir):
+        """Сохраняет модель в указанную директорию."""
+        os.makedirs(model_dir, exist_ok=True)
+        
+        metadata = {
+            'algorithm': self.algorithm,
+            'image_size': self.image_size,
+            'class_names': self.class_names,
+            'label_to_id': self.label_to_id
+        }
+        
+        with open(os.path.join(model_dir, 'metadata.json'), 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+        print(f"Модель сохранена в {model_dir}")
+    
+    def load_model(self, model_dir):
+        """Загружает модель из указанной директории."""
+        with open(os.path.join(model_dir, 'metadata.json'), 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        
+        self.algorithm = metadata['algorithm']
+        self.class_names = metadata['class_names']
+        self.image_size = tuple(metadata['image_size'])
+        self.label_to_id = metadata['label_to_id']
+        self.id_to_label = {int(i): name for name, i in self.label_to_id.items()}
+        
+        print(f"Модель загружена из {model_dir}")
+        return True
+    
     @abstractmethod
-    def train(self, train_file, images_dir=".", **kwargs):
+    def train(self, train_file, images_dir):
         """Абстрактный метод для обучения модели."""
         pass
-
+    
     @abstractmethod
-    def test(self, test_file, images_dir=".", **kwargs):
+    def test(self, test_file, images_dir):
         """Абстрактный метод для тестирования модели."""
         pass
-
+    
     @abstractmethod
     def predict_single(self, image_path):
         """Абстрактный метод для предсказания класса одного изображения."""
