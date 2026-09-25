@@ -1,10 +1,14 @@
-cd C:\PROG\ComputerVision\cv-practice\SavvaDA\1_ImageProcessing
-           ИЛИ
 git clone https://github.com/DariyaSavva/cv-practice
-cd cv-practice
 git checkout savva_dariya_lab1
 cd SavvaDA\1_ImageProcessing
-
 conda env create -f environment.yml
+
 conda activate cv-project
 python cli.py -f resize -i photo.jpg -o output.jpg --scale 0.5
+python cli.py -f gray -i photo.jpg -o gray_output.jpg
+python cli.py -f antique -i photo.jpg -o antique_low.jpg --intensity 0.2
+python cli.py -f fade -i photo.jpg -o fade_low.jpg --intensity 0.2
+python cli.py -f film -i photo.jpg -o film_mid.jpg --intensity 0.7
+python cli.py -f matte -i photo.jpg -o matte_2.jpg --border 0.30
+python cli.py -f scratches -i photo.jpg -o scratches_mid.jpg --intensity 0.7
+python cli.py -f neon -i photo.jpg -o neon_out.jpg
