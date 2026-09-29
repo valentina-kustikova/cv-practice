@@ -89,9 +89,7 @@ class RGB2GrayScale(ImageFilter):
         return to_uint8(to_gray(image))
 
 
-class Antique(ImageFilter):
-    """Сепия"""
-
+class Antique(ImageFilter): #Сепия
     # Матрица сепии для порядка каналов BGR
     SEPIA = np.array([[0.131, 0.534, 0.272],
                       [0.168, 0.686, 0.349],
@@ -165,17 +163,15 @@ class OldPhoto(ImageFilter):
         rng = np.random.default_rng(self.seed)
         h, w = image.shape[:2]
         img = image.astype(np.float64)
-
-        # Шум одинаковый во всех каналах, как зерно фотобумаги
         img += rng.normal(0, self.noise, (h, w))[:, :, None]
 
-        # Царапины: вертикальные полосы, толщина растет с размером фото
+        # Царапины
         thickness = max(1, w // 800)
         for _ in range(self.scratches):
             x = rng.integers(0, w)
             y0 = rng.integers(0, h)
             y1 = y0 + rng.integers(h // 5, h)
-            img[y0:y1, x:x + thickness] = rng.choice([230, 30])  # светлая или темная
+            img[y0:y1, x:x + thickness] = rng.choice([230, 30])
         return to_uint8(img)
 
 
@@ -188,7 +184,7 @@ class Neon(ImageFilter):
         self.color = np.array(color[::-1])  # RGB -> BGR
 
     def apply_filter(self, image):
-        gray = convolve(to_gray(image), np.ones((3, 3)) / 9)  # сглаживание против шума
+        gray = convolve(to_gray(image), np.ones((3, 3)) / 9)
         gx = convolve(gray, self.SOBEL_X)
         gy = convolve(gray, self.SOBEL_X.T)
         magnitude = np.sqrt(gx ** 2 + gy ** 2)
