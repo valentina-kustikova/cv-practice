@@ -1,4 +1,4 @@
-# Практическая работа 1. Обработка изображений с использованием OpenCV
+# Обработка изображений с использованием OpenCV
 
 
 ## Структура проекта
@@ -11,19 +11,19 @@ requirements.txt и описание README.md.
 ```
 1_ImageProcessing/
     filters/
-        __init__.py          — делает папку пакетом
-        base.py              — абстрактный класс ImageFilter + фабрика
-        resize.py            — изменение разрешения
-        grayscale.py         — перевод в оттенки серого
-        antique.py           — эффект «антиквариат»
-        fade.py              — выцветание
-        film.py              — имитация инфракрасной плёнки
-        matte.py             — овальная рамка
-        scratches.py         — царапины и шум
-        neon.py              — неоновый эффект
+        __init__.py        — делает папку пакетом
+        base.py            — абстрактный класс ImageFilter
+        resize.py          — изменение разрешения
+        grayscale.py       — перевод в оттенки серого
+        antique.py         — эффект «антиквариат»
+        fade.py            — выцветание
+        film.py            — имитация плёнки
+        matte.py           — овальная рамка
+        scratches.py       — царапины и шум
+        neon.py            — неоновый эффект
     images/
-        test.jpg             — тестовое изображение
-    main.py                  — точка входа (CLI)
+        test.jpg           — изображение
+    main.py 
     requirements.txt
     README.md
 ```
@@ -57,28 +57,28 @@ python main.py -i <input> -o <output> -f <filter> [параметры]
 
 ## Примеры запуска
 
-# Уменьшить изображение в 2 раза
+### Уменьшить изображение в 2 раза
 python main.py -i images\test.jpg -o out_resize.jpg -f resize --scale 0.5
 
-# Оттенки серого
+### Оттенки серого
 python main.py -i images\test.jpg -o out_gray.jpg -f gray
 
-# Антиквариат
+### Антиквариат
 python main.py -i images\test.jpg -o out_antique.jpg -f antique --vignette 0.6
 
-# Выцветание
+### Выцветание
 python main.py -i images\test.jpg -o out_fade.jpg -f fade --alpha 0.7 --brightness 25
 
-# Инфракрасная плёнка
+### Инфракрасная плёнка
 python main.py -i images\test.jpg -o out_film.jpg -f film --strength 0.35
 
-# Овальная рамка (маска)
+### Овальная рамка (маска)
 python main.py -i images\test.jpg -o out_matte.jpg -f matte --border 40
 
-# Царапины и шум
+### Царапины и шум
 python main.py -i images\test.jpg -o out_scratches.jpg -f scratches --n_scratches 25 --noise_std 10
 
-# Неоновый эффект
+### Неоновый эффект
 python main.py -i images\test.jpg -o out_neon.jpg -f neon --threshold 40
 
 
@@ -94,8 +94,7 @@ python main.py -i images\test.jpg -o out_neon.jpg -f neon --threshold 40
 
 Значение вычисляется как взвешенная сумма:
 ```
-I(x, y) = (1 − w_y) · [ (1 − w_x) * I(x0, y0) + w_x * I(x1, y0) ]
-        + w_y       · [ (1 − w_x) * I(x0, y1) + w_x * I(x1, y1) ]
+I(x, y) = (1 − w_y) · [ (1 − w_x) * I(x0, y0) + w_x * I(x1, y0) ] + w_y · [ (1 − w_x) * I(x0, y1) + w_x * I(x1, y1) ]
 ```
 где `w_x = x − x0`, `w_y = y − y1`.
 
@@ -187,9 +186,9 @@ I_final = clip( I_tinted + eps, 0, 255 )
 #### Этап 1. Сепия
 Линейное преобразование каналов через матрицу `M_sepia`:
 ```
-⎡ R' ⎤   ⎡ 0.393  0.769  0.189 ⎤   ⎡ R ⎤
-⎢ G' ⎥ = ⎢ 0.349  0.686  0.168 ⎥ * ⎢ G ⎥
-⎣ B' ⎦   ⎣ 0.272  0.534  0.131 ⎦   ⎣ B ⎦
+| R' |   | 0.393  0.769  0.189 |   | R |
+| G' | = | 0.349  0.686  0.168 | * | G |
+| B' |   | 0.272  0.534  0.131 |   | B |
 ```
 (даёт тёплый коричневато-жёлтый оттенок)
 
@@ -265,7 +264,7 @@ I <- I + eps,   eps = N(0, sigma^2)
 ```
 где `sigma = noise_std` (по умолчанию 10.0).
 
-#### Соль-и-перец
+#### 
 Выбираются `n = p · H · W` случайных пикселей, где `p = sp_amount`
 (по умолчанию 0.02 — это 2% пикселей). Каждый заменяется на 0 или 255:
 
