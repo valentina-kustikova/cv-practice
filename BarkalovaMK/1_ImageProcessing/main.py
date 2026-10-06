@@ -69,24 +69,24 @@ def main():
 
     try:
         image = read_image(args.input)
-        print(f"[+] Изображение загружено: shape={image.shape}")
+        print(f" Изображение загружено: shape={image.shape}")
     except Exception as e:
-        print(f"[-] Ошибка чтения: {e}", file=sys.stderr)
+        print(f" Ошибка чтения: {e}", file=sys.stderr)
         sys.exit(1)
 
     try:
         image_filter = ImageFilter.get_filter(args.filter, **build_filter_kwargs(args))
         result = image_filter.apply_filter(image)
-        print(f"[+] Фильтр '{args.filter}' применён")
+        print(f" Фильтр '{args.filter}' применён")
     except Exception as e:
-        print(f"[-] Ошибка применения фильтра: {e}", file=sys.stderr)
+        print(f" Ошибка применения фильтра: {e}", file=sys.stderr)
         sys.exit(2)
 
     try:
         save_image(args.output, result)
-        print(f"[+] Сохранено: {args.output}")
+        print(f" Сохранено: {args.output}")
     except Exception as e:
-        print(f"[-] Ошибка сохранения: {e}", file=sys.stderr)
+        print(f" Ошибка сохранения: {e}", file=sys.stderr)
         sys.exit(3)
 
 

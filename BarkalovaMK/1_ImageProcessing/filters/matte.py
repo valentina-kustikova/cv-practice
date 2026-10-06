@@ -3,16 +3,17 @@ from .base import ImageFilter
 
 
 class Matte(ImageFilter):
-    """Эффект маски: овальная рамка, края белые."""
+#Эффект маски: овальная рамка, края белые
 
-    def __init__(self, border: int = 40, softness: float = 0.15):
+    def __init__(self, border: int = 40, softness: float = 0.20):
         self.border = border
-        self.softness = softness
+        self.softness = softness #плавный переход
 
     def apply_filter(self, image: np.ndarray) -> np.ndarray:
         img = image.astype(np.float32)
         if img.ndim == 2:
-            img = np.stack([img] * 3, axis=2)
+            #1канал в 3х
+            img = np.stack([img] * 3, axis=2) #склад список из 3х одинак массивов в 3ю ось
 
         h, w = img.shape[:2]
         yy, xx = np.mgrid[0:h, 0:w]

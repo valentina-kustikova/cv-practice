@@ -3,7 +3,7 @@ from .base import ImageFilter
 
 
 class Resize(ImageFilter):
-    """Изменение разрешения (билинейная интерполяция, без cv2.resize)."""
+#Изменение разрешения (билинейная интерполяция)
 
     def __init__(self, scale: float = 0.5):
         if scale <= 0:
@@ -12,18 +12,19 @@ class Resize(ImageFilter):
 
     def apply_filter(self, image: np.ndarray) -> np.ndarray:
         h, w = image.shape[:2]
+        #новый размер
         new_h = max(1, int(h * self.scale))
         new_w = max(1, int(w * self.scale))
-
+        #коорд новых пикселей в исх изобр
         y_new = np.linspace(0, h - 1, new_h)
         x_new = np.linspace(0, w - 1, new_w)
         x_grid, y_grid = np.meshgrid(x_new, y_new)
-
+        #4 соседа
         x0 = np.floor(x_grid).astype(np.int32)
         y0 = np.floor(y_grid).astype(np.int32)
         x1 = np.clip(x0 + 1, 0, w - 1)
         y1 = np.clip(y0 + 1, 0, h - 1)
-
+        #веса интерполяции
         wx = x_grid - x0
         wy = y_grid - y0
 

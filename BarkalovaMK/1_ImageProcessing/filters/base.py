@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 
 class ImageFilter(ABC):
-    """Базовый класс для всех фильтров."""
+# Базовый класс для всех фильтров
 
     @staticmethod
     def get_filter(filter_type: str, **kwargs) -> "ImageFilter":

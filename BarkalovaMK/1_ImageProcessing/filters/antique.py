@@ -3,7 +3,7 @@ from .base import ImageFilter
 
 
 class Antique(ImageFilter):
-    """Эффект 'антиквариат': сепия + виньетка + зерно."""
+#Эффект антиквариат: сепия + виньетка + зерно
 
     def __init__(self, vignette: float = 0.6, noise: float = 6.0):
         self.vignette = vignette
@@ -11,23 +11,24 @@ class Antique(ImageFilter):
 
     def apply_filter(self, image: np.ndarray) -> np.ndarray:
         img = image.astype(np.float32)
+        #одноканальное
         if img.ndim == 2:
             img = np.stack([img] * 3, axis=2)
 
-        b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
-
+        b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2] #разделение каналов
+        #матрица сепии
         sr = 0.393 * r + 0.769 * g + 0.189 * b
         sg = 0.349 * r + 0.686 * g + 0.168 * b
         sb = 0.272 * r + 0.534 * g + 0.131 * b
-        sepia = np.stack([sb, sg, sr], axis=2)
+        sepia = np.stack([sb, sg, sr], axis=2) #склад список из 3 массивов в 3ю ось 
 
         h, w = sepia.shape[:2]
-        yy, xx = np.mgrid[0:h, 0:w]
+        yy, xx = np.mgrid[0:h, 0:w] #координатная сетка
         cx, cy = w / 2, h / 2
         d = np.sqrt(((xx - cx) / cx) ** 2 + ((yy - cy) / cy) ** 2)
         mask = np.clip(1 - self.vignette * d, 0, 1)[..., None]
-        sepia *= mask
-
+        sepia *= mask #примен виньетки
+        #добавл шум
         if self.noise > 0:
             sepia += np.random.normal(0, self.noise, sepia.shape)
 
