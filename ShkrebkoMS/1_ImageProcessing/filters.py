@@ -13,6 +13,8 @@ class ImageFilter(ABC):
             return Resize(param)
         if name == "antique":
             return Antique(param)
+        if name == "fade_color":
+            return FadeColor(param)
         raise ValueError(f"Неизвестный фильтр: {name}")
 
     @abstractmethod
@@ -79,10 +81,25 @@ class Antique(ImageFilter):
         result = (1 - self.param) * img + self.param * sepia
 
         return np.clip(result, 0, 255).astype(np.uint8)
-        
 
 
-# TODO (этап 5): FadeColor, FilmEffect
+class FadeColor(ImageFilter):
+    def __init__(self, param=None):
+        if param is None:
+            param = 0.5
+        if not (0 <= param <= 1):
+            raise ValueError("Параметр должен быть в диапазоне [0, 1]")
+        self.param = param
+
+    def apply_filter(self, image):
+        img = image.astype(np.float32)
+
+        faded = img * (1 - self.param) + 255 * self.param
+
+        return np.clip(faded, 0, 255).astype(np.uint8)
+
+
+# TODO (этап 5): FilmEffect
 # TODO (этап 6): Matte
 # TODO (этап 7): OldPhoto
 # TODO (этап 8): Neon

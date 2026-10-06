@@ -13,10 +13,10 @@ def cli_argument_parser():
     parser.add_argument("-o", "--output", required=True,
                         help="путь для сохранения результата")
     parser.add_argument("-f", "--filter", required=True,
-                        choices=["resize", "gray", "antique"],
+                        choices=["resize", "gray", "antique", "fade_color", "film_effect", "matte", "old_photo", "neon"],
                         help="тип фильтра")
     parser.add_argument("-p", "--param", type=float, default=None,
-                        help="параметр фильтра (например, коэффициент масштабирования для resize)")
+                        help="параметр фильтра (например, коэффициент масштабирования для resize и др. фильтров)")
 
     return parser.parse_args()
 
