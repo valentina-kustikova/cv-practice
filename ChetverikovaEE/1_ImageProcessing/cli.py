@@ -22,7 +22,7 @@ def cli_argument_parser():
     parser.add_argument('--grain', type=float, default=0.05,
                                 help='Grain amount for film')
     parser.add_argument('--threshold', type=float, default=40,
-                                    help='Grain amount for neon')
+                                    help='Threshold amount for neon')
     parser.add_argument('--glow_ksize', type=int, default=7,
-                                    help='Grain amount for neon')
+                                    help='ksize amount for neon')
     return parser.parse_args()
