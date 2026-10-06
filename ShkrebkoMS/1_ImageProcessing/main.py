@@ -1,39 +1,52 @@
-"""Скрипт запуска: применяет выбранный фильтр к изображению.
-
-Порядок работы (по заданию):
-    1. Разбор аргументов командной строки.
-    2. Чтение входного изображения с обработкой исключений.
-    3. Применение фильтра.
-    4. Сохранение результата.
-"""
-
 import argparse
+import sys
 
 import cv2
-
 from filters import ImageFilter
 
 
 def cli_argument_parser():
-    """Разбирает аргументы командной строки и возвращает их."""
-    # TODO (этап 2): создать argparse.ArgumentParser и добавить аргументы:
-    #   - путь к входному изображению
-    #   - тип фильтра
-    #   - путь для сохранения результата
-    #   - параметры фильтров
-    pass
+    parser = argparse.ArgumentParser(description="Применение фильтров к изображению")
+
+    parser.add_argument("-i", "--input", required=True,
+                        help="путь к входному изображению")
+    parser.add_argument("-o", "--output", required=True,
+                        help="путь для сохранения результата")
+    parser.add_argument("-f", "--filter", required=True,
+                        choices=["resize", "gray"],
+                        help="тип фильтра")
+    parser.add_argument("-p", "--param", type=float, default=None,
+                        help="параметр фильтра (например, коэффициент масштабирования для resize)")
+
+    return parser.parse_args()
 
 
 def read_image(image_path):
-    """Читает изображение и возвращает матрицу пикселей."""
-    # TODO (этап 2): прочитать изображение через cv2.imread
-    #   и обработать ситуацию, когда файл не найден или не читается
-    pass
+    image = cv2.imread(image_path)
+    if image is None:
+        raise FileNotFoundError(f"Не удалось прочитать изображение: {image_path}")
+    return image
 
 
 def main():
-    # TODO (этап 2): собрать всё вместе
-    pass
+    args = cli_argument_parser()
+
+    try:
+        image = read_image(args.input)
+    except FileNotFoundError as error:
+        print("Ошибка:", error)
+        sys.exit(1)
+
+    try:
+        image_filter = ImageFilter.get_filter(args.filter, args.param)
+    except ValueError as error:
+        print("Ошибка:", error)
+        sys.exit(1)
+
+    result = image_filter.apply_filter(image)
+
+    cv2.imwrite(args.output, result)
+    print("Готово, результат сохранён в", args.output)
 
 
 if __name__ == "__main__":
