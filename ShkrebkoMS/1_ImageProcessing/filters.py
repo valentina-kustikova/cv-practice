@@ -11,6 +11,8 @@ class ImageFilter(ABC):
             return GrayScale()
         if name == "resize":
             return Resize(param)
+        if name == "antique":
+            return Antique(param)
         raise ValueError(f"Неизвестный фильтр: {name}")
 
     @abstractmethod
@@ -52,8 +54,34 @@ class Resize(ImageFilter):
 
         return image[rows][:, cols]
 
+class Antique(ImageFilter):
 
-# TODO (этап 4): Resize, RGB2GrayScale
+    def __init__(self, param=None):
+        if param is None:
+            param = 1.0
+        if not (0 <= param <= 1):
+            raise ValueError("Параметр должен быть в диапазоне [0, 1]")
+        self.param = param
+
+    def apply_filter(self, image):
+        img = image.astype(np.float32)
+
+        b = img[:, :, 0]
+        g = img[:, :, 1]
+        r = img[:, :, 2]
+
+        new_r = 0.393 * r + 0.769 * g + 0.189 * b
+        new_g = 0.349 * r + 0.686 * g + 0.168 * b
+        new_b = 0.272 * r + 0.534 * g + 0.131 * b
+
+        sepia = np.stack([new_b, new_g, new_r], axis=2)
+
+        result = (1 - self.param) * img + self.param * sepia
+
+        return np.clip(result, 0, 255).astype(np.uint8)
+        
+
+
 # TODO (этап 5): Antique, FadeColor, FilmEffect
 # TODO (этап 6): Matte
 # TODO (этап 7): OldPhoto (царапины и шум)

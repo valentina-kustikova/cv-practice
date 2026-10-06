@@ -13,7 +13,7 @@ def cli_argument_parser():
     parser.add_argument("-o", "--output", required=True,
                         help="путь для сохранения результата")
     parser.add_argument("-f", "--filter", required=True,
-                        choices=["resize", "gray"],
+                        choices=["resize", "gray", "antique"],
                         help="тип фильтра")
     parser.add_argument("-p", "--param", type=float, default=None,
                         help="параметр фильтра (например, коэффициент масштабирования для resize)")
