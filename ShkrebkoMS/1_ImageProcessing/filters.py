@@ -82,7 +82,7 @@ class Antique(ImageFilter):
         
 
 
-# TODO (этап 5): Antique, FadeColor, FilmEffect
+# TODO (этап 5): FadeColor, FilmEffect
 # TODO (этап 6): Matte
-# TODO (этап 7): OldPhoto (царапины и шум)
+# TODO (этап 7): OldPhoto
 # TODO (этап 8): Neon
