@@ -302,11 +302,20 @@ T = threshold — порог отсечения слабых контуров.
 
 # Архитектура
 
-ImageFilter — абстрактный класс с фабричным методом get_filter(name, **params).
-Наследники: Resize, RGB2GrayScale, Antique, FadeColor, InfraredFilm, Matte,
-Scratches, Neon. Каждый реализует apply_filter(image) -> image.
+filters/
+├── base.py             ImageFilter (ABC) + get_filter
+├── resize_bilinear.py  Resize
+├── grayscale.py        RGB2GrayScale
+├── antique_sepia.py    Antique
+├── fade.py             FadeColor
+├── film_infrared.py    InfraredFilm
+├── matte_oval.py       Matte
+├── scratches_dust.py   Scratches
+└── neon_laplacian.py   Neon
 
-Фильтры используют только базовые матричные операции numpy (свёртки,
-поэлементная арифметика, срезы). Высокоуровневые функции OpenCV
-(cv2.resize, cv2.Laplacian, cv2.filter2D, cv2.GaussianBlur) не применяются.
+ImageFilter — абстрактный класс с фабричным методом get_filter(name, **params).
+Наследники реализуют apply_filter(image) -> image.
+
+Фильтры используют только базовые матричные операции numpy. Высокоуровневые
+функции OpenCV (cv2.resize, cv2.Laplacian, cv2.filter2D) не применяются.
 I/O — через Pillow.

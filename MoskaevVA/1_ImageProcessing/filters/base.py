@@ -12,24 +12,24 @@ class ImageFilter(ABC):
 
     @staticmethod
     def get_filter(name, **params):
-        from .resize import Resize
-        from .grayscale import RGB2GrayScale
-        from .antique import Antique
-        from .fade import FadeColor
-        from .film import InfraredFilm
-        from .matte import Matte
-        from .scratches import Scratches
-        from .neon import Neon
+        from .resize_bilinear import Resize
+        from .grayscale       import RGB2GrayScale
+        from .antique_sepia   import Antique
+        from .fade            import FadeColor
+        from .film_infrared   import InfraredFilm
+        from .matte_oval      import Matte
+        from .scratches_dust  import Scratches
+        from .neon_laplacian  import Neon
 
         reg = {
-            "resize": Resize,
+            "resize":    Resize,
             "grayscale": RGB2GrayScale,
-            "antique": Antique,
-            "fade": FadeColor,
-            "film": InfraredFilm,
-            "matte": Matte,
+            "antique":   Antique,
+            "fade":      FadeColor,
+            "film":      InfraredFilm,
+            "matte":     Matte,
             "scratches": Scratches,
-            "neon": Neon,
+            "neon":      Neon,
         }
         if name not in reg:
             raise ValueError("unknown filter: " + name)
