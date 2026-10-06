@@ -1,0 +1,71 @@
+<h1>Обработка изображений</h1>
+<h2>Запуск</h2>
+<pre><code class="language-text">python main.py --image ИМЯ_ФАЙЛА --filter ФИЛЬТР [параметры]
+</code></pre>
+<p>Без аргументов программа выводит краткую справку по аргументам:</p>
+<pre><code class="language-text">python main.py
+</code></pre>
+<p><code>--image</code> и <code>--filter</code> обязательны при обработке. В <code>--image</code> указывается имя файла, например <code>img.jpg</code>.</p>
+<h2>Параметры</h2>
+<table>
+<thead>
+<tr>
+<th>Аргумент</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--image ИМЯ_ФАЙЛА</code></td>
+<td>Имя изображения в папке <code>img</code>.</td>
+</tr>
+<tr>
+<td><code>--filter ФИЛЬТР</code></td>
+<td>Фильтр: <code>resize</code>, <code>grayscale</code>, <code>antique</code>, <code>fade</code>, <code>film</code>, <code>matte</code>, <code>scratches</code> или <code>neon</code>.</td>
+</tr>
+<tr>
+<td><code>--width ЧИСЛО</code></td>
+<td>Новая ширина для <code>resize</code>; целое число больше 0.</td>
+</tr>
+<tr>
+<td><code>--height ЧИСЛО</code></td>
+<td>Новая высота для <code>resize</code>; целое число больше 0.</td>
+</tr>
+<tr>
+<td><code>--count ЧИСЛО</code></td>
+<td>Количество царапин для <code>scratches</code>; целое число от 0 и выше.</td>
+</tr>
+<tr>
+<td><code>--strength ЧИСЛО</code></td>
+<td>Сила эффекта для <code>antique</code>, <code>fade</code>, <code>film</code>, <code>matte</code> или <code>neon</code>; от 0 до 1. По умолчанию: <code>1.0</code> для первых <code>antique</code>, <code>fade</code>, <code>film</code>, <code>0.8</code> для <code>matte</code>, <code>0.7</code> для <code>neon</code>.</td>
+</tr>
+<tr>
+<td><code>--threshold ЧИСЛО</code></td>
+<td>Порог поиска контуров для <code>neon</code>; от 0 и выше. По умолчанию: <code>70</code>.</td>
+</tr>
+<tr>
+<td><code>--brightness ЧИСЛО</code></td>
+<td>Яркость фона для <code>neon</code>; от 0 до 1. По умолчанию: <code>0.4</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Для <code>resize</code> обязательно указать <code>--width</code> и <code>--height</code>. Для <code>scratches</code> обязательно указать <code>--count</code>.</p>
+<h2>Фильтры</h2>
+<ul>
+<li><code>resize</code> — увеличивает или уменьшает изображение до заданных ширины и высоты, копируя цвета пикселей исходного изображения.</li>
+<li><code>grayscale</code> — заменяет цвет каждого пикселя яркостью, рассчитанной из синего, зелёного и красного каналов.</li>
+<li><code>antique</code> — пересчитывает цветовые каналы по формулам сепии и смешивает результат с исходным изображением.</li>
+<li><code>fade</code> — частично обесцвечивает изображение и добавляет светлый оттенок.</li>
+<li><code>film</code> — пересчитывает синий, зелёный и красный каналы, создавая эффект инфракрасной плёнки.</li>
+<li><code>matte</code> — смешивает пиксели с белым в зависимости от расстояния до центра, создавая овальную рамку.</li>
+<li><code>scratches</code> — рисует заданное число случайных вертикальных чёрных или белых царапин.</li>
+<li><code>neon</code> — затемняет изображение и окрашивает в неоновый цвет пиксели с резким изменением яркости относительно соседей.</li>
+</ul>
+<h2>Примеры</h2>
+<pre><code class="language-text">python main.py --image img.jpg --filter grayscale
+python main.py --image img.jpg --filter resize --width 800 --height 600
+python main.py --image img.jpg --filter antique --strength 0.5
+python main.py --image img.jpg --filter scratches --count 5
+python main.py --image img.jpg --filter neon --threshold 70 --brightness 0.4 --strength 0.7
+</code></pre>
+<p>Результат сохраняется <code>&lt;имя&gt;_&lt;номер фильтра&gt;.&lt;расширение&gt;</code>, например <code>result/img_3.jpg</code>.</p>
