@@ -1,7 +1,8 @@
 from pathlib import Path
 import cv2
 import numpy as np
-from inner.src import FILTERS, check_image
+
+from inner.src import ImageFilter, check_image
 
 IMAGE_DIR = Path(__file__).parent / "img"
 RESULT_DIR = Path(__file__).parent / "result"
@@ -30,11 +31,21 @@ def main():
     except (OSError, ValueError, cv2.error) as error:
         print("Не удалось открыть изображение:", error)
         return 1
-    filter_names = list(FILTERS)
+
+    filter_names = [
+        "resize",
+        "grayscale",
+        "antique",
+        "fade",
+        "film",
+        "matte",
+        "scratches",
+        "neon",
+    ]
     while True:
         print("\nВыберите фильтр:")
         for number, name in enumerate(filter_names, 1):
-            print(str(number) + ". " + name)
+            print(f"{number}. {name}")
         print("0. Выход")
         choice = input("Ваш выбор: ").strip()
         try:
@@ -44,17 +55,33 @@ def main():
             continue
         if number == 0:
             return 0
+        if number < 1 or number > len(filter_names):
+            print("Неверный номер фильтра.")
+            continue
+
         filter_name = filter_names[number - 1]
         try:
+            parameters = {}
             if filter_name == "resize":
-                width = int(input("Новая ширина: "))
-                height = int(input("Новая высота: "))
-                result = FILTERS[filter_name](image, width, height)
+                parameters["width"] = int(input("Новая ширина: "))
+                parameters["height"] = int(input("Новая высота: "))
             elif filter_name == "scratches":
-                count = int(input("Количество царапин: "))
-                result = FILTERS[filter_name](image, count)
-            else:
-                result = FILTERS[filter_name](image)
+                parameters["count"] = int(input("Количество царапин: "))
+            elif filter_name == "antique":
+                parameters["strength"] = float(input("Сила эффекта (0..1): "))
+            elif filter_name == "fade":
+                parameters["strength"] = float(input("Сила эффекта (0..1): "))
+            elif filter_name == "film":
+                parameters["strength"] = float(input("Сила эффекта (0..1): "))
+            elif filter_name == "matte":
+                parameters["strength"] = float(input("Сила эффекта (0..1): "))
+            elif filter_name == "neon":
+                parameters["threshold"] = float(input("Порог контуров: "))
+                parameters["strength"] = float(input("Сила эффекта (0..1): "))
+                parameters["brightness"] = float(input("Яркость фона (0..1): "))
+
+            filter_object = ImageFilter.get_filter(filter_name, **parameters)
+            result = filter_object.apply_filter(image)
             output_path = RESULT_DIR / f"{image_path.stem}_{number}{image_path.suffix}"
             write_image(output_path, result)
         except (OSError, ValueError, TypeError, cv2.error) as error:

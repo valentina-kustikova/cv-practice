@@ -5,7 +5,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from inner.src import FILTERS, check_image
+from inner.src import FILTERS, ImageFilter, check_image
 
 IMAGE_DIR = Path(__file__).parent / "img"
 RESULT_DIR = Path(__file__).parent / "result"
@@ -113,7 +113,7 @@ def main(argv=None):
         if args.brightness is not None:
             parameters["brightness"] = args.brightness
 
-        result = FILTERS[args.filter](image, **parameters)
+        result = ImageFilter.get_filter(args.filter, **parameters).apply_filter(image)
         filter_number = list(FILTERS).index(args.filter) + 1
         output_path = RESULT_DIR / (
             f"{image_path.stem}_{filter_number}{image_path.suffix}"
