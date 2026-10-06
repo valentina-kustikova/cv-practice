@@ -11,7 +11,7 @@ def cli_argument_parser():
     )
     parser.add_argument(
         "--filter", "-f", required=True,
-        choices=["resize", "grayscale", "antique", "fadecolor", "tape", "matte", "noize", "neon"],
+        choices=["resize", "grayscale", "antique", "fadecolor", "tape", "matte", "noise", "neon"],
         help="Тип фильтра"
     )
     parser.add_argument("--input", "-i", required=True, help="Путь к входному изображению")
@@ -41,6 +41,8 @@ def cli_argument_parser():
     # neon
     parser.add_argument("--threshold", type=int, default=50, help="Порог выделения границ (neon)")
     parser.add_argument("--glow", type=float, default=0.8, help="Интенсивность подсветки (neon)")
+
+    parser.add_argument("--color", type=int, nargs=3, default=[255, 255, 255], help="Установка цвета (b, r, g) (matte, neon)")
 
     return parser.parse_args()
 
@@ -79,14 +81,16 @@ def main():
     elif filter_type == 'matte':
         params['border'] = args.border
         params['feather'] = args.feather
+        params['color'] = tuple(args.color)
 
-    elif filter_type == 'noize':
+    elif filter_type == 'noise':
         params['scratch_count'] = args.scratch_count
         params['noise_level'] = args.noise_level
 
     elif filter_type == 'neon':
         params['threshold'] = args.threshold
         params['glow'] = args.glow
+        params['color'] = tuple(args.color)
 
     try:
         image_filter = ImageFilter.get_filter(filter_type, **params)

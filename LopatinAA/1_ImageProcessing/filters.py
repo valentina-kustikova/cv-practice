@@ -86,9 +86,9 @@ class Tape(ImageFilter):
         img = image.astype(np.float32)
         b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
 
-        new_b = r
-        new_g = np.clip(g * 1.1, 0, 255)
-        new_r = b * 0.8
+        new_r = 0.2 * r + 1.3 * g - 0.5 * b
+        new_g = 0.0 * r + 0.4 * g + 0.4 * b
+        new_b = 0.0 * r + 0.0 * g + 1.0 * b
         out = np.stack([new_b, new_g, new_r], axis=-1)
 
         if self.grain > 0:
@@ -98,9 +98,10 @@ class Tape(ImageFilter):
         return np.clip(out, 0, 255).astype(np.uint8)
 
 class Matte(ImageFilter):
-    def __init__(self, border=0.05, feather=0.05):
+    def __init__(self, border=0.05, feather=0.05, color=(255, 255, 255)):
         self.border = border
         self.feather = feather
+        self.color = color
 
     def apply_filter(self, image):
         img = image.astype(np.float32)
@@ -116,8 +117,12 @@ class Matte(ImageFilter):
         f = max(self.feather, 1e-6)
         mask = np.clip((1 - d) / f, 0, 1)[:, :, None]
 
-        white = np.full_like(img, 255)
-        out = img * mask + white * (1 - mask)
+        fill = np.zeros_like(img)
+        fill[:, :, 0] = self.color[0]
+        fill[:, :, 1] = self.color[1]
+        fill[:, :, 2] = self.color[2]
+
+        out = img * mask + fill * (1 - mask)
         return np.clip(out, 0, 255).astype(np.uint8)
 
 class Noise(ImageFilter):
@@ -146,9 +151,10 @@ class Noise(ImageFilter):
         return img
 
 class Neon(ImageFilter):
-    def __init__(self, threshold=50, glow=0.8):
+    def __init__(self, threshold=50, glow=0.8, color=(255, 255, 50)):
         self.threshold = threshold
         self.glow = glow
+        self.color = color
 
     @staticmethod
     def _blur3(image):
@@ -185,15 +191,17 @@ class Neon(ImageFilter):
         glow_mask[:, :blur_passes] = 0
         glow_mask[:, -blur_passes:] = 0
 
+        cb, cg, cr = self.color
+
         edges = np.zeros_like(img, dtype=np.float32)
-        edges[:, :, 0] = mask * 255
-        edges[:, :, 1] = mask * 255
-        edges[:, :, 2] = mask * 50
+        edges[:, :, 0] = mask * cb
+        edges[:, :, 1] = mask * cg
+        edges[:, :, 2] = mask * cr
 
         glow_layer = np.zeros_like(img, dtype=np.float32)
-        glow_layer[:, :, 0] = glow_mask * 255
-        glow_layer[:, :, 1] = glow_mask * 200
-        glow_layer[:, :, 2] = glow_mask * 100
+        glow_layer[:, :, 0] = glow_mask * cb * 0.8
+        glow_layer[:, :, 1] = glow_mask * cg * 0.8
+        glow_layer[:, :, 2] = glow_mask * cr * 0.8
 
         out = edges + glow_layer * self.glow
         return np.clip(out, 0, 255).astype(np.uint8)
