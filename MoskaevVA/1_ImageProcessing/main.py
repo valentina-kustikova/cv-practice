@@ -3,13 +3,14 @@ import logging
 import sys
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 from filters import ImageFilter
 
 
 def read_image(path: str) -> np.ndarray:
     with Image.open(path) as img:
+        img = ImageOps.exif_transpose(img)
         return np.array(img.convert("RGB"))
 
 
@@ -37,22 +38,33 @@ def cli_argument_parser() -> argparse.Namespace:
     # antique
     p.add_argument("--grain", type=float, default=0.25)
 
-    # film
+    # film — непроявленная плёнка
     p.add_argument("--mix", type=float, default=0.6)
+    p.add_argument("--veil", type=float, default=0.25)
+    p.add_argument("--tint", choices=["cyan", "magenta", "sepia"],
+                   default="cyan")
 
     # matte
     p.add_argument("--softness", type=float, default=0.15)
     p.add_argument("--scale", type=float, default=0.9)
+    p.add_argument("--mask-width", type=float, default=None)
+    p.add_argument("--mask-height", type=float, default=None)
+    p.add_argument("--center-x", type=float, default=None)
+    p.add_argument("--center-y", type=float, default=None)
 
     # scratches
     p.add_argument("--n-scratches", type=int, default=8)
     p.add_argument("--noise-sigma", type=float, default=12.0)
     p.add_argument("--dust", type=float, default=0.004)
+    p.add_argument("--vertical-bias", type=float, default=0.4)
+    p.add_argument("--texture-strength", type=float, default=0.35)
 
     # neon
     p.add_argument("--threshold", type=float, default=30.0)
     p.add_argument("--glow-radius", type=int, default=2)
     p.add_argument("--glow-strength", type=float, default=1.2)
+    p.add_argument("--halo-radius", type=int, default=6)
+    p.add_argument("--halo-strength", type=float, default=0.8)
 
     return p.parse_args()
 
@@ -70,20 +82,30 @@ def build_filter(name: str, a: argparse.Namespace) -> ImageFilter:
                                       black_lift=a.black_lift)
     if name == "film":
         return ImageFilter.get_filter("film", mix=a.mix,
-                                      grain=a.grain, seed=a.seed)
+                                      grain=a.grain, seed=a.seed,
+                                      veil=a.veil, lift=a.black_lift,
+                                      tint=a.tint)
     if name == "matte":
         return ImageFilter.get_filter("matte", softness=a.softness,
-                                      scale=a.scale)
+                                      scale=a.scale,
+                                      mask_width=a.mask_width,
+                                      mask_height=a.mask_height,
+                                      center_x=a.center_x,
+                                      center_y=a.center_y)
     if name == "scratches":
         return ImageFilter.get_filter("scratches",
                                       n_scratches=a.n_scratches,
                                       noise_sigma=a.noise_sigma,
                                       dust=a.dust,
-                                      seed=a.seed)
+                                      seed=a.seed,
+                                      vertical_bias=a.vertical_bias,
+                                      texture_strength=a.texture_strength)
     if name == "neon":
         return ImageFilter.get_filter("neon", threshold=a.threshold,
                                       glow_radius=a.glow_radius,
-                                      glow_strength=a.glow_strength)
+                                      glow_strength=a.glow_strength,
+                                      halo_radius=a.halo_radius,
+                                      halo_strength=a.halo_strength)
     raise ValueError("unknown filter: " + name)
 
 
