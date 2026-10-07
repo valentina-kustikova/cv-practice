@@ -1,9 +1,9 @@
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod #абстрактный класс - класс шаблон(наследники должны иметь одинаковый интерфейс)
 
 import numpy as np
 
 
-def to_gray(image):
+def to_gray(image): #  вспомогательная, тк далее много где ее вызываем
     """Яркость Y = 0.299 R + 0.587 G + 0.114 B"""
     b, g, r = image[:, :, 0], image[:, :, 1], image[:, :, 2]
     return 0.299 * r + 0.587 * g + 0.114 * b
@@ -11,14 +11,14 @@ def to_gray(image):
 
 def convolve(channel, kernel):
     """Свертка одноканального изображения с ядром нечетного размера."""
-    k = kernel.shape[0]
-    pad = k // 2
-    padded = np.pad(channel.astype(np.float64), pad, mode='edge')
+    k = kernel.shape[0] #ядро
+    pad = k // 2 #отступы с краев
+    padded = np.pad(channel.astype(np.float64), pad, mode='edge') 
     h, w = channel.shape
     result = np.zeros((h, w))
     for i in range(k):
         for j in range(k):
-            result += kernel[i, j] * padded[i:i + h, j:j + w]
+            result += kernel[i, j] * padded[i:i + h, j:j + w] #берем слепок изображения и двигаем его. умножаем каждый пиксель слепка на ячейку ядра.
     return result
 
 
@@ -28,8 +28,8 @@ def to_uint8(image):
 
 
 class ImageFilter(ABC):
-    @staticmethod
-    def get_filter(args):
+    @staticmethod #означает, что этому методу не нужны объекты, тк им не надо передавать никакие свойства
+    def get_filter(args): #фабричный метод, что не было много if/else
         filters = {
             'resize': lambda: Resize(args.width, args.height, args.scale),
             'gray': lambda: RGB2GrayScale(),
@@ -42,7 +42,7 @@ class ImageFilter(ABC):
         }
         if args.filter not in filters:
             raise ValueError(f'Неизвестный фильтр: {args.filter}')
-        return filters[args.filter]()
+        return filters[args.filter]() 
 
     @abstractmethod
     def apply_filter(self, image):
@@ -68,19 +68,21 @@ class Resize(ImageFilter):
             raise ValueError('Размер изображения должен быть положительным')
 
         # Координаты центров новых пикселей в исходном изображении
-        ys = np.clip((np.arange(new_h) + 0.5) * h / new_h - 0.5, 0, h - 1)
-        xs = np.clip((np.arange(new_w) + 0.5) * w / new_w - 0.5, 0, w - 1)
+        ys = np.clip((np.arange(new_h) + 0.5) * h / new_h - 0.5, 0, h - 1) 
+        xs = np.clip((np.arange(new_w) + 0.5) * w / new_w - 0.5, 0, w - 1)  
+
+        #берем соседей сверху слева и сверху справа. снизу слева и снизу справа.
         y0, x0 = ys.astype(int), xs.astype(int)
         y1, x1 = np.minimum(y0 + 1, h - 1), np.minimum(x0 + 1, w - 1)
 
-        # Веса соседей: дробная часть координаты
+        # Веса соседей: дробная часть координаты. 
         dy = (ys - y0)[:, None, None]
         dx = (xs - x0)[None, :, None]
 
         img = image.astype(np.float64)
-        top = img[y0][:, x0] * (1 - dx) + img[y0][:, x1] * dx
-        bottom = img[y1][:, x0] * (1 - dx) + img[y1][:, x1] * dx
-        return to_uint8(np.round(top * (1 - dy) + bottom * dy))
+        top = img[y0][:, x0] * (1 - dx) + img[y0][:, x1] * dx 
+        bottom = img[y1][:, x0] * (1 - dx) + img[y1][:, x1] * dx 
+        return to_uint8(np.round(top * (1 - dy) + bottom * dy)) 
 
 
 class RGB2GrayScale(ImageFilter):
@@ -109,10 +111,10 @@ class FadeColor(ImageFilter):
     def apply_filter(self, image):
         s = self.strength
         img = image.astype(np.float64)
-        gray = to_gray(img)[:, :, None]
-        desaturated = img + s * (gray - img)
-        low, high = 70 * s, 255 - 40 * s
-        return to_uint8(low + desaturated * (high - low) / 255)
+        gray = to_gray(img)[:, :, None] #
+        desaturated = img + s * (gray - img) #обесцвечивание
+        low, high = 70 * s, 255 - 40 * s #падение контраста.
+        return to_uint8(low + desaturated * (high - low) / 255) #переводим значения из шкалы [0,255] в шкалу [low,high]
 
 
 class InfraredFilm(ImageFilter):
@@ -124,10 +126,8 @@ class InfraredFilm(ImageFilter):
     def apply_filter(self, image):
         img = image.astype(np.float64)
         b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
-        # Канальный микшер ИК-пленки
-        ir = np.clip(-0.7 * r + 2.0 * g - 0.3 * b, 0, 255)
-        # Ореол вокруг светлых участков
-        glow = convolve(ir, np.ones((7, 7)) / 49)
+        ir = np.clip(-0.7 * r + 2.0 * g - 0.3 * b, 0, 255) # Канальный микшер ИК-пленки.
+        glow = convolve(ir, np.ones((7, 7)) / 49) # Ореол вокруг светлых участков
         ir = 0.7 * ir + 0.3 * np.maximum(ir, glow)
         # Зерно пленки
         rng = np.random.default_rng(self.seed)
@@ -137,7 +137,7 @@ class InfraredFilm(ImageFilter):
 
 class Matte(ImageFilter):
     """Эффект виньетки "Матте" """
-    def __init__(self, radius=0.7, softness=0.3):
+    def __init__(self, radius=0.7, softness=0.3): #softness - плавность перехода
         if softness <= 0:
             raise ValueError('softness должен быть больше 0')
         self.radius = radius
@@ -147,9 +147,9 @@ class Matte(ImageFilter):
         h, w = image.shape[:2]
         cy, cx = h / 2, w / 2
         y, x = np.mgrid[0:h, 0:w] + 0.5  # координаты центров пикселей
-        d = np.sqrt(((x - cx) / cx) ** 2 + ((y - cy) / cy) ** 2)  # нормированное расстояние
-        alpha = np.clip((d - self.radius) / self.softness, 0, 1)[:, :, None]
-        return to_uint8(image * (1 - alpha) + 255 * alpha)
+        d = np.sqrt(((x - cx) / cx) ** 2 + ((y - cy) / cy) ** 2)  
+        alpha = np.clip((d - self.radius) / self.softness, 0, 1)[:, :, None] 
+        return to_uint8(image * (1 - alpha) + 255 * alpha) #блендинг
 
 
 class OldPhoto(ImageFilter):
@@ -166,12 +166,12 @@ class OldPhoto(ImageFilter):
         img += rng.normal(0, self.noise, (h, w))[:, :, None]
 
         # Царапины
-        thickness = max(1, w // 800)
-        for _ in range(self.scratches):
+        thickness = max(1, w // 800) # толщина царапины
+        for _ in range(self.scratches): # создаем царапины
             x = rng.integers(0, w)
-            y0 = rng.integers(0, h)
-            y1 = y0 + rng.integers(h // 5, h)
-            img[y0:y1, x:x + thickness] = rng.choice([230, 30])
+            y0 = rng.integers(0, h) #начало царапины
+            y1 = y0 + rng.integers(h // 5, h)  # ее конец
+            img[y0:y1, x:x + thickness] = rng.choice([230, 30]) # рисуем саму царапину
         return to_uint8(img)
 
 
@@ -180,18 +180,20 @@ class Neon(ImageFilter):
     SOBEL_X = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
 
     def __init__(self, threshold=0.2, color=(255, 0, 255)):
-        self.threshold = threshold
+        self.threshold = threshold 
         self.color = np.array(color[::-1])  # RGB -> BGR
 
     def apply_filter(self, image):
-        gray = convolve(to_gray(image), np.ones((3, 3)) / 9)
+        gray = convolve(to_gray(image), np.ones((3, 3)) / 9) 
+        
+        #градиенты яркости
         gx = convolve(gray, self.SOBEL_X)
         gy = convolve(gray, self.SOBEL_X.T)
-        magnitude = np.sqrt(gx ** 2 + gy ** 2)
-        if magnitude.max() > 0:
+        magnitude = np.sqrt(gx ** 2 + gy ** 2) #считаем длину вектора градиента 
+        if magnitude.max() > 0: 
             magnitude /= magnitude.max()
 
-        edges = (magnitude > self.threshold).astype(np.float64)
-        glow = convolve(edges, np.ones((9, 9)) / 81)
-        light = np.clip(edges + 2 * glow, 0, 1)
+        edges = (magnitude > self.threshold).astype(np.float64) 
+        glow = convolve(edges, np.ones((9, 9)) / 81) #свечение контура
+        light = np.clip(edges + 2 * glow, 0, 1) 
         return to_uint8(light[:, :, None] * self.color)
