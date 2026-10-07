@@ -1,0 +1,152 @@
+<h1>Обработка изображений</h1>
+<h2>Запуск</h2>
+<pre><code class="language-text">python main.py --image ИМЯ_ФАЙЛА --filter ФИЛЬТР [параметры]
+</code></pre>
+<p>Если аргументы не переданы, программа выводит краткую справку:</p>
+<pre><code class="language-text">python main.py
+</code></pre>
+<p><code>--image</code> и <code>--filter</code> обязательны. В <code>--image</code> передаётся имя файла из папки <code>img</code>.</p>
+<h2>Параметры</h2>
+<table>
+<thead>
+<tr>
+<th>Аргумент</th>
+<th>Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--image ИМЯ_ФАЙЛА</code></td>
+<td>Имя изображения в папке <code>img</code>.</td>
+</tr>
+<tr>
+<td><code>--filter ФИЛЬТР</code></td>
+<td>Фильтр: <code>resize</code>, <code>grayscale</code>, <code>antique</code>, <code>fade</code>, <code>film</code>, <code>matte</code>, <code>scratches</code> или <code>neon</code>.</td>
+</tr>
+<tr>
+<td><code>--width ЧИСЛО</code></td>
+<td>Новая ширина для <code>resize</code>.</td>
+</tr>
+<tr>
+<td><code>--height ЧИСЛО</code></td>
+<td>Новая высота для <code>resize</code>.</td>
+</tr>
+<tr>
+<td><code>--count ЧИСЛО</code></td>
+<td>Количество царапин для <code>scratches</code>.</td>
+</tr>
+<tr>
+<td><code>--strength ЧИСЛО</code></td>
+<td>Сила эффекта для <code>antique</code>, <code>fade</code>, <code>film</code>, <code>matte</code> или <code>neon</code>; диапазон <code>[0, 1]</code>.</td>
+</tr>
+<tr>
+<td><code>--threshold ЧИСЛО</code></td>
+<td>Порог поиска контуров для <code>neon</code>.</td>
+</tr>
+<tr>
+<td><code>--brightness ЧИСЛО</code></td>
+<td>Яркость фона для <code>neon</code>; диапазон <code>[0, 1]</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2>1. resize</h2>
+<p>Изображение масштабируется до размеров <code>(W', H')</code>, и каждый пиксель выходного изображения берётся из соответствующего положения на исходном изображении.</p>
+<p>Пусть исходное изображение имеет размеры <code>(W, H)</code>, а целевое — <code>(W', H')</code>. Для координат пикселя на выходе:</p>
+<pre><code class="language-text">x_out = i,  i = 0..W'-1
+y_out = j,  j = 0..H'-1
+
+x_in = floor(i * W / W')
+y_in = floor(j * H / H')
+</code></pre>
+<p>Тогда:</p>
+<pre><code class="language-text">I'(j, i) = I(y_in, x_in)
+</code></pre>
+<p>То есть координаты отображаются в исходное изображение с сохранением RGB-компонент.</p>
+<h2>2. grayscale</h2>
+<p>Яркость вычисляется по формуле:</p>
+<pre><code class="language-text">Y = 0.299R + 0.587G + 0.114B
+</code></pre>
+<p>После этого каждый канал заменяется на это значение:</p>
+<pre><code class="language-text">I'(x, y, c) = Y(x, y),  c ∈ {R, G, B}
+</code></pre>
+<p>Затем значения ограничиваются диапазоном <code>[0, 255]</code>.</p>
+<h2>3. antique</h2>
+<p>Сепия получается линейным преобразованием RGB-каналов:</p>
+<pre><code class="language-text">[ R_sep  ]   [0.272  0.534  0.131] [R]
+[ G_sep  ] = [0.349  0.686  0.168] [G]
+[ B_sep  ]   [0.393  0.769  0.189] [B]
+</code></pre>
+<p>После этого выполняется смешение с исходным изображением:</p>
+<pre><code class="language-text">I' = (1 - s)I + sI_sep
+</code></pre>
+<p>где <code>s ∈ [0,1]</code> — параметр <code>strength</code>.</p>
+<h2>4. fade</h2>
+<p>Фильтр ослабляет насыщенность и добавляет светлый оттенок. Сначала вычисляется яркость <code>Y</code>:</p>
+<pre><code class="language-text">Y = 0.299R + 0.587G + 0.114B
+</code></pre>
+<p>Далее:</p>
+<pre><code class="language-text">I1 = I * (1 - 0.55s) + Y * (0.55s)
+I' = I1 * (1 - 0.18s) + 245 * (0.18s)
+</code></pre>
+<p>где <code>s</code> — параметр <code>strength</code>.</p>
+<p>Так изображение становится светлее и менее контрастным, но сохраняет общий тон.</p>
+<h2>5. film</h2>
+<p>Эффект плёнки задаётся преобразованием каналов:</p>
+<pre><code class="language-text">B' = 0.65B + 0.35R
+G' = 0.75R + 0.25G
+R' = 1.35G - 0.25B + 20
+</code></pre>
+<p>После этого новое изображение смешивается с исходным:</p>
+<pre><code class="language-text">I' = (1 - s)I + sI_film
+</code></pre>
+<p>где <code>s</code> — параметр <code>strength</code>.</p>
+<h2>6. matte</h2>
+<p>Фильтр создаёт затемнённую рамку вокруг центра. Для точки <code>(x, y)</code> вычисляется расстояние до центра:</p>
+<pre><code class="language-text">d(x, y) = sqrt((x - cx)^2 + (y - cy)^2)
+</code></pre>
+<p>Здесь <code>(cx, cy)</code> — центр изображения. После нормализации:</p>
+<pre><code class="language-text">w(x, y) = clip((d(x, y) / R - 0.68) / 0.32, 0, 1)
+</code></pre>
+<p>Результат записывается так:</p>
+<pre><code class="language-text">I'(x, y) = I(x, y) * (1 - s * w(x, y)) + 255 * s * w(x, y)
+</code></pre>
+<p>Здесь <code>s</code> — параметр <code>strength</code>; белый цвет создаёт матовый овал вокруг центра.</p>
+<h2>7. scratches</h2>
+<p>Фильтр добавляет <code>N</code> случайных вертикальных царапин. Для каждой царапины выбираются:</p>
+<ul>
+<li>столбец <code>x</code> случайно из диапазона <code>[0, W)</code></li>
+<li>начало строки <code>y0</code> из <code>[0, H)</code></li>
+<li>конец строки <code>y1</code> из <code>[y0 + 1, H]</code></li>
+<li>цвет <code>c из {0, 255}</code></li>
+</ul>
+<p>Затем в участке:</p>
+<pre><code class="language-text">I[y0:y1, x, :] = c
+</code></pre>
+<p>происходит замена цвета. При <code>c = 0</code> царапина чёрная, при <code>c = 255</code> — белая.</p>
+<h2>8. neon</h2>
+<p>Контуры выделяются по разнице яркости соседних пикселей. Для каждого пикселя вычисляется яркость изображения:</p>
+<pre><code class="language-text">Y(x, y) = 0.299R(x, y) + 0.587G(x, y) + 0.114B(x, y)
+</code></pre>
+<p>Затем для соседних пикселей:</p>
+<pre><code class="language-text">dv(x, y) = |Y(x, y) - Y(x + 1, y)|
+dh(x, y) = |Y(x, y) - Y(x, y + 1)|
+</code></pre>
+<p>Контур определяется условием:</p>
+<pre><code class="language-text">E(x, y) = (dv(x, y) + dh(x, y)) &gt; T
+</code></pre>
+<p>где <code>T</code> — порог <code>threshold</code>.</p>
+<p>Далее изображение затемняется до коэффициента <code>b = brightness</code>:</p>
+<pre><code class="language-text">I_dark = I * b
+</code></pre>
+<p>Для пикселей контура выполняется смешение с неоновым цветом <code>C = (255, 45, 210)</code>:</p>
+<pre><code class="language-text">I'(x, y) = (1 - s)I_dark(x, y) + sC
+</code></pre>
+<p>где <code>s</code> — параметр <code>strength</code>.</p>
+<h2>Примеры запуска</h2>
+<pre><code class="language-text">python main.py --image img.jpg --filter grayscale
+python main.py --image img.jpg --filter resize --width 800 --height 600
+python main.py --image img.jpg --filter antique --strength 0.5
+python main.py --image img.jpg --filter scratches --count 5
+python main.py --image img.jpg --filter neon --threshold 70 --brightness 0.4 --strength 0.7
+</code></pre>
+<p>Результат сохраняется в папке <code>result</code> в формате <code>&lt;имя&gt;_&lt;номер фильтра&gt;.&lt;расширение&gt;</code>, например <code>result/img_3.jpg</code>.</p>
