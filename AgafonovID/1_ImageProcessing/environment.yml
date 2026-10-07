@@ -1,0 +1,9 @@
+name: cv_lab1
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - numpy
+      - opencv-python
