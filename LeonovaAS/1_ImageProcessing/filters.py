@@ -40,7 +40,7 @@ class Grayscale(ImageFilter):
         0, 255).astype(np.uint8)
 
 class Antique(ImageFilter):
-    """Фильтр антиквариат (сепия)"""
+    """Фильтр антиквариат (сепия) добавить виньетку"""
     def apply_filter(self, image):
         result = Grayscale().apply_filter(image) 
         B = result * 0.43
@@ -100,7 +100,7 @@ class Matte(ImageFilter):
         return result
 
 class Age(ImageFilter):
-    """Эффект состаривания картинки"""
+    """Эффект состаривания картинки затемнить царапины"""
     def __init__(self, sigma = 10.0, seed = None):
         if sigma < 0:
             raise ValueError("Negative sigma value")
@@ -144,7 +144,7 @@ class Age(ImageFilter):
         return np.clip(result, 0, 255).astype(np.uint8)
         
 class Neon(ImageFilter):
-    """Неоновое подсвечивание"""
+    """Неоновое подсвечивание как в фотошопе"""
     def __init__(self, color = "pink", intensity = 1.5):
         if (color != "pink") and (color != "cyan") and (color != "green"):
             raise ValueError("Color can only be pink, cyan or green")
