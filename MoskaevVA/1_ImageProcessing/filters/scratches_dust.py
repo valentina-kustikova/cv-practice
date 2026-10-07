@@ -46,7 +46,7 @@ class Scratches(ImageFilter):
         self.vertical_bias = float(np.clip(vertical_bias, 0.0, 1.0))
         self.texture_strength = float(np.clip(texture_strength, 0.0, 1.0))
 
-    # ---------- текстуры ----------
+    #текстуры
     def _apply_textures(self, out):
         h, w = out.shape[:2]
         
@@ -76,7 +76,7 @@ class Scratches(ImageFilter):
 
         return out
 
-    # ---------- хаотичная царапина (ломаная) ----------
+    #хаотичная царапина (ломаная)
     def _draw_scratch(self, out, rng, h, w):
         x = float(rng.integers(0, w))
         y = float(rng.integers(0, h))

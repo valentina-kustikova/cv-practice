@@ -18,7 +18,6 @@ class Neon(ImageFilter):
         self.halo_strength = float(halo_strength)
         self.inner_glow = float(inner_glow)
 
-    # ---------- Лапласиан (базовые сдвиги матриц) ----------
     def _laplacian(self, gray: np.ndarray) -> np.ndarray:
         k = np.array([[1,  1, 1],
                       [1, -8, 1],
@@ -32,7 +31,6 @@ class Neon(ImageFilter):
                     out += k[dy, dx] * p[dy:dy + h, dx:dx + w]
         return out
 
-    # ---------- Мощный скользящий Box Blur (базовый NumPy) ----------
     def _box_blur(self, img: np.ndarray, r: int) -> np.ndarray:
         if r <= 0:
             return img.copy()
@@ -62,7 +60,7 @@ class Neon(ImageFilter):
         # Нормализуем цвет неона под диапазон [0.0, 1.0]
         c = self.color / 255.0
 
-        # --- Слои неонового света ---
+        #Слои неонового света
         # 1) Жесткое ядро контура
         neon_edge = edge_mask[..., None] * c
 
@@ -70,7 +68,7 @@ class Neon(ImageFilter):
         inner = self._box_blur(edge_mask, self.glow_radius * 2)
         neon_inner = inner[..., None] * c * self.glow_strength
 
-        # 3) Огромное объемное внешнее гало (Halo)
+        # 3) Огромное объемное внешнее Halo
         neon_halo = np.zeros_like(neon_edge)
         if self.halo_radius > 0:
             # Масштабируем радиус окна под разрешение картинки
@@ -81,10 +79,10 @@ class Neon(ImageFilter):
             halo_mask = np.clip(wide - inner * 0.2, 0.0, 1.0)
             neon_halo = halo_mask[..., None] * c * self.halo_strength
 
-        # --- БЛЕНДИНГ SCREEN (Экранное наложение без пересветов) ---
+        #SCREEN Экранное наложение без пересветов
         neon_total = 1.0 - (1.0 - neon_edge) * (1.0 - neon_inner) * (1.0 - neon_halo)
         
-        # Притемняем исходную фотографию мухомора до 15% под глубокую ночь
+        # Притемняем исходную фотографию до 15% под глубокую ночь
         bg = (img / 255.0) * 0.15
         
         # Накладываем светящийся неон поверх темного кадра
