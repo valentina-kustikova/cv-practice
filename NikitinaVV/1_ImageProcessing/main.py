@@ -38,7 +38,8 @@ def cli_argument_parser():
 def read_image(path):
     if not os.path.isfile(path):
         raise FileNotFoundError(f'Файл не найден: {path}')
-    image = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_COLOR) 
+    image = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
         raise ValueError(f'Не удалось прочитать изображение: {path}')
     return image
 
