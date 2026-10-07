@@ -52,7 +52,6 @@ film
 matte
 noise
 neon
-all
 ```
 
 Полную справку можно посмотреть:
