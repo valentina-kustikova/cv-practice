@@ -1,9 +1,9 @@
-from abc import ABC, abstractmethod #абстрактный класс - класс шаблон(наследники должны иметь одинаковый интерфейс)
+from abc import ABC, abstractmethod 
 
 import numpy as np
 
 
-def to_gray(image): #  вспомогательная, тк далее много где ее вызываем
+def to_gray(image):
     """Яркость Y = 0.299 R + 0.587 G + 0.114 B"""
     b, g, r = image[:, :, 0], image[:, :, 1], image[:, :, 2]
     return 0.299 * r + 0.587 * g + 0.114 * b
@@ -28,8 +28,8 @@ def to_uint8(image):
 
 
 class ImageFilter(ABC):
-    @staticmethod #означает, что этому методу не нужны объекты, тк им не надо передавать никакие свойства
-    def get_filter(args): #фабричный метод, что не было много if/else
+    @staticmethod 
+    def get_filter(args):
         filters = {
             'resize': lambda: Resize(args.width, args.height, args.scale),
             'gray': lambda: RGB2GrayScale(),
@@ -111,7 +111,7 @@ class FadeColor(ImageFilter):
     def apply_filter(self, image):
         s = self.strength
         img = image.astype(np.float64)
-        gray = to_gray(img)[:, :, None] #
+        gray = to_gray(img)[:, :, None] 
         desaturated = img + s * (gray - img) #обесцвечивание
         low, high = 70 * s, 255 - 40 * s #падение контраста.
         return to_uint8(low + desaturated * (high - low) / 255) #переводим значения из шкалы [0,255] в шкалу [low,high]
