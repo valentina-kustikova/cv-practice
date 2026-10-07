@@ -9,21 +9,21 @@ Python 3.10 или новее. Команды выполняются из `Pikho
 ```powershell
 python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
-.venv\Scripts\python main.py --input images/colors.png --output result.png --filter antique
+.venv\Scripts\python main.py --input images/image.jpg --output result.png --filter antique
 ```
 
 В Linux и macOS путь к интерпретатору окружения: `.venv/bin/python`.
 В следующих примерах `python` обозначает интерпретатор с установленными зависимостями.
 
 ```text
-python main.py -i images/colors.png -o results/resize.png -f resize --width 640 --height 480
-python main.py -i images/colors.png -o results/grayscale.png -f grayscale
-python main.py -i images/colors.png -o results/antique.png -f antique --strength 0.8
-python main.py -i images/colors.png -o results/fade.png -f fade --strength 0.6
-python main.py -i images/colors.png -o results/film.png -f film --gamma 1.2
-python main.py -i images/shapes.png -o results/matte.png -f matte --softness 0.3
-python main.py -i images/shapes.png -o results/scratches.png -f scratches --count 15 --noise 12 --seed 42
-python main.py -i images/shapes.png -o results/neon.png -f neon --threshold 25 --radius 4 --glow 2
+python main.py -i images/image.jpg -o results/resize.png -f resize --width 640 --height 640
+python main.py -i images/image.jpg -o results/grayscale.png -f grayscale
+python main.py -i images/image.jpg -o results/antique.png -f antique --strength 0.8
+python main.py -i images/image.jpg -o results/fade.png -f fade --strength 0.6
+python main.py -i images/image.jpg -o results/film.png -f film --gamma 1.2
+python main.py -i images/image.jpg -o results/matte.png -f matte --softness 0.3
+python main.py -i images/image.jpg -o results/scratches.png -f scratches --count 15 --noise 12 --seed 42
+python main.py -i images/image.jpg -o results/neon.png -f neon --threshold 25 --radius 4 --glow 2
 ```
 
 `--input`, `--output`, `--filter` обязательны. Параметры доступны только для выбранного
@@ -173,8 +173,8 @@ J = 0.1I + A * (255, 180, 40).
 
 Контуры окрашиваются в голубой цвет, вокруг них появляется свечение на тёмном фоне.
 
-## Тестовые изображения
+## Тестовое изображение
 
-`images/colors.png` содержит градиенты, основные цвета, чёрный и белый участки
-для проверки цветовых преобразований. `images/shapes.png` содержит прямоугольник,
-эллипс и диагональную полосу для проверки границ, масштабирования и овальной маски.
+`images/image.jpg` — цветное изображение размером 736×736 пикселей с горным
+пейзажем и отражением в озере. Оно используется во всех примерах запуска
+для проверки цветовых эффектов, контуров, масштабирования и овальной маски.
