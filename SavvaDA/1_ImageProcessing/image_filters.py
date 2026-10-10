@@ -158,97 +158,196 @@ class Film(ImageFilter):
         return result
 
 
+
+
 class Matte(ImageFilter):
 
-    def __init__(self, intensity=1, border=0.15, **kwargs):
-        
+    def __init__(self, intensity=1.0, border=0.15, **kwargs):
         self.border = max(0.0, min(0.5, border))
         self.intensity = max(0.0, min(1.0, intensity))
 
     def apply_filter(self, image):
+        if self.intensity == 0:
+            return image.copy()
 
         h, w = image.shape[:2]
-
-
-        cx = w / 2.0
-        cy = h / 2.0
-
-
-        # border — доля, которую «отрезаем» от края.
-
-        a = cx * (1.0 - self.border)
-        b = cy * (1.0 - self.border)
-
-        # экономный способ создания массивов
         Y, X = np.ogrid[:h, :w]
 
-        dist = np.sqrt(((X - cx) / a) ** 2 + ((Y - cy) / b) ** 2)
+        cx = (w - 1) / 2.0
+        cy = (h - 1) / 2.0
 
-        mask = 1.0 - np.clip(dist, 0.0, 1.0)
+        rx = max(cx * (1.0 - self.border), 1.0)
+        ry = max(cy * (1.0 - self.border), 1.0)
 
+        # Нормированное расстояние: 0 в центре, 1 — на границе овала.
+        dist = np.sqrt(
+            ((X - cx) / rx) ** 2 +
+            ((Y - cy) / ry) ** 2
+        )
 
-        #    mask[:, :, None] — добавляем третью ось для трёх каналов.
+        mask = np.clip((dist - 0.85) / 0.15, 0.0, 1.0)
+
+        # smoothstep — сглаживает кривую перехода.
+        mask = mask * mask * (3.0 - 2.0 * mask)
+
+        # Всё, что ЗА границей овала — принудительно белое.
+        mask = np.where(dist >= 1.0, 1.0, mask).astype(np.float32)
+
         img = image.astype(np.float32)
-        white = np.array([255, 255, 255], dtype=np.float32)
+        alpha = (mask * self.intensity)[:, :, None]
 
-        result = img * mask[:, :, None] + white * (1.0 - mask[:, :, None])
+        result = img * (1.0 - alpha) + 255.0 * alpha
 
-        result = np.clip(result, 0, 255).astype(np.uint8)
+        return np.clip(result, 0, 255).astype(np.uint8)
 
-        return result
+
+
 
 
 class Scratches(ImageFilter):
 
-
     def __init__(self, intensity=1.0, count=None, **kwargs):
-
         self.intensity = max(0.0, min(1.0, intensity))
-        # count - число царапин
+
         if count is None:
-            self.count = int(10 * self.intensity)   # до 10 царапин
+            self.count = int(250 * self.intensity)
         else:
             self.count = max(0, int(count))
+            
+    def _blur_mask(self, mask):
+        h, w = mask.shape
+        padded = np.pad(mask, 1, mode="edge")
+        result = np.zeros((h, w), dtype=np.float32)
+
+        # Ядро 3x3 с повышенным весом центрального пикселя.
+        kernel = np.array([
+            [1, 2, 1],
+            [2, 4, 2],
+            [1, 2, 1]
+        ], dtype=np.float32)
+
+        kernel /= kernel.sum()
+
+        for dy in range(3):
+            for dx in range(3):
+                result += (
+                    padded[dy:dy + h, dx:dx + w]
+                    * kernel[dy, dx]
+                )
+
+        return result
 
     def apply_filter(self, image):
+        if self.intensity == 0:
+            return image.copy()
+
         img = image.astype(np.float32).copy()
         h, w = img.shape[:2]
 
+        if h < 2 or w < 2:
+            return image.copy()
+
+        # Слой царапин и карта их прозрачности
+        scratches = img.copy()
+        alpha_map = np.zeros((h, w), dtype=np.float32)
+
         for _ in range(self.count):
+            # Разные длины: от коротких потёртостей
+            # до длинных царапин.
+            length = np.random.randint(2, max(3, int(h * 0.05) + 1)
+)
 
-            x = np.random.randint(0, w)
+            x0 = np.random.randint(0, w)
+            y0 = np.random.randint(0, h)
 
-            y_start = np.random.randint(0, h // 2)
-            y_end = np.random.randint(h // 2, h)
+            # Преимущественно вертикальное направление,
+            # но с естественным наклоном.
+            angle = np.random.normal(0.0, 0.20)
 
+            dx = np.sin(angle) * length
+            dy = np.cos(angle) * length
+
+            steps = max(2, int(length * 1.5))
+
+            # Каждая царапина имеет собственную яркость
+            # и прозрачность.
             if np.random.rand() < 0.7:
                 color = 255.0
             else:
                 color = 0.0
 
-            # толщина 1 или 2 пикселя.
-            thickness = np.random.randint(1, 3)
+            alpha = np.random.uniform(0.20, 0.70)
+            alpha *= self.intensity
 
-            # x_min и x_max — границы по горизонтали
-            x_min = max(0, x - thickness)
-            x_max = min(w, x + thickness + 1)
+            thickness = np.random.choice([1, 1, 1, 2])
 
-            img[y_start:y_end, x_min:x_max] = color
+            for t in np.linspace(0.0, 1.0, steps):
+                # Небольшие отклонения создают неровные края.
+                jitter_x = np.random.normal(0.0, 0.45)
+                jitter_y = np.random.normal(0.0, 0.20)
 
-        # шум
-        sigma = 8.0 * self.intensity
-        noise = np.random.normal(0.0, sigma, img.shape).astype(np.float32)
-        img = img + noise
+                x = int(round(x0 + dx * t + jitter_x))
+                y = int(round(y0 + dy * t + jitter_y))
 
-        img = np.clip(img, 0, 255)
+                if not (0 <= x < w and 0 <= y < h):
+                    continue
 
-        # смешиваем с оригиналом по intensity.
-        original = image.astype(np.float32)
-        result = original * (1.0 - self.intensity) + img * self.intensity
+                x_min = max(0, x - thickness // 2)
+                x_max = min(w, x + (thickness + 1) // 2)
+                y_min = max(0, y)
+                y_max = min(h, y + 1)
 
-        result = np.clip(result, 0, 255).astype(np.uint8)
+                # Чередование непрозрачных и слабых участков
+                # делает царапину менее похожей на прямую линию.
+                local_alpha = alpha * np.random.uniform(0.55, 1.0)
 
-        return result
+                region = alpha_map[y_min:y_max, x_min:x_max]
+                stronger = local_alpha > region
+
+                region[stronger] = local_alpha
+
+                color_region = scratches[y_min:y_max, x_min:x_max]
+                color_region[stronger] = color
+
+        # Накладываем царапины с разной прозрачностью.
+        #mask = alpha_map[:, :, None]
+        #result = img * (1.0 - mask) + scratches * mask
+        # Слегка смягчаем края царапин.
+
+        soft_alpha = self._blur_mask(alpha_map)
+        soft_alpha = np.clip(soft_alpha * 1.15, 0.0, 1.0)
+
+        mask = soft_alpha[:, :, None]
+        result = img * (1.0 - mask) + scratches * mask
+
+        # Мелкое плёночное зерно вместо сильного равномерного шума.
+        sigma = 4.0 * self.intensity
+        noise = np.random.normal(
+            0.0, sigma, result.shape
+        ).astype(np.float32)
+
+        result += noise
+
+        # Редкие мелкие точки-повреждения.
+        speckle_count = int(h * w * 0.00008 * self.intensity)
+
+        if speckle_count > 0:
+            ys = np.random.randint(0, h, speckle_count)
+            xs = np.random.randint(0, w, speckle_count)
+
+            values = np.random.choice(
+                [0.0, 255.0], size=speckle_count
+            )
+
+            result[ys, xs] = (
+                result[ys, xs] * (1.0 - 0.45 * self.intensity)
+                + values[:, None] * (0.45 * self.intensity)
+            )
+
+        return np.clip(result, 0, 255).astype(np.uint8)
+
+
+
 
 
 class Neon(ImageFilter):
@@ -256,52 +355,104 @@ class Neon(ImageFilter):
     def __init__(self, intensity=1.0, threshold=50, **kwargs):
         self.intensity = max(0.0, min(1.0, intensity))
         self.threshold = max(0, min(255, threshold))
-        self.neon_color = np.array([255, 0, 255], dtype=np.float32)
+        self.neon_color = np.array([255, 0, 220], dtype=np.float32)
 
     def apply_filter(self, image):
-        # контуры ищем на одном канале
-        b = image[:, :, 0].astype(np.float32)
-        g = image[:, :, 1].astype(np.float32)
-        r = image[:, :, 2].astype(np.float32)
+        if self.intensity == 0:
+            return image.copy()
+
+        img = image.astype(np.float32)
+        b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
         gray = 0.299 * r + 0.587 * g + 0.114 * b
-        
-        kernel_blur = np.ones((3, 3)) / 9
-        gray = self._convolve(gray, kernel_blur)
 
+        smooth = np.array([
+            [1, 2, 1],
+            [2, 4, 2],
+            [1, 2, 1]
+        ], dtype=np.float32) / 16.0
 
-        Gx = self._convolve(gray, np.array([[-1, 0, 1],
-                                             [-2, 0, 2],
-                                             [-1, 0, 1]], dtype=np.float32))
+        gray = self._convolve(gray, smooth)
 
-        Gy = self._convolve(gray, np.array([[-1, -2, -1],
-                                             [ 0,  0,  0],
-                                             [ 1,  2,  1]], dtype=np.float32))
+        gx = self._convolve(gray, np.array([
+            [-1, 0, 1],
+            [-2, 0, 2],
+            [-1, 0, 1]
+        ], dtype=np.float32))
 
-        magnitude = np.sqrt(Gx ** 2 + Gy ** 2)
+        gy = self._convolve(gray, np.array([
+            [-1, -2, -1],
+            [0, 0, 0],
+            [1, 2, 1]
+        ], dtype=np.float32))
 
+        magnitude = np.sqrt(gx ** 2 + gy ** 2)
         edges = (magnitude > self.threshold).astype(np.float32)
 
-        h, w = gray.shape
-        # Фон - затемнённая версия оригинала
-        background = (image.astype(np.float32) * 0.15)
+        kernel = np.array([
+            [1,  4,  7,  4, 1],
+            [4, 16, 26, 16, 4],
+            [7, 26, 41, 26, 7],
+            [4, 16, 26, 16, 4],
+            [1,  4,  7,  4, 1]
+        ], dtype=np.float32)
+        kernel /= kernel.sum()
 
-        # Накладываем контуры
-        result = background + edges[:, :, None] * self.neon_color * self.intensity
+        glow_small = edges.copy()
+        for _ in range(4):
+            glow_small = self._convolve(glow_small, kernel)
 
-        result = np.clip(result, 0, 255).astype(np.uint8)
+        glow_medium = edges.copy()
+        for _ in range(14):
+            glow_medium = self._convolve(glow_medium, kernel)
 
-        return result
+        glow_wide = edges.copy()
+        for _ in range(30):
+            glow_wide = self._convolve(glow_wide, kernel)
+        
+
+        glow = (
+            glow_small[:, :, None] * np.array([180, 0, 220], dtype=np.float32) * 1.0 +
+            glow_medium[:, :, None] * np.array([220, 0, 255], dtype=np.float32) * 2.0 +
+            glow_wide[:, :, None] * np.array([255, 0, 180], dtype=np.float32) * 2.5
+        )
+        
+
+        background = img * 0.10
+        result = background + glow
+
+        core = self._convolve(edges, smooth)
+        core = core[:, :, None]
+
+        result = result * (1.0 - core * 0.85) + 255.0 * (core * 0.85)
+
+        result = (
+            img * (1.0 - self.intensity) +
+            result * self.intensity
+        )
+
+        return np.clip(result, 0, 255).astype(np.uint8)
 
     @staticmethod
     def _convolve(image, kernel):
         h, w = image.shape
+        kh, kw = kernel.shape
+        py, px = kh // 2, kw // 2
+
+        padded = np.pad(
+            image,
+            ((py, py), (px, px)),
+            mode="constant"
+        )
+
         result = np.zeros((h, w), dtype=np.float32)
 
-        for ky in range(3):
-            for kx in range(3):
-                result[1:h-1, 1:w-1] += (
-                    kernel[ky, kx] *
-                    image[ky:h-2+ky, kx:w-2+kx]
+        for y in range(kh):
+            for x in range(kw):
+                result += (
+                    kernel[y, x] *
+                    padded[y:y + h, x:x + w]
                 )
 
         return result
+
+

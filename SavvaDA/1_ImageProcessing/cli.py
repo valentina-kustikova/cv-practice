@@ -20,6 +20,8 @@ def cli_argument_parser():
                         help="Интенсивность эффекта (для antique/fade/neon)")
     parser.add_argument("--border", type=float, default=0.15,
                     help="Отступ овальной маски (для matte)")
+    parser.add_argument("--threshold", type=float, default=50,
+                        help="Порог выделения контуров (для neon)")
 
     return parser.parse_args()
 
@@ -38,9 +40,15 @@ def main():
     image = read_image(args.input)  # чтение изображения
 
     # Выбор фильтра по имени
-    filter_obj = ImageFilter.get_filter(args.filter, scale=args.scale,
-                                        intensity=args.intensity,
-                                        border=args.border)
+
+    filter_obj = ImageFilter.get_filter(
+        args.filter,
+        scale=args.scale,
+        intensity=args.intensity,
+        border=args.border,
+        threshold=args.threshold
+    )
+    
     result = filter_obj.apply_filter(image)  # применение
 
     cv2.imwrite(args.output, result)  # сохранение
