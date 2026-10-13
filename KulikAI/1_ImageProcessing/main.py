@@ -152,8 +152,8 @@ def run(args: argparse.Namespace) -> None:
     elif args.filter == "neon":
         result = ImageFilter.get_filter(
             "neon",
-            strength=args.neon_strength,
-            blur=args.neon_blur,
+            neon_strength=args.neon_strength,
+            neon_blur=args.neon_blur,
         ).apply_filter(image)
 
     else:

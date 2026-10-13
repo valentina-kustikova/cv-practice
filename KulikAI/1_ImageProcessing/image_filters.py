@@ -270,53 +270,68 @@ def filter2d(img, kernel):
 
 @dataclass
 class Neon(ImageFilter):
-    strength: float = 1.5
-    blur: float = 0.8
+    neon_strength: float = 1.5
+    neon_blur: float = 0.8
     name = "neon"
 
-    def apply_filter(self, image: Image) -> Image:
-        if self.strength < 0:
-            raise ValueError("neon strength должен быть >= 0.")
-        if self.blur < 0:
-            raise ValueError("neon blur должен быть >= 0.")
+    @staticmethod
+    def _blur(image: np.ndarray, iterations: int) -> np.ndarray:
+        #Размытие усреднением 3x3
+        result = image.astype(np.float32)
 
-        b, g, r = cv2.split(image.astype(np.float32))
-        gray = 0.1140 * b + 0.5870 * g + 0.2990 * r
-        gray_u8 = _clip_u8(gray)
+        for _ in range(iterations):
+            p = np.pad(result, 1, mode="edge")
+            result = (
+                p[:-2, :-2] + p[:-2, 1:-1] + p[:-2, 2:] +
+                p[1:-1, :-2] + p[1:-1, 1:-1] + p[1:-1, 2:] +
+                p[2:, :-2] + p[2:, 1:-1] + p[2:, 2:]
+            ) / 9.0
 
-        if self.blur > 0:
-            k = max(3, int(round(self.blur * 6)) | 1)
-            gray_u8 = cv2.GaussianBlur(gray_u8, (k, k), self.blur)
+        return result
 
-        kernel_x = np.array(
-            [[-1, 0, 1],
-             [-2, 0, 2],
-             [-1, 0, 1]],
-            dtype=np.float32,
-        )
-        kernel_y = kernel_x.T
+    def apply_filter(self, img: Image) -> Image:
+        if self.neon_strength < 0:
+            raise ValueError("neon-strength должен быть >= 0")
 
-        gx = cv2.filter2D(gray_u8.astype(np.float32), cv2.CV_32F, kernel_x)
-        gy = cv2.filter2D(gray_u8.astype(np.float32), cv2.CV_32F, kernel_y)
-        #gx = filter2d(gray_u8.astype(np.float32), kernel_x)
-        #gy = filter2d(gray_u8.astype(np.float32), kernel_y)
+        if self.neon_blur < 0:
+            raise ValueError("neon-blur должен быть >= 0")
 
-        magnitude = np.sqrt(gx * gx + gy * gy)
-        magnitude /= max(float(magnitude.max()), 1.0)
-        edge = np.clip(magnitude * self.strength, 0.0, 1.0)[..., None]
-
-        dark = image.astype(np.float32) * (1.0 - 0.78 * edge)
-        neon_bgr = np.concatenate(
-            [
-                edge * 255.0,
-                edge * 190.0,
-                edge * 255.0,
-            ],
-            axis=-1,
+        gray = RGB2GrayScale().apply_filter(img).astype(
+            np.float32
         )
 
-        result = dark * 0.65 + neon_bgr * 0.95
-        return _clip_u8(result)
+        # Поиск границ разностями соседних пикселей
+        gx = np.zeros_like(gray)
+        gy = np.zeros_like(gray)
+
+        gx[:, :-1] = gray[:, 1:] - gray[:, :-1]
+        gy[:-1, :] = gray[1:, :] - gray[:-1, :]
+
+        magnitude = np.sqrt(gx ** 2 + gy ** 2)
+        edges = np.clip(magnitude / 255.0, 0.0, 1.0)
+
+        # Два слоя свечения
+        # neon-blur управляет шириной ореола.
+        soft_iterations = max(0, round(4 * self.neon_blur))
+        wide_iterations = max(0, round(10 * self.neon_blur))
+
+        soft_glow = self._blur(edges, soft_iterations)
+        wide_glow = self._blur(edges, wide_iterations)
+
+        # neon-strength управляет яркостью свечения.
+        glow = self.neon_strength * (
+            edges * 70.0
+            + soft_glow * 130.0
+            + wide_glow * 180.0
+        )
+
+        result = img.astype(np.float32).copy()
+
+        # BGR: синий + красный = фиолетовый
+        result[:, :, 0] += glow
+        result[:, :, 2] += glow
+
+        return np.clip(result, 0, 255).astype(np.uint8)
 
 
 def read_image(filename: str) -> Image:

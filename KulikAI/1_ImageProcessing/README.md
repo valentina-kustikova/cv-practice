@@ -109,7 +109,7 @@ python main.py -i photo.jpg -o result.png -f noise --noise-amount 0.3 --scratch-
 ### Neon
 
 ```bat
-python main.py -i photo.jpg -o result.png -f neon --neon-strength 1.5 --neon-blur 0.8
+python main.py -i photo.jpg -o result.png -f neon --neon-strength 2 --neon-blur 1.3
 ```
 
 ## 5. Математическое описание алгоритмов
