@@ -116,42 +116,31 @@ python main.py -i photo.jpg -o result.png -f neon --neon-strength 2 --neon-blur 
 
 Изображение рассматривается как матрица:
 
-\[
-I \in [0,255]^{H\times W\times 3},
-\]
+$$I \in [0,255]^{H\times W\times 3},$$
 
-где третий индекс соответствует каналам B, G, R.
+где третий индекс соответствует каналам B, G, R (порядок OpenCV).
 
-### 6.1. Изменение разрешения
+### 5.1. Изменение разрешения (Resize)
 
-реализована bilinear interpolation.
+Поддерживаются два метода интерполяции: `nearest` и `bilinear`.
 
 Для каждой координаты результата вычисляются непрерывные координаты исходного изображения:
 
-\[
-x = j\frac{W_s-1}{W_d-1}, \qquad
-y = i\frac{H_s-1}{H_d-1}.
-\]
+$$x_j = j\cdot\frac{W_s-1}{W_d-1},\qquad y_i = i\cdot\frac{H_s-1}{H_d-1}.$$
 
-Пусть:
+Обозначим:
 
-\[
-x_0=\lfloor x\rfloor,\; x_1=\min(x_0+1,W_s-1),
-\]
+$$x_0=\lfloor x\rfloor,\; x_1=\min(x_0+1,W_s-1),\qquad y_0=\lfloor y\rfloor,\; y_1=\min(y_0+1,H_s-1),$$
 
-\[
-y_0=\lfloor y\rfloor,\; y_1=\min(y_0+1,H_s-1).
-\]
+$$t_x = x - x_0,\qquad t_y = y - y_0.$$
 
-Тогда:
+**Nearest** — берётся ближайший пиксель:
 
-\[
-I'(i,j)=
-(1-t_x)(1-t_y)I(y_0,x_0)
-+t_x(1-t_y)I(y_0,x_1)
-+(1-t_x)t_yI(y_1,x_0)
-+t_xt_yI(y_1,x_1).
-\]
+$$I'(i,j) = I(\mathrm{round}(y_i),\,\mathrm{round}(x_j)).$$
+
+**Bilinear** — линейная интерполяция по четырём соседям:
+
+$$I'(i,j) = (1-t_x)(1-t_y)\,I(y_0,x_0) + t_x(1-t_y)\,I(y_0,x_1) + (1-t_x)\,t_y\,I(y_1,x_0) + t_x t_y\,I(y_1,x_1).$$
 
 Все координаты и веса строятся как матрицы NumPy; поэлементного Python-цикла нет.
 
