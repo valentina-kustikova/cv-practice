@@ -81,8 +81,8 @@ def cli_argument_parser() -> argparse.ArgumentParser:
     )
 
     # Film
-    parser.add_argument("--film-gamma", type=float, default=0.85)
-    parser.add_argument("--film-grain", type=float, default=0.06)
+    parser.add_argument("--film-strength", type=float, default=0.7)
+    parser.add_argument("--film-noise", type=float, default=8)
 
     # Matte
     parser.add_argument("--matte-radius", type=float, default=0.58)
@@ -130,8 +130,8 @@ def run(args: argparse.Namespace) -> None:
     elif args.filter == "film":
         result = ImageFilter.get_filter(
             "film",
-            gamma=args.film_gamma,
-            grain=args.film_grain,
+            strength=args.film_strength,
+            noise=args.film_noise,
         ).apply_filter(image)
 
     elif args.filter == "matte":

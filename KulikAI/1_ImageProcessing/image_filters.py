@@ -152,37 +152,28 @@ class FadeColor(ImageFilter):
         result = image.astype(np.float32) * (1.0 - self.alpha) + target * self.alpha
         return _clip_u8(result)
 
-
 @dataclass
 class Film(ImageFilter):
-    gamma: float = 0.85
-    grain: float = 0.06
-    seed: int = 42
+    strength: float = 0.35
+    noise: float = 8.0
     name = "film"
-
     def apply_filter(self, image: Image) -> Image:
-        if self.gamma <= 0:
-            raise ValueError("gamma должен быть > 0.")
-        if not 0.0 <= self.grain <= 1.0:
-            raise ValueError("grain должен быть от 0 до 1.")
+        img = image.astype(np.float32)
+        if img.ndim == 2:
+            img = np.stack([img] * 3, axis=2)
 
-        x = image.astype(np.float32) / 255.0
+        b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
+        new_r = (1 - self.strength) * r + self.strength * b
+        new_g = g * (1 - 0.15 * self.strength)
+        new_b = (1 - self.strength) * b + self.strength * r
+        out = np.stack([new_b, new_g, new_r], axis=2)
+        out[..., 0] = np.clip(out[..., 0] * 1.05, 0, 255)
+        out[..., 2] = np.clip(out[..., 2] * 0.95, 0, 255) 
 
-        b, g, r = cv2.split(x)
-        film_b = 0.95 * b + 0.05 * g
-        film_g = 0.12 * b + 0.78 * g + 0.10 * r
-        film_r = 0.08 * g + 0.92 * r
-        film = np.stack((film_b, film_g, film_r), axis=-1)
+        if self.noise > 0:
+            out += np.random.normal(0, self.noise, out.shape)
 
-        film = np.power(np.clip(film, 0.0, 1.0), self.gamma)
-
-        rng = np.random.default_rng(self.seed)
-        noise = rng.normal(0.0, self.grain / 3.0, size=film.shape[:2])[..., None]
-        film = film + noise
-
-        # Легкое усиление контраста относительно среднего.
-        film = 0.5 + (film - 0.5) * 1.10
-        return _clip_u8(film * 255.0)
+        return np.clip(out, 0, 255).astype(np.uint8)
 
 
 @dataclass
@@ -215,14 +206,12 @@ class Matte(ImageFilter):
         result = image.astype(np.float32) * (1.0 - edge) + white * edge
         return _clip_u8(result)
 
-
 @dataclass
 class ScratchesAndNoise(ImageFilter):
     noise: float = 0.10
     scratch_density: float = 0.03
     seed: int = 42
     name = "noise"
-
     def apply_filter(self, image: Image) -> Image:
         if not 0.0 <= self.noise <= 1.0:
             raise ValueError("noise должен быть от 0 до 1.")
@@ -232,27 +221,34 @@ class ScratchesAndNoise(ImageFilter):
         h, w = image.shape[:2]
         rng = np.random.default_rng(self.seed)
 
-        grain = rng.normal(
-            0.0, 255.0 * self.noise * 0.18, size=(h, w, 1)
-        )
+        grain = rng.normal(0.0, 255.0 * self.noise * 0.18, size=(h, w, 1))
 
-        yy, xx = np.meshgrid(
-            np.arange(h, dtype=np.float32),
-            np.arange(w, dtype=np.float32),
-            indexing="ij",
-        )
+        stripe_field = np.zeros((h, w), dtype=np.float32)
+        
+        num_scratches = int(w * self.scratch_density * 0.5) 
+        
+        for _ in range(num_scratches):
+            x1 = rng.integers(0, w)
+            y1 = rng.integers(0, h)
+            
+            length = rng.integers(int(h * 0.05), int(h * 0.40))
+            
+            angle = rng.uniform(-5, 5) * np.pi / 180.0
+            
+            x2 = int(x1 + length * np.sin(angle))
+            y2 = int(y1 + length * np.cos(angle))
+            
+            thickness = int(rng.choice([1, 2], p=[0.8, 0.2]))
+            intensity = rng.uniform(0.3, 0.7)
+            
+            cv2.line(stripe_field, (x1, y1), (x2, y2), intensity, thickness)
 
-        phase1 = rng.uniform(0.0, 2.0 * np.pi)
-        phase2 = rng.uniform(0.0, 2.0 * np.pi)
-        stripe_field = (
-            0.5 * (np.sin(2.0 * np.pi * xx / max(w / 13.0, 2.0) + phase1) > 0.997)
-            + 0.5 * (np.sin(2.0 * np.pi * xx / max(w / 29.0, 2.0) + phase2) > 0.998)
-        )
-
+        # 3. Пятна/Точки (мелкая грязь)
         specks = rng.random((h, w)) < (self.scratch_density * 0.04)
-        scratch = np.clip(stripe_field + specks, 0.0, 1.0)[..., None]
+        
+        # Объединяем царапины и точки
+        scratch = np.clip(stripe_field + specks.astype(np.float32), 0.0, 1.0)[..., None]
 
-        # Царапины делаем преимущественно светлыми, иногда затемняем.
         scratch_value = rng.uniform(0.65, 1.0, size=(h, w, 1))
         result = (
             image.astype(np.float32)
@@ -261,6 +257,15 @@ class ScratchesAndNoise(ImageFilter):
         )
         return _clip_u8(result)
 
+
+
+def filter2d(img, kernel):
+    kh, kw = kernel.shape
+    pad_h, pad_w = kh // 2, kw // 2
+    img_padded = np.pad(img, ((pad_h, pad_h), (pad_w, pad_w)), mode='reflect')
+    windows = np.lib.stride_tricks.sliding_window_view(img_padded, (kh, kw))
+    
+    return np.einsum('ijkl,kl->ij', windows, kernel)
 
 @dataclass
 class Neon(ImageFilter):
@@ -292,6 +297,8 @@ class Neon(ImageFilter):
 
         gx = cv2.filter2D(gray_u8.astype(np.float32), cv2.CV_32F, kernel_x)
         gy = cv2.filter2D(gray_u8.astype(np.float32), cv2.CV_32F, kernel_y)
+        #gx = filter2d(gray_u8.astype(np.float32), kernel_x)
+        #gy = filter2d(gray_u8.astype(np.float32), kernel_y)
 
         magnitude = np.sqrt(gx * gx + gy * gy)
         magnitude /= max(float(magnitude.max()), 1.0)

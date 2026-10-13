@@ -91,7 +91,7 @@ python main.py -i photo.jpg -o result.png -f fade --fade-alpha 0.35 --fade-color
 ### Film
 
 ```bat
-python main.py -i photo.jpg -o result.png -f film --film-gamma 0.85 --film-grain 0.06
+python main.py -i photo.jpg -o result.png -f film --film-strength 0.7 --film-noise 8
 ```
 
 ### Matte
