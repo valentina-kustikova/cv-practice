@@ -369,8 +369,72 @@ def desaturate_region(image: np.ndarray, region: Set[Point],
 
 
 # ============================================================
+# Генератор (царапин)
+# ============================================================
+
+import math
+
+
+def _fill_rhombus(mask: np.ndarray,
+                  p1: Point,
+                  p2: Point,
+                  half_diag_fraction: float = 0.02) -> None:
+    """
+    Заливает в `mask` (uint8, значения 0/255) ромб с диагоналями:
+      - по отрезку p1–p2 (его длина L),
+      - по перпендикуляру через середину, полудлина = half_diag_fraction * L.
+
+    p1, p2 — координаты (y, x). Если p1 == p2, ставится одна точка.
+    """
+    h, w = mask.shape[:2]
+    y1, x1 = int(p1[0]), int(p1[1])
+    y2, x2 = int(p2[0]), int(p2[1])
+
+    dy = y2 - y1
+    dx = x2 - x1
+    length = math.hypot(dy, dx)
+
+    if length == 0:
+        # Вырожденный отрезок — одна точка
+        if 0 <= y1 < h and 0 <= x1 < w:
+            mask[y1, x1] = 255
+        return
+
+    # Ортонормированный базис: e_d — вдоль отрезка, e_p — перпендикуляр
+    uy, ux = dy / length, dx / length     # e_d
+    py, px = -ux, uy                       # e_p = поворот e_d на 90°
+
+    half = length / 2.0                    # полудиагональ вдоль отрезка
+    perp_half = half_diag_fraction * length  # полудиагональ по перпендикуляру
+
+    # Центр ромба — середина отрезка
+    my, mx = (y1 + y2) / 2.0, (x1 + x2) / 2.0
+
+    # Границы bounding box (проекции половин диагоналей на оси y и x)
+    ext_y = abs(uy) * half + abs(py) * perp_half
+    ext_x = abs(ux) * half + abs(px) * perp_half
+
+    y_min = max(0, int(math.floor(my - ext_y)) - 1)
+    y_max = min(h - 1, int(math.ceil(my + ext_y)) + 1)
+    x_min = max(0, int(math.floor(mx - ext_x)) - 1)
+    x_max = min(w - 1, int(math.ceil(mx + ext_x)) + 1)
+
+    # Точка внутри ромба <=> сумма нормированных проекций <= 1
+    for y in range(y_min, y_max + 1):
+        vy = y - my
+        for x in range(x_min, x_max + 1):
+            vx = x - mx
+            proj_d = vy * uy + vx * ux      # проекция на длинную диагональ
+            proj_p = vy * py + vx * px      # проекция на короткую диагональ
+            if abs(proj_d) / half + abs(proj_p) / perp_half <= 1.0:
+                mask[y, x] = 255
+
+
+
+# ============================================================
 # 11. Генератор рандомных отрезков (царапин) + растеризация
 # ============================================================
+
 
 def generate_scratches(image_shape: Tuple[int, ...],
                        scratch_coefficient: float,
@@ -389,12 +453,18 @@ def generate_scratches(image_shape: Tuple[int, ...],
 
 
 def scratches_to_mask(image_shape: Tuple[int, ...],
-                      scratches: List[Tuple[Point, Point, int]]) -> np.ndarray:
+                      scratches: List[Tuple[Point, Point, int]],
+                      half_diag_fraction: float = 0.02) -> np.ndarray:
+    """
+    Растеризует царапины как ромбовидные углубления.
+    Третий элемент в каждой записи (толщина) сохраняется для совместимости,
+    но больше не используется — форма определяется только отрезком.
+    """
     h, w = image_shape[:2]
     mask = np.zeros((h, w), dtype=np.uint8)
-    for (p1, p2, thickness) in scratches:
-        for (y, x) in _bresenham_line(p1, p2):
-            _stamp_square(mask, y, x, thickness)
+    for entry in scratches:
+        p1, p2 = entry[0], entry[1]
+        _fill_rhombus(mask, p1, p2, half_diag_fraction)
     return mask
 
 
@@ -405,9 +475,12 @@ def scratches_to_mask(image_shape: Tuple[int, ...],
 def apply_scratches(image: np.ndarray,
                     scratch_coefficient: float,
                     scratch_color: Tuple[int, int, int] = (255, 255, 255),
-                    intensity: float = 0.8) -> np.ndarray:
-    scratches = generate_scratches(image.shape, scratch_coefficient)
-    mask = scratches_to_mask(image.shape, scratches)
+                    intensity: float = 0.8,
+                    max_segments: int = 10,
+                    max_thickness: int = 3,
+                    half_diag_fraction: float = 0.02) -> np.ndarray:
+    scratches = generate_scratches(image.shape, scratch_coefficient, max_segments, max_thickness)
+    mask = scratches_to_mask(image.shape, scratches, half_diag_fraction)
     mask_bool = mask > 0
 
     result = image.copy()
@@ -480,3 +553,69 @@ def neonify(image: np.ndarray,
 
     result[edges > 0] = glow_color
     return result
+
+# ============================================================
+# 15. по Отцу
+# ============================================================
+
+
+def otsu_threshold(gray: np.ndarray) -> int:
+    """
+    Вычисляет порог бинаризации методом Оцу для grayscale-изображения (H, W).
+    Возвращает целое число 0..255.
+    """
+    hist = np.bincount(gray.ravel().astype(np.uint8), minlength=256) \
+             .astype(np.float64)
+    total = hist.sum()
+    if total == 0:
+        return 0
+
+    # Накопленные суммы для быстрого вычисления mu0, mu1
+    levels = np.arange(256, dtype=np.float64)
+    cum_count = np.cumsum(hist)              # omega0 * total
+    cum_sum = np.cumsum(hist * levels)       # sum of i*hist[i] up to t
+
+    # Защита от деления на 0: где cum_count == 0 или == total, дисперсия = 0
+    w0 = cum_count / total
+    w1 = 1.0 - w0
+
+    mu0 = np.zeros(256, dtype=np.float64)
+    mu1 = np.zeros(256, dtype=np.float64)
+    valid0 = cum_count > 0
+    valid1 = cum_count < total
+    mu0[valid0] = cum_sum[valid0] / cum_count[valid0]
+    mu1[valid1] = (cum_sum[-1] - cum_sum[valid1]) / (total - cum_count[valid1])
+
+    sigma_b = w0 * w1 * (mu0 - mu1) ** 2
+    sigma_b[~np.isfinite(sigma_b)] = 0.0
+    return int(np.argmax(sigma_b))
+
+
+def otsu_binarize(image: np.ndarray, invert: bool = False) -> np.ndarray:
+    """
+    Бинаризует изображение методом Оцу.
+
+    Параметры
+    ---------
+    image : np.ndarray
+        BGR-изображение (H, W, 3) или grayscale (H, W).
+    invert : bool
+        Если True, инвертирует результат (фон — белый, объект — чёрный).
+
+    Возвращает
+    ----------
+    np.ndarray
+        Бинарное изображение (H, W), значения 0 или 255, dtype=uint8.
+    """
+    if image.ndim == 3:
+        gray = _to_grayscale(image).astype(np.uint8)
+    else:
+        gray = image.astype(np.uint8)
+
+    t = otsu_threshold(gray)
+    # Пиксели строго выше порога — 255, иначе 0
+    binary = np.where(gray > t, 255, 0).astype(np.uint8)
+
+    if invert:
+        binary = 255 - binary
+    return binary
