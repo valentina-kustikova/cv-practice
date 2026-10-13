@@ -255,7 +255,8 @@ class ScratchesAndNoise(ImageFilter):
             + grain
             + scratch * (255.0 * scratch_value - image.astype(np.float32))
         )
-        return _clip_u8(result)
+        result = _clip_u8(result)
+        return Antique(strength=0.6).apply_filter(result)
 
 
 

@@ -103,7 +103,7 @@ python main.py -i photo.jpg -o result.png -f matte --matte-radius 0.58 --matte-s
 ### Царапины и шум
 
 ```bat
-python main.py -i photo.jpg -o result.png -f noise --noise-amount 0.10 --scratch-density 0.03
+python main.py -i photo.jpg -o result.png -f noise --noise-amount 0.3 --scratch-density 0.1
 ```
 
 ### Neon
