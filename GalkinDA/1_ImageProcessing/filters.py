@@ -40,7 +40,10 @@ class ImageFilter:
         if name == 'film':
             return Film(params.get('grain_sigma', 10), params.get('seed'))
         if name == 'matte':
-            return Matte()
+            return Matte(
+                params.get('radius', 1.25),
+                params.get('feather', 0.4)
+            )
         if name == 'neon':
             return Neon(params.get('sob_threshold', 50))
         if name == 'scratches':
@@ -117,7 +120,7 @@ class Film(ImageFilter):
             raise ValueError('Для плёнки нужно RGB-изображение')
         source = img.astype(np.float32)
         aerochrome_matrix = np.array([
-            [ 0.0,  2.0, -1.0 ], 
+            [ 0.0,  2.2, -1.0 ], 
             [ 1.0,  0.0,  0.0 ], 
             [ 0.0, -1.0,  2.0 ]   
         ])
@@ -133,6 +136,13 @@ class Film(ImageFilter):
 
 
 class Matte(ImageFilter):
+    def __init__(self, radius=1.25, feather=0.4):
+        if radius <= 0 or feather <= 0:
+            raise ValueError('Радиус и плавность должны быть больше нуля')
+
+        self.radius = radius
+        self.feather = feather
+
     def apply_filter(self, img):
         h, w = img.shape[:2]
         y, x = np.meshgrid(np.arange(h), np.arange(w), indexing='ij')
@@ -142,7 +152,7 @@ class Matte(ImageFilter):
         radius_y = max(center_y, 0.5)
         distance = np.sqrt(((x - center_x) / radius_x) ** 2 +
                            ((y - center_y) / radius_y) ** 2)
-        weight = np.clip((1 - distance) / 0.5, 0, 1)
+        weight = np.clip((self.radius - distance) / self.feather, 0, 1)
         if img.ndim == 3:
             weight = weight[:, :, None]
         result = weight * img.astype(np.float32) + (1 - weight) * 255
@@ -162,30 +172,50 @@ class ScratchesNoise(ImageFilter):
     def apply_filter(self, img):
         rng = np.random.default_rng(self.seed)
 
-        result = img.astype(np.float32)
-        result += rng.normal(0, self.noise_sigma, img.shape)
-
         h, w = img.shape[:2]
+        result = img.astype(np.float32)
+
+        noise = rng.normal(0, self.noise_sigma, (h, w, 1))
+        result += noise
+
         for _ in range(self.num_scratches):
-            x0, x1 = rng.integers(0, w, size=2)
-            y0, y1 = rng.integers(0, h, size=2)
+            x0 = rng.integers(0, w)
+            y0 = rng.integers(0, h)
+
+            length = rng.integers(max(1, h // 12), max(2, h // 2 + 1))
+
+            x1 = np.clip(x0 + rng.integers(-4, 5), 0, w - 1)
+            y1 = min(y0 + length, h - 1)
+
+            if y1 <= y0:
+                continue
+
+            t = np.linspace(0, 1, y1 - y0 + 1)
+
+            x = np.rint(x0 + t * (x1 - x0)).astype(int)
+            y = np.rint(y0 + t * (y1 - y0)).astype(int)
+
             thickness = rng.integers(1, 3)
-            dx, dy = x1 - x0, y1 - y0
-            n = max(abs(dx), abs(dy)) + 1
-            t = np.linspace(0, 1, n)
-            x = np.rint(x0 + t * dx).astype(int)[:, None]
-            y = np.rint(y0 + t * dy).astype(int)[:, None]
+            color = 240 if rng.random() < 0.7 else 20
+            alpha = rng.uniform(0.45, 0.85)
 
-            offsets = np.arange(thickness)[None, :]
-            if abs(dx) >= abs(dy):
-                x = x + np.zeros_like(offsets)
-                y = y + offsets
-            else:
-                x = x + offsets
-                y = y + np.zeros_like(offsets)
+            for offset in range(thickness):
+                xx = np.clip(x + offset, 0, w - 1)
 
-            valid = (x >= 0) & (x < w) & (y >= 0) & (y < h)
-            result[y[valid], x[valid]] = 255
+                result[y, xx] = (
+                    (1 - alpha) * result[y, xx] + alpha * color
+                )
+
+        dust_count = int(h * w * 0.0003)
+
+        ys = rng.integers(0, h, size=dust_count)
+        xs = rng.integers(0, w, size=dust_count)
+
+        dust_color = rng.choice([30, 225], size=dust_count)
+
+        result[ys, xs] = (
+            0.3 * result[ys, xs] + 0.7 * dust_color[:, None]
+        )
 
         return to_uint8(result)
 

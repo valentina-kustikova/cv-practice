@@ -33,25 +33,26 @@ python3 main.py ВХОДНОЙ_ФАЙЛ ВЫХОДНОЙ_ФАЙЛ --filter ИМ�
 | `antique` | Сепия | нет |
 | `fade` | Смешивание с блеклым цветом | `--alpha` от 0 до 1, по умолчанию `0.5`; `--fade-color R G B` — целые значения от 0 до 255, по умолчанию `200 200 200` |
 | `film` | Цветовая имитация плёнки с зерном | `--grain-sigma` не меньше нуля, по умолчанию `10`; `--seed` |
-| `matte` | Белая овальная виньетка | нет |
-| `scratches` | Состаривание: шум и светлые царапины | `--noise-sigma` не меньше нуля, по умолчанию `15`; `--num-scratches` — целое число не меньше нуля, по умолчанию `7`; `--seed` |
+| `matte` | Белая овальная виньетка | `--radius` — нормализованный радиус белой рамки, по умолчанию `1.25`; `--feather` — ширина плавного перехода, по умолчанию `0.4` |
+| `scratches` | Состаривание: зернистость, царапины и пыль | `--noise-sigma` не меньше нуля, по умолчанию `15`; `--num-scratches` — целое число не меньше нуля, по умолчанию `7`; `--seed` |
 | `neon` | Контуры с голубым свечением | `--sob-threshold` не меньше нуля, по умолчанию `50` |
 
 Для `film` и `scratches` параметр `--seed` задаёт неотрицательное целое число.
 При одинаковых изображении, параметрах и `seed` результат повторяется.
 Если `seed` не указан, шум и царапины генерируются заново при каждом запуске.
 
-Примеры всех команд:
+Примеры всех команд (результаты сохраняются в `results/`):
 
 ```bash
-python3 main.py images/mediabasket.jpg images/resize.png --filter resize --new-h 1200 --new-w 1800
-python3 main.py images/mediabasket.jpg images/gray.png --filter gray
-python3 main.py images/mediabasket.jpg images/antique.png --filter antique
-python3 main.py images/mediabasket.jpg images/fade.png --filter fade --alpha 0.4 --fade-color 200 200 200
-python3 main.py images/mediabasket.jpg images/film.png --filter film --grain-sigma 10 --seed 10
-python3 main.py images/mediabasket.jpg images/matte.png --filter matte
-python3 main.py images/mediabasket.jpg images/scratches.png --filter scratches --noise-sigma 15 --num-scratches 7 --seed 10
-python3 main.py images/mediabasket.jpg images/neon.png --filter neon --sob-threshold 50
+mkdir -p results
+python3 main.py images/mediabasket.jpg results/resize.png --filter resize --new-h 1200 --new-w 1800
+python3 main.py images/mediabasket.jpg results/gray.png --filter gray
+python3 main.py images/mediabasket.jpg results/antique.png --filter antique
+python3 main.py images/mediabasket.jpg results/fade.png --filter fade --alpha 0.4 --fade-color 200 200 200
+python3 main.py images/mediabasket.jpg results/film.png --filter film --grain-sigma 10 --seed 10
+python3 main.py images/mediabasket.jpg results/matte.png --filter matte
+python3 main.py images/mediabasket.jpg results/scratches.png --filter scratches --noise-sigma 15 --num-scratches 7 --seed 10
+python3 main.py images/mediabasket.jpg results/neon.png --filter neon --sob-threshold 50
 ```
 
 ## Описание алгоритмов
@@ -59,7 +60,7 @@ python3 main.py images/mediabasket.jpg images/neon.png --filter neon --sob-thres
 Изображение представлено массивом `uint8` формы `(H, W, 3)` с каналами RGB,
 где `H` — высота, `W` — ширина; `x` обозначает столбец, `y` — строку.
 CLI принимает RGB-изображения. Результат `gray` имеет форму `(H, W)`.
-Обработка выполняется операциями NumPy, Pillow используется только для чтения и сохранения.
+Обработка выполняется операциями NumPy, Pillow используется для чтения, сохранения и коррекции EXIF-ориентации изображений.
 
 Вычисления с яркостью выполняются в вещественных числах. Перед возвратом результата
 значения ограничиваются диапазоном `0..255` и переводятся в `uint8`;
@@ -122,7 +123,7 @@ result = (1 - alpha) * img + alpha * fade_color
 Цветовой плёночный эффект создаётся линейным преобразованием RGB-каналов:
 
 ```text
-R' = 2G - B
+R' = 2.2G - B
 G' = R
 B' = 2B - G
 ```
@@ -147,38 +148,81 @@ result = clip([R', G', B'], 0, 255) + epsilon
 cx = (W - 1) / 2, cy = (H - 1) / 2
 rx = max(cx, 0.5), ry = max(cy, 0.5)
 d = sqrt(((x - cx) / rx)^2 + ((y - cy) / ry)^2)
-w = clip((1 - d) / 0.5, 0, 1)
+w = clip((radius - d) / feather, 0, 1)
 ```
 
 Минимальная полуось `0.5` исключает деление на ноль для изображения шириной
 или высотой в один пиксель. Маска смешивает изображение с белым фоном:
 
+Параметр `radius` определяет нормализованное расстояние от центра, начиная с которого изображение становится полностью белым. Параметр `feather` определяет ширину плавного перехода. При `d <= radius - feather` исходные пиксели сохраняются, при `d >= radius` заменяются белыми. Между этими значениями выполняется линейное смешивание.
+
 ```text
 result = w * img + (1 - w) * 255
 ```
 
-При `d <= 0.5` исходное изображение сохраняется. При `0.5 < d < 1` оно плавно
-осветляется, а при `d >= 1` заменяется белым цветом.
+При стандартных параметрах `radius=1.25`, `feather=0.4` исходное изображение сохраняется при `d <= 0.85`.
+При `0.85 < d < 1.25` оно плавно осветляется, а при `d >= 1.25` заменяется белым цветом.
 
 ### 7. ScratchesNoise
 
-Сначала к изображению добавляется гауссов шум:
+Эффект состаривания фотографии создаётся добавлением зернистости,
+царапин и мелких дефектов, имитирующих повреждения фотоплёнки.
+
+**1. Зернистость**
+
+К каждому пикселю добавляется гауссовский шум:
 
 ```text
 epsilon ~ N(0, noise_sigma^2)
 result = img + epsilon
 ```
 
-Для каждой царапины выбираются случайные концы отрезка и толщина в один или два
-пикселя. Координаты вдоль отрезка вычисляются по формулам:
+Шум генерируется в виде матрицы (H, W, 1).
+Одно значение добавляется ко всем трём цветовым каналам пикселя.
+
+**2. Царапины**
+
+Генерируются случайные вертикальные царапины.
+
+Для каждой царапины выбираются начальная точка,
+длина, небольшое горизонтальное смещение и толщина
+в один или два пикселя.
+
+Координаты точек отрезка определяются параметрически:
 
 ```text
 x(t) = x0 + t * (x1 - x0)
 y(t) = y0 + t * (y1 - y0),  0 <= t <= 1
 ```
 
-Координаты округляются до целых, а пиксели царапин закрашиваются белым (`255`).
-Точки линии рассчитываются массивами; цикл выполняется только по числу царапин.
+Полученные координаты округляются до целых чисел.
+Царапины могут быть светлыми или тёмными.
+
+Для более естественного отображения используется
+смешивание цвета царапины с исходным изображением:
+
+```text
+result = (1 - alpha) * result + alpha * color
+```
+
+Здесь alpha определяет интенсивность царапины,
+color — её яркость.
+
+**3. Пыль и мелкие дефекты**
+
+Случайно выбирается небольшое количество пикселей
+(примерно 0.03% от общего числа).
+
+Они частично заменяются светлыми или тёмными точками:
+
+```text
+result = 0.3 * result + 0.7 * dust_color
+```
+
+Значения dust_color выбираются из 30 и 225.
+
+После всех преобразований интенсивности ограничиваются
+диапазоном 0-255 и переводятся в uint8.
 
 ### 8. Neon
 
@@ -218,8 +262,10 @@ result = strength * [0, 255, 255]
 
 ## Пример результата
 
-Исходное изображение и результат неонового эффекта хранятся в `images/`.
+Исходное изображение и результат неонового эффекта хранятся в `images/` в формате JPEG.
+Также сохранено исходное изображение моста: `images/bor_bridge_orig.jpg`.
+Изображения уменьшены с сохранением пропорций; размер каждого файла — менее 100 КБ.
 
 | До | После: `neon` |
 | --- | --- |
-| ![Исходное изображение](images/mediabasket.jpg) | ![Неоновый эффект](images/mediabasket.png) |
+| ![Исходное изображение](images/mediabasket.jpg) | ![Неоновый эффект](images/mediabasket_neon.jpg) |

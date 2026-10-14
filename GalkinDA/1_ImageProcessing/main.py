@@ -2,7 +2,7 @@ import argparse
 import sys
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 from filters import ImageFilter
 
@@ -24,13 +24,15 @@ def cli_argument_parser():
     parser.add_argument('--num-scratches', type=int, default=7)
     parser.add_argument('--sob-threshold', type=float, default=50)
     parser.add_argument('--seed', type=int)
+    parser.add_argument('--radius', type=float, default=1.25)
+    parser.add_argument('--feather', type=float, default=0.4)
     return parser.parse_args()
 
 
 def read_image(path):
     try:
         with Image.open(path) as image:
-            img = np.array(image)
+            img = np.array(ImageOps.exif_transpose(image))
     except FileNotFoundError:
         raise ValueError('Файл не найден: ' + path)
     except OSError:
