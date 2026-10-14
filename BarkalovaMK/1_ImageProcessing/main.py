@@ -25,8 +25,10 @@ def cli_argument_parser():
     parser.add_argument("--strength", type=float, default=0.35)
     parser.add_argument("--vignette", type=float, default=0.6)
     parser.add_argument("--border", type=int, default=40)
-    parser.add_argument("--n_scratches", type=int, default=25)
-    parser.add_argument("--noise_std", type=float, default=10.0)
+    #parser.add_argument("--n_scratches", type=int, default=25)
+    #parser.add_argument("--noise_std", type=float, default=10.0)
+    parser.add_argument("--noise-amount", type=float, default=0.10, help="Сила шума (0..1)")
+    parser.add_argument("--scratch-density", type=float, default=0.03, help="Плотность царапин (0..0.5)")
     parser.add_argument("--threshold", type=int, default=40)
     return parser.parse_args()
 
@@ -57,8 +59,10 @@ def build_filter_kwargs(args):
         return {"vignette": args.vignette}
     if args.filter == "matte":
         return {"border": args.border}
+    #if args.filter == "scratches":
+     #   return {"n_scratches": args.n_scratches, "noise_std": args.noise_std}
     if args.filter == "scratches":
-        return {"n_scratches": args.n_scratches, "noise_std": args.noise_std}
+         return {"noise": args.noise_amount, "scratch_density": args.scratch_density}
     if args.filter == "neon":
         return {"threshold": args.threshold}
     return {}
