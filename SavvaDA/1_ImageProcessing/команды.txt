@@ -1,0 +1,10 @@
+cd C:\PROG\ComputerVision\cv-practice\SavvaDA\1_ImageProcessing
+           ИЛИ
+git clone https://github.com/DariyaSavva/cv-practice
+cd cv-practice
+git checkout savva_dariya_lab1
+cd SavvaDA\1_ImageProcessing
+
+conda env create -f environment.yml
+conda activate cv-project
+python cli.py -f resize -i photo.jpg -o output.jpg --scale 0.5
