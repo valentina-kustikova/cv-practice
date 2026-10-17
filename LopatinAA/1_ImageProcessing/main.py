@@ -22,7 +22,7 @@ def cli_argument_parser():
     parser.add_argument("--height", type=int, default=None, help="Желаемая высота (resize)")
 
     # antique
-    parser.add_argument("--intensity", type=float, default=0.8, help="Интенсивность эффекта (antique)")
+    parser.add_argument("--intensity", type=float, default=0.8, help="Интенсивность эффекта (antique, noise)")
 
     # fadecolor
     parser.add_argument("--strength", type=float, default=0.5, help="Степень выцветания (fadecolor)")
@@ -33,16 +33,16 @@ def cli_argument_parser():
     # matte
     parser.add_argument("--border", type=float, default=0.05, help="Ширина рамки (matte)")
     parser.add_argument("--feather", type=float, default=0.05, help="Cтепень закругления (matte)")
+    parser.add_argument("--color", type=int, nargs=3, default=[255, 255, 255], help="Установка цвета (b, r, g) (matte, neon)")
 
     # noise
-    parser.add_argument("--scratch_count", type=int, default=7, help="Количество царапин (noise)")
-    parser.add_argument("--noise_level", type=float, default=0.05, help="Уровень шума (noise)")
+    parser.add_argument("--scratch_count", type=int, default=2, help="Количество царапин (noise)")
+    parser.add_argument("--noise_level", type=float, default=0.04, help="Уровень шума (noise)")
 
     # neon
-    parser.add_argument("--threshold", type=int, default=50, help="Порог выделения границ (neon)")
+    parser.add_argument("--threshold", type=int, default=40, help="Порог выделения границ (neon)")
     parser.add_argument("--glow", type=float, default=0.8, help="Интенсивность подсветки (neon)")
-
-    parser.add_argument("--color", type=int, nargs=3, default=[255, 255, 255], help="Установка цвета (b, r, g) (matte, neon)")
+    parser.add_argument("--glow_width", type=int, default=4, help="Ширина свечения контура (neon)")
 
     return parser.parse_args()
 
@@ -86,11 +86,13 @@ def main():
     elif filter_type == 'noise':
         params['scratch_count'] = args.scratch_count
         params['noise_level'] = args.noise_level
+        params['intensity'] = args.intensity
 
     elif filter_type == 'neon':
         params['threshold'] = args.threshold
         params['glow'] = args.glow
         params['color'] = tuple(args.color)
+        params['glow_width'] = args.glow_width
 
     try:
         image_filter = ImageFilter.get_filter(filter_type, **params)

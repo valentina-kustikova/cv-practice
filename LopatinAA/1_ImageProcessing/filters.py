@@ -54,6 +54,9 @@ class Antique(ImageFilter):
     def apply_filter(self, image):
         img = image.astype(np.float32)
 
+        noise = np.random.normal(0, 0.05 * self.intensity * 255, img.shape)
+        img = img + noise
+
         b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
         new_r = 0.393 * r + 0.769 * g + 0.189 * b
         new_g = 0.349 * r + 0.686 * g + 0.168 * b
@@ -113,7 +116,7 @@ class Matte(ImageFilter):
 
         yy, xx = np.mgrid[0:h, 0:w]
         d = np.sqrt(((yy - cy) / ry) ** 2 + ((xx - cx) / rx) ** 2)
-
+    
         f = max(self.feather, 1e-6)
         mask = np.clip((1 - d) / f, 0, 1)[:, :, None]
 
@@ -126,50 +129,114 @@ class Matte(ImageFilter):
         return np.clip(out, 0, 255).astype(np.uint8)
 
 class Noise(ImageFilter):
-    def __init__(self, scratch_count=7, noise_level=0.05):
-        self.scratch_count = scratch_count
+    def __init__(self, scratch_count=2, noise_level=0.04, intensity=0.8):
+        self.scratch_count = max(0, scratch_count)
         self.noise_level = noise_level
+        self.intensity = intensity
+
+    @staticmethod
+    def _smooth(arr, passes):
+        for _ in range(passes):
+            arr = (
+                arr
+                + np.roll(arr, 1, axis=0) + np.roll(arr, -1, axis=0)
+                + np.roll(arr, 1, axis=1) + np.roll(arr, -1, axis=1)
+            ) / 5.0
+        return arr
 
     def apply_filter(self, image):
-        img = image.copy()
+        img = image.astype(np.float32)
         h, w = img.shape[:2]
         rng = np.random.default_rng()
 
+        # sepia
+        b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
+        new_r = 0.393 * r + 0.769 * g + 0.189 * b
+        new_g = 0.349 * r + 0.686 * g + 0.168 * b
+        new_b = 0.272 * r + 0.534 * g + 0.131 * b
+        sepia = np.stack([new_b, new_g, new_r], axis=-1)
+        out = self.intensity * sepia + (1 - self.intensity) * img
+
+        # paper texture
+        texture = np.zeros((h, w), dtype=np.float32)
+        for passes, weight in [(2, 0.4), (6, 0.4), (15, 0.2)]:
+            layer = rng.random((h, w)).astype(np.float32)
+            layer = self._smooth(layer, passes)
+            layer = (layer - layer.min()) / (layer.max() - layer.min() + 1e-6)
+            texture += weight * layer
+        texture = (texture - texture.min()) / (texture.max() - texture.min() + 1e-6)
+        out = out * (0.85 + 0.15 * texture)[..., None]
+
+        yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+
+        # scratches
+        fold_map = np.zeros((h, w), dtype=np.float32)
+        diag = np.hypot(h, w)
         for _ in range(self.scratch_count):
-            x = int(rng.integers(0, w))
-            y0 = int(rng.integers(0, max(h // 2, 1)))
-            y1 = int(rng.integers(max(h // 2, 1), h))
-            color = 255 if rng.random() < 0.5 else 0
-            img[y0:y1, x] = color
+            cy = rng.uniform(0, h)
+            cx = rng.uniform(0, w)
+            angle = rng.uniform(-1.0, 1.0)
+            width = rng.uniform(3.0, 8.0)
+            length = rng.uniform(0.6, 1.0)
 
-        if self.noise_level > 0:
-            mask = rng.random((h, w)) < self.noise_level
-            salt = rng.random((h, w)) < 0.5
-            img[mask & salt] = 255
-            img[mask & ~salt] = 0
+            dist_signed = np.cos(angle) * (yy - cy) - np.sin(angle) * (xx - cx)
+            dist = np.abs(dist_signed)
 
-        return img
+            line = np.exp(-(dist ** 2) / (2 * width ** 2))
+
+            along = np.sin(angle) * (yy - cy) + np.cos(angle) * (xx - cx)
+            half_len = 0.5 * length * diag
+            line *= (np.abs(along) < half_len).astype(np.float32)
+
+            side = np.sign(dist_signed)
+            fold = line * side * rng.uniform(0.15, 0.28)
+            fold_map += fold
+        fold_map = np.clip(fold_map, -0.4, 0.4)
+
+        gray_neutral = np.full_like(out, 128.0)
+        alpha_fold = np.abs(fold_map)[..., None] * 0.85
+        target = gray_neutral + fold_map[..., None] * 90
+        out = out * (1 - alpha_fold) + target * alpha_fold
+
+        # noise
+        out = out + rng.normal(0, self.noise_level * 255, out.shape)
+
+        # vignette
+        cy_v, cx_v = h / 2, w / 2
+        r2 = ((yy - cy_v) / cy_v) ** 2 + ((xx - cx_v) / cx_v) ** 2
+        vignette = 1 - 0.35 * np.clip(r2, 0, 1)
+        out = out * vignette[..., None]
+
+        return np.clip(out, 0, 255).astype(np.uint8)
 
 class Neon(ImageFilter):
-    def __init__(self, threshold=50, glow=0.8, color=(255, 255, 50)):
+    def __init__(self, threshold=40, glow=0.7, color=(255, 255, 50), glow_width=4):
         self.threshold = threshold
         self.glow = glow
         self.color = color
+        self.glow_width = glow_width
 
     @staticmethod
-    def _blur3(image):
-        return (
-            image
-            + np.roll(image, 1, axis=0) + np.roll(image, -1, axis=0)
-            + np.roll(image, 1, axis=1) + np.roll(image, -1, axis=1)
-            + np.roll(np.roll(image, 1, axis=0), 1, axis=1)
-            + np.roll(np.roll(image, 1, axis=0), -1, axis=1)
-            + np.roll(np.roll(image, -1, axis=0), 1, axis=1)
-            + np.roll(np.roll(image, -1, axis=0), -1, axis=1)
-        ) / 9.0
+    def _dilate(mask):
+        out = mask.copy()
+        out[1:, :] = np.maximum(out[1:, :], mask[:-1, :])
+        out[:-1, :] = np.maximum(out[:-1, :], mask[1:, :])
+        out[:, 1:] = np.maximum(out[:, 1:], mask[:, :-1])
+        out[:, :-1] = np.maximum(out[:, :-1], mask[:, 1:])
+        return out
+
+    def _glow_by_dilation(self, mask, sigma):
+        glow = mask * 0.4
+        current = mask
+        radius = max(1, int(sigma * 3))
+        for r in range(1, radius + 1):
+            current = self._dilate(current)
+            weight = np.exp(-(r * r) / (2 * sigma * sigma)) * 0.4
+            glow = np.maximum(glow, current * weight)
+        return glow
 
     def apply_filter(self, image):
-        img = image.astype(np.uint8)
+        img = image.astype(np.float32)
         b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
         gray = 0.2126 * r + 0.7152 * g + 0.0722 * b
 
@@ -180,28 +247,22 @@ class Neon(ImageFilter):
         mag = np.sqrt(gx * gx + gy * gy)
 
         mask = (mag > self.threshold).astype(np.float32)
-        glow_mask = mask
 
-        blur_passes = 6
-        for _ in range(blur_passes):
-            glow_mask = self._blur3(glow_mask)
-
-        glow_mask[:blur_passes, :] = 0
-        glow_mask[-blur_passes:, :] = 0
-        glow_mask[:, :blur_passes] = 0
-        glow_mask[:, -blur_passes:] = 0
+        sigma = max(1.0, float(self.glow_width))
+        glow_mask = self._glow_by_dilation(mask, sigma)
 
         cb, cg, cr = self.color
+        base = img * 0.65
 
-        edges = np.zeros_like(img, dtype=np.float32)
+        edges = np.zeros_like(img)
         edges[:, :, 0] = mask * cb
         edges[:, :, 1] = mask * cg
         edges[:, :, 2] = mask * cr
 
-        glow_layer = np.zeros_like(img, dtype=np.float32)
-        glow_layer[:, :, 0] = glow_mask * cb * 0.8
-        glow_layer[:, :, 1] = glow_mask * cg * 0.8
-        glow_layer[:, :, 2] = glow_mask * cr * 0.8
+        glow_layer = np.zeros_like(img)
+        glow_layer[:, :, 0] = glow_mask * cb
+        glow_layer[:, :, 1] = glow_mask * cg
+        glow_layer[:, :, 2] = glow_mask * cr
 
-        out = edges + glow_layer * self.glow
+        out = base + edges + glow_layer * self.glow
         return np.clip(out, 0, 255).astype(np.uint8)
