@@ -210,7 +210,7 @@ class Noise(ImageFilter):
         return np.clip(out, 0, 255).astype(np.uint8)
 
 class Neon(ImageFilter):
-    def __init__(self, threshold=40, glow=0.7, color=(255, 255, 50), glow_width=4):
+    def __init__(self, threshold=40, glow=0.8, color=(255, 255, 50), glow_width=4):
         self.threshold = threshold
         self.glow = glow
         self.color = color

@@ -33,7 +33,7 @@ def cli_argument_parser():
     # matte
     parser.add_argument("--border", type=float, default=0.05, help="Ширина рамки (matte)")
     parser.add_argument("--feather", type=float, default=0.05, help="Cтепень закругления (matte)")
-    parser.add_argument("--color", type=int, nargs=3, default=[255, 255, 255], help="Установка цвета (b, r, g) (matte, neon)")
+    parser.add_argument("--color", type=int, nargs=3, default=[255, 255, 50], help="Установка цвета (b, r, g) (matte, neon)")
 
     # noise
     parser.add_argument("--scratch_count", type=int, default=2, help="Количество царапин (noise)")
