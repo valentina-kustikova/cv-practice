@@ -8,74 +8,77 @@ from filters import ImageFilter
 
 
 def cli_argument_parser():
-    parser = argparse.ArgumentParser(description="Обработка изображений")
-    parser.add_argument("-i", "--input", required=True, help="Путь к входному изображению")
-    parser.add_argument("-o", "--output", required=True, help="Путь для результата")
+    parser = argparse.ArgumentParser(description="Image processing")
+    
+    parser.add_argument("-i", "--input", required=True, help="Input image")
+    parser.add_argument("-o", "--output", required=True, help="Output image")
     parser.add_argument(
         "-f", "--filter", required=True,
         choices=["resize", "gray", "antique", "fade", "film", "matte", "scratches", "neon"],
-        help="Тип фильтра",
+        help="Filter name",
     )
-    parser.add_argument("--width", type=int)
-    parser.add_argument("--height", type=int)
-    parser.add_argument("--intensity", type=float, default=1.0)
-    parser.add_argument("--strength", type=float, default=0.3)
+    
+    parser.add_argument("--width", type=int, help="Width")
+    parser.add_argument("--height", type=int, help="Height")
+    parser.add_argument("--intensity", type=float, default=0.85)
+    parser.add_argument("--strength", type=float, default=0.35)
     parser.add_argument("--grain", type=float, default=15.0)
-    parser.add_argument("--tint", type=float, default=0.6)
-    parser.add_argument("--border", type=float, default=0.1)
-    parser.add_argument("--softness", type=float, default=0.05)
-    parser.add_argument("--n-scratches", dest="n_scratches", type=int, default=15)
-    parser.add_argument("--noise-level", dest="noise_level", type=float, default=20.0)
-    parser.add_argument("--threshold", type=float, default=50.0)
-    parser.add_argument("--glow-intensity", dest="glow_intensity", type=float, default=0.8)
+    parser.add_argument("--tint", type=float, default=0.4)
+    parser.add_argument("--radius", type=float, default=0.75)
+    parser.add_argument("--softness", type=float, default=0.2)
+    parser.add_argument("--n-scratches", dest="n_scratches", type=int, default=20)
+    parser.add_argument("--noise-level", dest="noise_level", type=float, default=15.0)
+    parser.add_argument("--threshold", type=float, default=40.0)
+    parser.add_argument("--glow-intensity", dest="glow", type=float, default=1.5)
+
     return parser.parse_args()
 
 
-def read_image(path):
-    image = cv2.imread(path, cv2.IMREAD_COLOR)
-    if image is None:
-        raise FileNotFoundError(f"Не удалось прочитать изображение: {path}")
-    return image
+def get_image(path):
+    img = cv2.imread(path, cv2.IMREAD_COLOR)
+    if img is None:
+        raise FileNotFoundError(f"Cannot open: {path}")
+    return img
 
 
-def build_params(args):
+def gather_kwargs(args):
     if args.filter == "resize":
-        if args.width is None or args.height is None:
-            raise ValueError("Для фильтра resize укажите --width и --height")
+        if not args.width or not args.height:
+            raise ValueError("Specify --width and --height for resize")
         return {"width": args.width, "height": args.height}
-    if args.filter == "antique":
-        return {"intensity": args.intensity}
-    if args.filter == "fade":
-        return {"strength": args.strength}
-    if args.filter == "film":
-        return {"grain": args.grain, "tint": args.tint}
-    if args.filter == "matte":
-        return {"border": args.border, "softness": args.softness}
-    if args.filter == "scratches":
-        return {"n_scratches": args.n_scratches, "noise_level": args.noise_level}
-    if args.filter == "neon":
-        return {"threshold": args.threshold, "glow_intensity": args.glow_intensity}
-    return {}
+        
+    params = {
+        "antique": {"intensity": args.intensity},
+        "fade": {"strength": args.strength},
+        "film": {"grain": args.grain, "tint": args.tint},
+        "matte": {"radius": args.radius, "softness": args.softness},
+        "scratches": {"n_scratches": args.n_scratches, "noise_level": args.noise_level},
+        "neon": {"threshold": args.threshold, "glow": args.glow},
+    }
+    return params.get(args.filter, {})
 
 
 def main():
     args = cli_argument_parser()
+    
     try:
-        image = read_image(args.input)
-        params = build_params(args)
-        image_filter = ImageFilter.get_filter(args.filter, **params)
-        result = image_filter.apply_filter(image)
-
+        img = get_image(args.input)
+        kwargs = gather_kwargs(args)
+        
+        img_filter = ImageFilter.get_filter(args.filter, **kwargs)
+        processed = img_filter.apply_filter(img)
+        
         out_dir = os.path.dirname(os.path.abspath(args.output))
-        if out_dir and not os.path.isdir(out_dir):
+        if out_dir and not os.path.exists(out_dir):
             os.makedirs(out_dir, exist_ok=True)
-
-        if not cv2.imwrite(args.output, result):
-            raise IOError(f"Не удалось сохранить изображение: {args.output}")
-
-        print(f"Готово: {args.output}")
-    except Exception as error:
-        print(f"Ошибка: {error}", file=sys.stderr)
+            
+        if not cv2.imwrite(args.output, processed):
+            raise IOError(f"Failed to write: {args.output}")
+            
+        print(f"Saved to {args.output}")
+        
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
 

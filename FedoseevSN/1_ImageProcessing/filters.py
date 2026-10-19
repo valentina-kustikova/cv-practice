@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
-
 import numpy as np
 
 
 class ImageFilter(ABC):
     @staticmethod
     def get_filter(filter_name, **params):
-        registry = {
+        filters_map = {
             "resize": Resize,
             "gray": RGB2GrayScale,
             "antique": Antique,
@@ -16,9 +15,9 @@ class ImageFilter(ABC):
             "scratches": ScratchesNoise,
             "neon": Neon,
         }
-        if filter_name not in registry:
-            raise ValueError(f"Неизвестный фильтр: {filter_name}")
-        return registry[filter_name](**params)
+        if filter_name not in filters_map:
+            raise ValueError(f"Фильтр '{filter_name}' не найден")
+        return filters_map[filter_name](**params)
 
     @abstractmethod
     def apply_filter(self, image):
@@ -28,168 +27,204 @@ class ImageFilter(ABC):
 class Resize(ImageFilter):
     def __init__(self, width, height):
         if width <= 0 or height <= 0:
-            raise ValueError("Ширина и высота должны быть > 0")
-        self.width = width
-        self.height = height
+            raise ValueError("Размеры должны быть положительными")
+        self.w = int(width)
+        self.h = int(height)
 
     def apply_filter(self, image):
-        h, w = image.shape[:2]
-        y_idx = np.clip((np.arange(self.height) * h / self.height).astype(int), 0, h - 1)
-        x_idx = np.clip((np.arange(self.width) * w / self.width).astype(int), 0, w - 1)
-        return image[y_idx][:, x_idx]
+        src_h, src_w = image.shape[:2]
+        
+        y_points = np.linspace(0, src_h - 1, self.h)
+        x_points = np.linspace(0, src_w - 1, self.w)
+        
+        y0 = np.floor(y_points).astype(int)
+        x0 = np.floor(x_points).astype(int)
+        y1 = np.minimum(y0 + 1, src_h - 1)
+        x1 = np.minimum(x0 + 1, src_w - 1)
+        
+        dy = (y_points - y0)
+        dx = (x_points - x0)
+        
+        if image.ndim == 3:
+            dy = dy[:, np.newaxis, np.newaxis]
+            dx = dx[np.newaxis, :, np.newaxis]
+        else:
+            dy = dy[:, np.newaxis]
+            dx = dx[np.newaxis, :]
+            
+        row0 = image[y0[:, None], x0] * (1 - dx) + image[y0[:, None], x1] * dx
+        row1 = image[y1[:, None], x0] * (1 - dx) + image[y1[:, None], x1] * dx
+        
+        res = row0 * (1 - dy) + row1 * dy
+        return np.clip(res, 0, 255).astype(np.uint8)
 
 
 class RGB2GrayScale(ImageFilter):
     def apply_filter(self, image):
-        b = image[:, :, 0].astype(np.float32)
-        g = image[:, :, 1].astype(np.float32)
-        r = image[:, :, 2].astype(np.float32)
-        gray = 0.114 * b + 0.587 * g + 0.299 * r
+        weights = np.array([0.114, 0.587, 0.299], dtype=np.float32)
+        gray = image.astype(np.float32) @ weights
         return np.clip(gray, 0, 255).astype(np.uint8)
 
 
 class Antique(ImageFilter):
-    def __init__(self, intensity=1.0):
-        self.intensity = float(np.clip(intensity, 0.0, 1.0))
+    def __init__(self, intensity=0.85):
+        self.alpha = max(0.0, min(1.0, float(intensity)))
 
     def apply_filter(self, image):
         img = image.astype(np.float32)
-        b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
-
-        sr = 0.393 * r + 0.769 * g + 0.189 * b
-        sg = 0.349 * r + 0.686 * g + 0.168 * b
-        sb = 0.272 * r + 0.534 * g + 0.131 * b
-
-        gamma = 1.2
-        sr = 255.0 * (np.clip(sr, 0, 255) / 255.0) ** gamma
-        sg = 255.0 * (np.clip(sg, 0, 255) / 255.0) ** gamma
-        sb = 255.0 * (np.clip(sb, 0, 255) / 255.0) ** gamma
-
+        
+        sepia_mat = np.array([
+            [0.131, 0.534, 0.272],
+            [0.168, 0.686, 0.349],
+            [0.189, 0.769, 0.393]
+        ], dtype=np.float32)
+        
+        sepia_img = img @ sepia_mat.T
+        
         h, w = img.shape[:2]
-        cy, cx = h / 2.0, w / 2.0
         y, x = np.ogrid[:h, :w]
-        dist = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
-        max_dist = np.sqrt(cx ** 2 + cy ** 2)
-        vignette = 1.0 - 0.5 * (dist / max_dist)
-
-        sr *= vignette
-        sg *= vignette
-        sb *= vignette
-
-        antique = np.stack([sb, sg, sr], axis=2)
-        result = img * (1.0 - self.intensity) + antique * self.intensity
-        return np.clip(result, 0, 255).astype(np.uint8)
+        center_x, center_y = w / 2.0, h / 2.0
+        
+        dist = np.sqrt(((x - center_x) / center_x) ** 2 + ((y - center_y) / center_y) ** 2)
+        mask = np.clip(1.0 - 0.5 * dist, 0.0, 1.0)
+        
+        if img.ndim == 3:
+            mask = mask[..., np.newaxis]
+            
+        res = img * (1.0 - self.alpha) + (sepia_img * mask) * self.alpha
+        return np.clip(res, 0, 255).astype(np.uint8)
 
 
 class FadeColor(ImageFilter):
-    def __init__(self, strength=0.3):
-        self.strength = float(np.clip(strength, 0.0, 1.0))
+    def __init__(self, strength=0.35):
+        self.fade = max(0.0, min(1.0, float(strength)))
 
     def apply_filter(self, image):
         img = image.astype(np.float32)
-        faded = img + (255.0 - img) * self.strength
-        mean = faded.mean(axis=2, keepdims=True)
-        faded = mean + (faded - mean) * (1.0 - self.strength * 0.5)
-        return np.clip(faded, 0, 255).astype(np.uint8)
+        
+        mixed = img * (1.0 - self.fade) + 255.0 * self.fade
+        mean_val = mixed.mean(axis=2, keepdims=True)
+        
+        res = mean_val + (mixed - mean_val) * (1.0 - self.fade * 0.5)
+        return np.clip(res, 0, 255).astype(np.uint8)
 
 
 class Film(ImageFilter):
-    def __init__(self, grain=15.0, tint=0.6):
+    def __init__(self, grain=15.0, tint=0.4):
         self.grain = float(grain)
-        self.tint = float(np.clip(tint, 0.0, 1.0))
+        self.tint = max(0.0, min(1.0, float(tint)))
 
     def apply_filter(self, image):
         img = image.astype(np.float32)
-        b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
-
-        new_r = np.clip(g * 1.3, 0, 255)
-        new_g = np.clip(r * 0.8, 0, 255)
-        new_b = np.clip(b * 0.5, 0, 255)
-        infrared = np.stack([new_b, new_g, new_r], axis=2)
-
-        result = img * (1.0 - self.tint) + infrared * self.tint
-        noise = np.random.normal(0.0, self.grain, result.shape)
-        result = result + noise
-        return np.clip(result, 0, 255).astype(np.uint8)
+        
+        color_mat = np.array([
+            [0.2, 0.7, 0.1],
+            [0.4, 0.4, 0.2],
+            [0.9, 0.05, 0.05]
+        ], dtype=np.float32)
+        
+        infrared = img @ color_mat.T
+        res = img * (1.0 - self.tint) + infrared * self.tint
+        
+        if self.grain > 0:
+            noise = np.random.normal(0, self.grain, res.shape)
+            res += noise
+            
+        return np.clip(res, 0, 255).astype(np.uint8)
 
 
 class Matte(ImageFilter):
-    def __init__(self, border=0.1, softness=0.05):
-        self.border = float(np.clip(border, 0.0, 0.49))
-        self.softness = float(max(softness, 1e-3))
-
-    def apply_filter(self, image):
-        h, w = image.shape[:2]
-        cy, cx = h / 2.0, w / 2.0
-        y, x = np.ogrid[:h, :w]
-
-        rx = cx * (1.0 - self.border)
-        ry = cy * (1.0 - self.border)
-        dist = np.sqrt(((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2)
-
-        mask = np.clip((1.0 - dist) / self.softness + 0.5, 0.0, 1.0)[:, :, np.newaxis]
-
-        white = np.full_like(image, 255, dtype=np.float32)
-        result = image.astype(np.float32) * mask + white * (1.0 - mask)
-        return np.clip(result, 0, 255).astype(np.uint8)
-
-
-class ScratchesNoise(ImageFilter):
-    def __init__(self, n_scratches=15, noise_level=20.0):
-        self.n_scratches = int(n_scratches)
-        self.noise_level = float(noise_level)
-
-    def apply_filter(self, image):
-        result = image.astype(np.float32)
-        h, w = result.shape[:2]
-
-        noise = np.random.normal(0.0, self.noise_level, result.shape)
-        result = result + noise
-
-        for _ in range(self.n_scratches):
-            x_start = np.random.randint(0, w)
-            y_start = np.random.randint(0, h)
-            length = np.random.randint(h // 4, h)
-            angle = np.pi / 2 + np.random.uniform(-0.3, 0.3)
-            brightness = np.random.randint(180, 256)
-
-            for t in range(length):
-                x = int(x_start + t * np.cos(angle))
-                y = int(y_start + t * np.sin(angle))
-                if 0 <= x < w and 0 <= y < h:
-                    result[y, x] = brightness
-
-        return np.clip(result, 0, 255).astype(np.uint8)
-
-
-class Neon(ImageFilter):
-    def __init__(self, threshold=50.0, glow_intensity=0.8):
-        self.threshold = float(threshold)
-        self.glow_intensity = float(np.clip(glow_intensity, 0.0, 1.0))
+    def __init__(self, radius=0.75, softness=0.2):
+        self.rad = max(0.1, min(1.0, float(radius)))
+        self.soft = max(0.01, float(softness))
 
     def apply_filter(self, image):
         img = image.astype(np.float32)
+        h, w = img.shape[:2]
+        
+        y, x = np.ogrid[:h, :w]
+        cx, cy = w / 2.0, h / 2.0
+        
+        d = np.sqrt(((x - cx) / (cx * self.rad)) ** 2 + ((y - cy) / (cy * self.rad)) ** 2)
+        
+        weight = np.clip((d - 1.0 + self.soft) / self.soft, 0.0, 1.0)
+        weight = weight * weight * (3.0 - 2.0 * weight)
+        
+        if img.ndim == 3:
+            weight = weight[..., np.newaxis]
+            
+        res = img * (1.0 - weight) + 255.0 * weight
+        return np.clip(res, 0, 255).astype(np.uint8)
 
-        gray = 0.114 * img[:, :, 0] + 0.587 * img[:, :, 1] + 0.299 * img[:, :, 2]
 
-        gy, gx = np.gradient(gray)
-        magnitude = np.sqrt(gx ** 2 + gy ** 2)
+class ScratchesNoise(ImageFilter):
+    def __init__(self, n_scratches=20, noise_level=15.0):
+        self.count = int(n_scratches)
+        self.sigma = float(noise_level)
+        self.rng = np.random.default_rng()
 
-        edges = np.clip(magnitude - self.threshold, 0.0, None)
-        if edges.max() > 0:
-            edges = edges / edges.max() * 255.0
+    def apply_filter(self, image):
+        res = image.astype(np.float32)
+        h, w = res.shape[:2]
 
-        glow = edges.copy()
-        for shift in range(1, 4):
-            glow = np.maximum(glow, np.roll(edges, shift, axis=0))
-            glow = np.maximum(glow, np.roll(edges, -shift, axis=0))
-            glow = np.maximum(glow, np.roll(edges, shift, axis=1))
-            glow = np.maximum(glow, np.roll(edges, -shift, axis=1))
+        res += self.rng.normal(0.0, self.sigma, res.shape)
+        
+        scratch_mask = np.zeros((h, w), dtype=np.float32)
 
-        neon_r = glow
-        neon_g = glow * 0.3
-        neon_b = glow * 0.9
-        neon_layer = np.stack([neon_b, neon_g, neon_r], axis=2)
+        for _ in range(self.count):
+            start_x = self.rng.integers(0, w)
+            start_y = self.rng.integers(0, h // 4)
+            length = self.rng.integers(h // 2, h)
+            
+            end_x = int(start_x + self.rng.integers(-10, 10))
+            end_y = int(start_y + length)
+            
+            pts = max(abs(end_x - start_x), abs(end_y - start_y), 1)
+            xs = np.linspace(start_x, end_x, pts).round().astype(int)
+            ys = np.linspace(start_y, end_y, pts).round().astype(int)
+            
+            mask = (xs >= 0) & (xs < w) & (ys >= 0) & (ys < h)
+            scratch_mask[ys[mask], xs[mask]] = 1.0
 
-        result = img * (1.0 - self.glow_intensity) + neon_layer * self.glow_intensity
-        return np.clip(result, 0, 255).astype(np.uint8)
+        if image.ndim == 3:
+            scratch_mask = scratch_mask[..., np.newaxis]
+            
+        res += scratch_mask * 50.0
+        return np.clip(res, 0, 255).astype(np.uint8)
+
+
+class Neon(ImageFilter):
+    def __init__(self, threshold=40, glow=1.5):
+        self.thr = float(threshold)
+        self.glow = float(glow)
+
+    def apply_filter(self, image):
+        img = image.astype(np.float32)
+        
+        weights = np.array([0.114, 0.587, 0.299], dtype=np.float32)
+        gray = img @ weights
+        
+        padded = np.pad(gray, 1, mode='edge')
+        
+        gx = (padded[:-2, 2:] + 2 * padded[1:-1, 2:] + padded[2:, 2:]) - \
+             (padded[:-2, :-2] + 2 * padded[1:-1, :-2] + padded[2:, :-2])
+             
+        gy = (padded[2:, :-2] + 2 * padded[2:, 1:-1] + padded[2:, 2:]) - \
+             (padded[:-2, :-2] + 2 * padded[:-2, 1:-1] + padded[:-2, 2:])
+
+        mag = np.sqrt(gx ** 2 + gy ** 2)
+        mag = np.clip(mag * self.glow, 0, 255)
+        
+        edges = (mag > self.thr).astype(np.float32)
+        
+        if img.ndim == 3:
+            glow_layer = np.zeros_like(img)
+            glow_layer[..., 0] = edges * mag * 0.2
+            glow_layer[..., 1] = edges * mag * 0.9
+            glow_layer[..., 2] = edges * mag * 1.0
+            
+            res = img * 0.25 + glow_layer
+        else:
+            res = edges * mag
+            
+        return np.clip(res, 0, 255).astype(np.uint8)
