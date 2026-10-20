@@ -5,24 +5,12 @@ import sys
 import cv2
 import numpy as np
 
-import filters
-
-
-FILTERS = {
-    "resize": filters.resize,
-    "grayscale": filters.grayscale,
-    "antique": filters.antique,
-    "fade": filters.fade,
-    "film": filters.film,
-    "matte": filters.matte,
-    "scratches": filters.scratches,
-    "neon": filters.neon,
-}
+from filters import FILTER_CLASSES, ImageFilter
 
 
 def cli_argument_parser(argv=None):
     selector = argparse.ArgumentParser(add_help=False)
-    selector.add_argument("-f", "--filter", choices=FILTERS)
+    selector.add_argument("-f", "--filter", choices=FILTER_CLASSES)
     selected, _ = selector.parse_known_args(argv)
     parser = argparse.ArgumentParser(
         description="Применение фильтра к изображению",
@@ -30,7 +18,7 @@ def cli_argument_parser(argv=None):
     )
     parser.add_argument("-i", "--input", required=True, help="Входное изображение")
     parser.add_argument("-o", "--output", required=True, help="Файл результата")
-    parser.add_argument("-f", "--filter", required=True, choices=FILTERS)
+    parser.add_argument("-f", "--filter", required=True, choices=FILTER_CLASSES)
     if selected.filter == "resize":
         parser.add_argument("--width", type=int, required=True, help="Новая ширина > 0")
         parser.add_argument("--height", type=int, required=True, help="Новая высота > 0")
@@ -90,7 +78,8 @@ def main(argv=None):
     filter_name = parameters.pop("filter")
     try:
         image = read_image(input_path)
-        result = FILTERS[filter_name](image, **parameters)
+        image_filter = ImageFilter.get_filter(filter_name, **parameters)
+        result = image_filter.apply_filter(image)
         save_image(output_path, result)
     except (OSError, ValueError, cv2.error) as error:
         print(f"Ошибка: {error}", file=sys.stderr)

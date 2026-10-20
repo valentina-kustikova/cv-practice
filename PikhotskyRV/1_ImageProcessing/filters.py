@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 import numpy as np
 
 
@@ -132,3 +134,95 @@ def neon(image, threshold=25.0, radius=4, glow=2.0):
     light = edges + glow * blur(edges, radius)
     color = np.array([255, 180, 40], dtype=np.float32)
     return to_uint8(0.1 * source + light[:, :, None] * color)
+
+
+class ImageFilter(ABC):
+    @staticmethod
+    def get_filter(name, **parameters):
+        try:
+            filter_class = FILTER_CLASSES[name]
+        except KeyError:
+            raise ValueError(f"Неизвестный фильтр: {name}") from None
+        return filter_class(**parameters)
+
+    @abstractmethod
+    def apply_filter(self, image):
+        pass
+
+
+class Resize(ImageFilter):
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+
+    def apply_filter(self, image):
+        return resize(image, self.width, self.height)
+
+
+class RGB2GrayScale(ImageFilter):
+    def apply_filter(self, image):
+        return grayscale(image)
+
+
+class Antique(ImageFilter):
+    def __init__(self, strength=1.0):
+        self.strength = strength
+
+    def apply_filter(self, image):
+        return antique(image, self.strength)
+
+
+class FadeColor(ImageFilter):
+    def __init__(self, strength=0.5):
+        self.strength = strength
+
+    def apply_filter(self, image):
+        return fade(image, self.strength)
+
+
+class Film(ImageFilter):
+    def __init__(self, gamma=1.0):
+        self.gamma = gamma
+
+    def apply_filter(self, image):
+        return film(image, self.gamma)
+
+
+class Matte(ImageFilter):
+    def __init__(self, softness=0.3):
+        self.softness = softness
+
+    def apply_filter(self, image):
+        return matte(image, self.softness)
+
+
+class Scratches(ImageFilter):
+    def __init__(self, count=12, noise=10.0, seed=None):
+        self.count = count
+        self.noise = noise
+        self.seed = seed
+
+    def apply_filter(self, image):
+        return scratches(image, self.count, self.noise, self.seed)
+
+
+class Neon(ImageFilter):
+    def __init__(self, threshold=25.0, radius=4, glow=2.0):
+        self.threshold = threshold
+        self.radius = radius
+        self.glow = glow
+
+    def apply_filter(self, image):
+        return neon(image, self.threshold, self.radius, self.glow)
+
+
+FILTER_CLASSES = {
+    "resize": Resize,
+    "grayscale": RGB2GrayScale,
+    "antique": Antique,
+    "fade": FadeColor,
+    "film": Film,
+    "matte": Matte,
+    "scratches": Scratches,
+    "neon": Neon,
+}
