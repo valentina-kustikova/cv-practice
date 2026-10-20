@@ -6,6 +6,7 @@ from filters import ImageFilter
 
 
 def cli_argument_parser():
+    # Разбор аргументов командной строки
     parser = argparse.ArgumentParser(description="Применение фильтров к изображению")
 
     parser.add_argument("-i", "--input", required=True,
@@ -22,6 +23,7 @@ def cli_argument_parser():
 
 
 def read_image(image_path):
+    # Чтение изображения из файла
     image = cv2.imread(image_path)
     if image is None:
         raise FileNotFoundError(f"Не удалось прочитать изображение: {image_path}")
@@ -29,6 +31,7 @@ def read_image(image_path):
 
 
 def main():
+    # Разбор аргументов, чтение, применение фильтра и сохранение
     args = cli_argument_parser()
 
     try:
