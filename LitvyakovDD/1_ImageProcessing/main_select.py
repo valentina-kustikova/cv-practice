@@ -65,20 +65,15 @@ def main():
             if filter_name == "resize":
                 parameters["width"] = int(input("Новая ширина: "))
                 parameters["height"] = int(input("Новая высота: "))
-            elif filter_name == "scratches":
-                parameters["count"] = int(input("Количество царапин: "))
-            elif filter_name == "antique":
-                parameters["strength"] = float(input("Сила эффекта (0..1): "))
-            elif filter_name == "fade":
-                parameters["strength"] = float(input("Сила эффекта (0..1): "))
-            elif filter_name == "film":
+            elif filter_name in ("antique", "fade", "film", "scratches"):
                 parameters["strength"] = float(input("Сила эффекта (0..1): "))
             elif filter_name == "matte":
-                parameters["strength"] = float(input("Сила эффекта (0..1): "))
+                parameters["matte_radius_x"] = float(input("Радиус matte по X (>0): "))
+                parameters["matte_radius_y"] = float(input("Радиус matte по Y (>0): "))
+                parameters["matte_softness"] = float(input("Мягкость matte (>=0): "))
             elif filter_name == "neon":
-                parameters["threshold"] = float(input("Порог контуров: "))
-                parameters["strength"] = float(input("Сила эффекта (0..1): "))
-                parameters["brightness"] = float(input("Яркость фона (0..1): "))
+                parameters["neon_gain"] = float(input("Усиление свечения (>0): "))
+                parameters["neon_brightness"] = float(input("Яркость фона (0..1): "))
 
             filter_object = ImageFilter.get_filter(filter_name, **parameters)
             result = filter_object.apply_filter(image)

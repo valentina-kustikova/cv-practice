@@ -34,7 +34,9 @@ def make_parser():
             "Examples:\n"
             "  python main.py --image img.jpg --filter grayscale\n"
             "  python main.py --image img.jpg --filter resize --width 800 --height 600\n"
-            "  python main.py --image img.jpg --filter scratches --count 5"
+            "  python main.py --image img.jpg --filter matte --matte-radius-x 0.8 --matte-radius-y 0.8 --matte-softness 0.2\n"
+            "  python main.py --image img.jpg --filter scratches --strength 0.3\n"
+            "  python main.py --image img.jpg --filter neon --neon-gain 9 --neon-brightness 0.4"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -42,10 +44,16 @@ def make_parser():
     parser.add_argument("--filter", choices=FILTERS, help="название фильтра")
     parser.add_argument("--width", type=int, help="ширина результата для resize")
     parser.add_argument("--height", type=int, help="высота результата для resize")
-    parser.add_argument("--count", type=int, help="количество царапин для scratches")
     parser.add_argument("--strength", type=float, help="сила эффекта от 0 до 1")
-    parser.add_argument("--threshold", type=float, help="порог контуров для neon")
-    parser.add_argument("--brightness", type=float, help="яркость фона neon от 0 до 1")
+    parser.add_argument("--matte-radius-x", type=float, help="радиус matte по X")
+    parser.add_argument("--matte-radius-y", type=float, help="радиус matte по Y")
+    parser.add_argument(
+        "--matte-softness", type=float, help="мягкость перехода эффекта matte"
+    )
+    parser.add_argument("--neon-gain", type=float, help="усиление свечения neon")
+    parser.add_argument(
+        "--neon-brightness", type=float, help="яркость фона neon от 0 до 1"
+    )
     return parser
 
 
@@ -72,28 +80,38 @@ def main(argv=None):
     elif args.width is not None or args.height is not None:
         parser.error("--width и --height используются только с resize")
 
-    if args.filter == "scratches":
-        if args.count is None:
-            parser.error("для scratches укажите --count")
-        if args.count < 0:
-            parser.error("--count не может быть отрицательным")
-    elif args.count is not None:
-        parser.error("--count используется только с scratches")
-
     if args.strength is not None and not 0 <= args.strength <= 1:
         parser.error("--strength должен быть от 0 до 1")
-    if args.threshold is not None and args.threshold < 0:
-        parser.error("--threshold не может быть отрицательным")
-    if args.brightness is not None and not 0 <= args.brightness <= 1:
-        parser.error("--brightness должен быть от 0 до 1")
+    if args.neon_gain is not None and args.neon_gain <= 0:
+        parser.error("--neon-gain должен быть больше нуля")
+    if args.neon_brightness is not None and not 0 <= args.neon_brightness <= 1:
+        parser.error("--neon-brightness должен быть от 0 до 1")
+    if args.matte_radius_x is not None and args.matte_radius_x <= 0:
+        parser.error("--matte-radius-x должен быть больше нуля")
+    if args.matte_radius_y is not None and args.matte_radius_y <= 0:
+        parser.error("--matte-radius-y должен быть больше нуля")
+    if args.matte_softness is not None and args.matte_softness < 0:
+        parser.error("--matte-softness не может быть отрицательной")
     if args.strength is not None and args.filter not in (
-        "antique", "fade", "film", "matte", "neon"
+        "antique", "fade", "film", "scratches"
     ):
         parser.error("--strength не используется этим фильтром")
-    if args.filter != "neon" and (
-        args.threshold is not None or args.brightness is not None
+    if args.filter != "matte" and (
+        args.matte_radius_x is not None
+        or args.matte_radius_y is not None
+        or args.matte_softness is not None
     ):
-        parser.error("--threshold и --brightness используются только с neon")
+        parser.error(
+            "--matte-radius-x, --matte-radius-y и --matte-softness "
+            "используются только с matte"
+        )
+    if args.filter != "neon" and (
+        args.neon_gain is not None
+        or args.neon_brightness is not None
+    ):
+        parser.error(
+            "--neon-gain и --neon-brightness используются только с neon"
+        )
 
     image_path = IMAGE_DIR / args.image
     try:
@@ -104,15 +122,18 @@ def main(argv=None):
         if args.filter == "resize":
             parameters["width"] = args.width
             parameters["height"] = args.height
-        elif args.filter == "scratches":
-            parameters["count"] = args.count
         if args.strength is not None:
             parameters["strength"] = args.strength
-        if args.threshold is not None:
-            parameters["threshold"] = args.threshold
-        if args.brightness is not None:
-            parameters["brightness"] = args.brightness
-
+        if args.matte_radius_x is not None:
+            parameters["matte_radius_x"] = args.matte_radius_x
+        if args.matte_radius_y is not None:
+            parameters["matte_radius_y"] = args.matte_radius_y
+        if args.matte_softness is not None:
+            parameters["matte_softness"] = args.matte_softness
+        if args.neon_gain is not None:
+            parameters["neon_gain"] = args.neon_gain
+        if args.neon_brightness is not None:
+            parameters["neon_brightness"] = args.neon_brightness
         result = ImageFilter.get_filter(args.filter, **parameters).apply_filter(image)
         filter_number = list(FILTERS).index(args.filter) + 1
         output_path = RESULT_DIR / (

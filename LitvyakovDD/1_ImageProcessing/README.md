@@ -22,10 +22,12 @@ python main.py
 | `--filter ФИЛЬТР` | Фильтр: `resize`, `grayscale`, `antique`, `fade`, `film`, `matte`, `scratches` или `neon`. |
 | `--width ЧИСЛО` | Новая ширина для `resize`. |
 | `--height ЧИСЛО` | Новая высота для `resize`. |
-| `--count ЧИСЛО` | Количество царапин для `scratches`. |
-| `--strength ЧИСЛО` | Сила эффекта для `antique`, `fade`, `film`, `matte` или `neon`; диапазон `[0, 1]`. |
-| `--threshold ЧИСЛО` | Порог поиска контуров для `neon`. |
-| `--brightness ЧИСЛО` | Яркость фона для `neon`; диапазон `[0, 1]`. |
+| `--strength ЧИСЛО` | Сила эффекта для `antique`, `fade`, `film` или `scratches`; диапазон `[0, 1]`. |
+| `--matte-radius-x ЧИСЛО` | Радиус рамки `matte` по X; должен быть больше нуля (по умолчанию `0.8`). |
+| `--matte-radius-y ЧИСЛО` | Радиус рамки `matte` по Y; должен быть больше нуля (по умолчанию `0.8`). |
+| `--matte-softness ЧИСЛО` | Мягкость перехода `matte`; неотрицательное число. При нуле переход резкий. |
+| `--neon-gain ЧИСЛО` | Усиление свечения для `neon`; должно быть больше нуля. |
+| `--neon-brightness ЧИСЛО` | Яркость исходного изображения под неоном; диапазон `[0, 1]`, по умолчанию `0.4`; меньшее значение сильнее затемняет. |
 
 ## 1. resize
 
@@ -122,88 +124,62 @@ I' = (1 - s)I + sI_film
 
 ## 6. matte
 
-Фильтр создаёт затемнённую рамку вокруг центра. Для точки `(x, y)` вычисляется расстояние до центра:
+Фильтр осветляет края изображения белым цветом, создавая мягкую овальную рамку.
+Для точки `(x, y)` вычисляется нормированное расстояние:
 
 ```text
-d(x, y) = sqrt((x - cx)^2 + (y - cy)^2)
+d(x, y) = (x - cx)^2 / (cx * matte_radius_x)^2
+        + (y - cy)^2 / (cy * matte_radius_y)^2
 ```
-
-Здесь `(cx, cy)` — центр изображения. После нормализации:
-
-```text
-w(x, y) = clip((d(x, y) / R - 0.68) / 0.32, 0, 1)
-```
-
-Результат записывается так:
-
-```text
-I'(x, y) = I(x, y) * (1 - s * w(x, y)) + 255 * s * w(x, y)
-```
-
-Здесь `s` — параметр `strength`; белый цвет создаёт матовый овал вокруг центра.
 
 ## 7. scratches
 
-Фильтр добавляет `N` случайных вертикальных царапин. Для каждой царапины выбираются:
-
-- столбец `x` случайно из диапазона `[0, W)`
-- начало строки `y0` из `[0, H)`
-- конец строки `y1` из `[y0 + 1, H]`
-- цвет `c из {0, 255}`
-
-Затем в участке:
+Фильтр накладывает текстуру `inner/Scratches.jpg` поверх исходного изображения.
+Если текстура больше изображения, лишняя область обрезается по центру; если
+текстура меньше, она растягивается до размера кадра. Параметр `strength`
+задаёт силу текстуры в результате:
 
 ```text
-I[y0:y1, x, :] = c
+I' = (1 - s)I + sT
 ```
-
-происходит замена цвета. При `c = 0` царапина чёрная, при `c = 255` — белая.
 
 ## 8. neon
 
-Контуры выделяются по разнице яркости соседних пикселей. Для каждого пикселя вычисляется яркость изображения:
+Сначала изображение переводится в серое `G`. Для каждого пикселя
+вычисляются горизонтальный и вертикальный градиенты:
 
 ```text
-Y(x, y) = 0.299R(x, y) + 0.587G(x, y) + 0.114B(x, y)
+gx(x, y) = G(x, y + 1) - G(x, y)
+gy(x, y) = G(x + 1, y) - G(x, y)
 ```
 
-Затем для соседних пикселей:
+Их величина усиливается параметром `neon_gain` и ограничивается диапазоном
+`[0, 255]`:
 
 ```text
-dv(x, y) = |Y(x, y) - Y(x + 1, y)|
-dh(x, y) = |Y(x, y) - Y(x, y + 1)|
+M(x, y) = clip(neon_gain * sqrt(gx(x, y)^2 + gy(x, y)^2), 0, 255)
 ```
 
-Контур определяется условием:
+Исходное изображение затемняется коэффициентом `neon_brightness` перед
+добавлением свечения:
 
 ```text
-E(x, y) = (dv(x, y) + dh(x, y)) > T
+I_dark = I * neon_brightness
+I' = I_dark + M
 ```
 
-где `T` — порог `threshold`.
-
-Далее изображение затемняется до коэффициента `b = brightness`:
-
-```text
-I_dark = I * b
-```
-
-Для пикселей контура выполняется смешение с неоновым цветом `C = (255, 45, 210)`:
-
-```text
-I'(x, y) = (1 - s)I_dark(x, y) + sC
-```
-
-где `s` — параметр `strength`.
 
 ## Примеры запуска
 
 ```text
-python main.py --image img.jpg --filter grayscale
-python main.py --image img.jpg --filter resize --width 800 --height 600
-python main.py --image img.jpg --filter antique --strength 0.5
-python main.py --image img.jpg --filter scratches --count 5
-python main.py --image img.jpg --filter neon --threshold 70 --brightness 0.4 --strength 0.7
+python main.py --image unn.jpg --filter resize --width 800 --height 800
+python main.py --image unn.jpg --filter grayscale
+python main.py --image unn.jpg --filter antique --strength 0.8
+python main.py --image unn.jpg --filter fade --strength 0.8
+python main.py --image unn.jpg --filter film --strength 0.8
+python main.py --image unn.jpg --filter matte --matte-radius-x 0.6 --matte-radius-y 0.6 --matte-softness 0.2
+python main.py --image unn.jpg --filter scratches --strength 0.4
+python main.py --image unn.jpg --filter neon --neon-gain 2 --neon-brightness 0.9
 ```
 
 Результат сохраняется в папке `result` в формате `<имя>_<номер фильтра>.<расширение>`, например `result/img_3.jpg`.
