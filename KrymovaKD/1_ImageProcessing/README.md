@@ -126,22 +126,22 @@ $$
 Эти формулы можно представить в виде матричного умножения:
 
 $$
-\begin{bmatrix}
+\begin{array}{c}
 R'\\
 G'\\
 B'
-\end{bmatrix}
+\end{array}
 =
-\begin{bmatrix}
+\begin{array}{ccc}
 0.393 & 0.769 & 0.189\\
 0.349 & 0.686 & 0.168\\
 0.272 & 0.534 & 0.131
-\end{bmatrix}
-\begin{bmatrix}
+\end{array}
+\begin{array}{c}
 R\\
 G\\
 B
-\end{bmatrix}
+\end{array}
 $$
 
 Матрица изменяет соотношение исходных цветовых компонентов, придавая изображению тёплый коричневатый оттенок.
