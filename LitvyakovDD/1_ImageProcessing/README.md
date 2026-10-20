@@ -179,7 +179,9 @@ python main.py --image unn.jpg --filter fade --strength 0.8
 python main.py --image unn.jpg --filter film --strength 0.8
 python main.py --image unn.jpg --filter matte --matte-radius-x 0.6 --matte-radius-y 0.6 --matte-softness 0.2
 python main.py --image unn.jpg --filter scratches --strength 0.4
-python main.py --image unn.jpg --filter neon --neon-gain 2 --neon-brightness 0.9
+python main.py --image unn.jpg --filter neon --neon-gain 1 --neon-brightness 0.9
+
+python main.py --image line.jpg --filter neon --neon-gain 2 --neon-brightness 0.9
 ```
 
 Результат сохраняется в папке `result` в формате `<имя>_<номер фильтра>.<расширение>`, например `result/img_3.jpg`.

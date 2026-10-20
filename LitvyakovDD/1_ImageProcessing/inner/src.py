@@ -227,7 +227,7 @@ class Neon(ImageFilter):
         )
         magnitude = np.clip(magnitude * neon_gain, 0, 255)
         magnitude = cv2.dilate(
-            magnitude, np.ones((3, 3), dtype=np.uint8)
+            magnitude, np.ones((5, 5), dtype=np.uint8)
         )
         result = image.astype(np.float32) * neon_brightness
         result[:, :, 0] += magnitude
