@@ -14,8 +14,15 @@ def cli_argument_parser():
     parser.add_argument('--width', type=int, default=None, help="Target width for resizing")
     parser.add_argument('--height', type=int, default=None, help="Target height for resizing")
     parser.add_argument('--factor', type=float, default=0.4, help="Fade color factor (0.0 to 1.0)")
-    parser.add_argument('--noise', type=float, default=0.05, help="Noise intensity level for scratch filter")
-    parser.add_argument('--scratches', type=int, default=5, help="Number of scratches for scratch filter")
+    
+    parser.add_argument('--matte_radius', type=float, default=0.7, help="Radius of matte oval mask")
+    parser.add_argument('--matte_softness', type=float, default=0.2, help="Softness of matte oval mask edges")
+    
+    parser.add_argument('--noise', type=float, default=0.04, help="Noise intensity level (0.0 to 0.5)")
+    parser.add_argument('--scratches', type=int, default=7, help="Number of scratches")
+    
+    parser.add_argument('--neon_strength', type=float, default=1.5, help="Brightness/gain of neon glow")
+    parser.add_argument('--neon_blur', type=float, default=0.8, help="Width factor of the neon aura blur")
     
     return parser.parse_args()
 
@@ -40,7 +47,11 @@ def main():
         elif args.filter == 'fade':
             kwargs = {'factor': args.factor}
         elif args.filter == 'scratch':
-            kwargs = {'noise_level': args.noise, 'scratches': args.scratches}
+            kwargs = {'noise': args.noise, 'scratches': args.scratches}
+        elif args.filter == 'matte':
+            kwargs = {'matte_radius': args.matte_radius, 'matte_softness': args.matte_softness}
+        elif args.filter == 'neon':
+            kwargs = {'neon_strength': args.neon_strength, 'neon_blur': args.neon_blur}
             
         img_filter = ImageFilter.get_filter(args.filter, **kwargs)
         

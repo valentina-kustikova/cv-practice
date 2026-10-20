@@ -86,15 +86,15 @@ pip install numpy opencv-python
   ```bash
   python main.py -i images/apple1.jpg -o output_film.jpg -f film
   ```
-* **Овальная рамка-маска (Matte):**
+* **Овальная рамка-маска:**
   ```bash
-  python main.py -i images/apple1.jpg -o output_matte.jpg -f matte
+  python main.py -i images/apple1.jpg -o output_matte.jpg -f matte --matte_radius 0.65 --matte_softness 0.25
   ```
 * **Добавление шума и царапин:**
   ```bash
-  python main.py -i images/apple1.jpg -o output_scratch.jpg -f scratch --noise 0.08 --scratches 8
+  python main.py -i images/apple1.jpg -o output_scratch.jpg -f scratch --noise 0.05 --scratches 6
   ```
 * **Неоновый эффект:**
   ```bash
-  python main.py -i images/apple1.jpg -o output_neon.jpg -f neon
+  python main.py -i images/apple1.jpg -o output_neon.jpg -f neon --neon_strength 1.8 --neon_blur 1.2
   ```

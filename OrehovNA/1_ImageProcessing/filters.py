@@ -105,93 +105,103 @@ class FilmSimulationFilter(ImageFilter):
         return np.stack([ir_gray, ir_gray, ir_gray], axis=-1)
 
 class MatteFilter(ImageFilter):
+    def __init__(self, matte_radius=0.7, matte_softness=0.2):
+        self.radius = float(matte_radius)
+        self.softness = float(matte_softness)
+        if self.radius <= 0:
+            raise ValueError("matte_radius must be positive")
+        if self.softness < 0:
+            raise ValueError("matte_softness must be non-negative")
+
     def apply_filter(self, image):
-        h, w, c = image.shape
-        yc, xc = h / 2.0, w / 2.0
+        h, w = image.shape[:2]
+        y_c, x_c = h / 2.0, w / 2.0
+        y, x = np.ogrid[:h, :w]
+
+        d = (x - x_c) ** 2 / (x_c ** 2) + (y - y_c) ** 2 / (y_c ** 2)
+
+        if self.softness == 0:
+            weight = (d > self.radius).astype(np.float32)
+        else:
+            weight = np.clip((d - self.radius) / self.softness, 0, 1).astype(np.float32)
         
-        y = np.arange(h)[:, None]
-        x = np.arange(w)[None, :]
-        
-        r1x, r1y = w * 0.45, h * 0.45
-        r2x, r2y = w * 0.5, h * 0.5
-        
-        d_inner = ((x - xc) / r1x) ** 2 + ((y - yc) / r1y) ** 2
-        d_outer = ((x - xc) / r2x) ** 2 + ((y - yc) / r2y) ** 2
-        
-        mask = np.ones((h, w), dtype=float)
-        
-        inner_mask = d_inner <= 1.0
-        outer_mask = d_outer >= 1.0
-        transition_mask = (~inner_mask) & (~outer_mask)
-        
-        norm_d = (d_inner - 1.0) / (d_inner - d_outer + 1e-6)
-        
-        mask[transition_mask] = 1.0 - np.clip(norm_d[transition_mask], 0, 1)
-        mask[outer_mask] = 0.0
-        
-        mask_3d = mask[:, :, None]
-        matte_img = image * mask_3d + 255 * (1.0 - mask_3d)
-        return np.clip(matte_img, 0, 255).astype(np.uint8)
+        weight = weight[:, :, None]
+
+        res = image.astype(np.float32) * (1 - weight) + 255.0 * weight
+        return np.clip(res, 0, 255).astype(np.uint8)
 
 
 class ScratchNoiseFilter(ImageFilter):
-    def __init__(self, noise_level=0.05, scratches=5):
-        self.noise_level = float(noise_level)
+    def __init__(self, noise: float = 0.04, scratches: int = 7):
+        self.noise = float(noise)
         self.scratches = int(scratches)
 
-    def apply_filter(self, image):
+    def apply_filter(self, image: np.ndarray) -> np.ndarray:
         h, w, c = image.shape
-        result = image.copy().astype(float)
+        res = image.astype(np.float32) + np.random.normal(0.0, self.noise * 255.0, (h, w, 1))
         
-        noise = np.random.randn(h, w, c) * (self.noise_level * 255)
-        result += noise
-        
+        mask = np.zeros((h, w), dtype=np.float32)
         for _ in range(self.scratches):
-            x1, y1 = np.random.randint(0, w), np.random.randint(0, h)
-            length = np.random.randint(20, 150)
-            angle = np.random.uniform(0, 2 * np.pi)
+            x0, y0 = np.random.randint(0, w), np.random.randint(0, int(h * 0.5))
+            length = np.random.randint(int(h * 0.1), int(h * 0.4))
+            angle = np.random.uniform(-0.08, 0.08)
             
-            x2 = int(x1 + length * np.cos(angle))
-            y2 = int(y1 + length * np.sin(angle))
+            t = np.linspace(0, 1, length)
+            xs = np.clip(x0 + t * length * np.sin(angle) + np.random.normal(0, 0.4, length), 0, w - 1).astype(np.int32)
+            ys = np.clip(y0 + t * length * np.cos(angle) + np.random.normal(0, 0.4, length), 0, h - 1).astype(np.int32)
             
-            steps = max(abs(x2 - x1), abs(y2 - y1))
-            if steps == 0:
-                continue
-            x_step = (x2 - x1) / steps
-            y_step = (y2 - y1) / steps
-            
-            for s in range(int(steps)):
-                curr_x = int(x1 + s * x_step)
-                curr_y = int(y1 + s * y_step)
-                if 0 <= curr_x < w and 0 <= curr_y < h:
-                    result[curr_y, curr_x, :] = 220
-                    
-        return np.clip(result, 0, 255).astype(np.uint8)
+            mask[ys, xs] = np.maximum(mask[ys, xs], np.random.uniform(0.3, 0.6))
+
+        p = np.pad(mask, 1, mode="edge")
+        mask = (p[:-2, :-2] + p[:-2, 1:-1] + p[:-2, 2:] +
+                p[1:-1, :-2] + p[1:-1, 1:-1] + p[1:-1, 2:] +
+                p[2:, :-2] + p[2:, 1:-1] + p[2:, 2:]) / 9.0
+
+        res = res * (1.0 - mask[..., None]) + np.random.uniform(210, 240) * mask[..., None]
+        res = np.clip(res, 0, 255)
+
+        res_uint8 = np.clip(res, 0, 255).astype(np.uint8)
+        
+        sepia = AntiqueFilter().apply_filter(res_uint8)
+        
+        return np.clip(res * 0.4 + sepia * 0.6, 0, 255).astype(np.uint8)
+
 
 class NeonFilter(ImageFilter):
-    def apply_filter(self, image):
-        gray = 0.114 * image[:, :, 0] + 0.587 * image[:, :, 1] + 0.299 * image[:, :, 2]
+    def __init__(self, neon_strength: float = 1.5, neon_blur: float = 0.8):
+        self.strength = float(neon_strength)
+        self.blur_factor = float(neon_blur)
+
+    def apply_filter(self, image: np.ndarray) -> np.ndarray:
+        h, w, c = image.shape
+        gray = GrayScaleFilter().apply_filter(image)[:, :, 0].astype(np.float32)
+
+        gx, gy = np.zeros_like(gray), np.zeros_like(gray)
+        gx[:, :-1] = gray[:, 1:] - gray[:, :-1]
+        gy[:-1, :] = gray[1:, :] - gray[:-1, :]
         
-        sobel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=float)
-        sobel_y = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=float)
+        edges = np.clip(np.sqrt(gx**2 + gy**2) / 255.0, 0.0, 1.0)
+
+        def multi_blur(img_mask, iterations):
+            res = img_mask.copy()
+            for _ in range(max(0, iterations)):
+                p = np.pad(res, 1, mode="edge")
+                res = (p[:-2, :-2] + p[:-2, 1:-1] + p[:-2, 2:] +
+                       p[1:-1, :-2] + p[1:-1, 1:-1] + p[1:-1, 2:] +
+                       p[2:, :-2] + p[2:, 1:-1] + p[2:, 2:]) / 9.0
+            return res
+
+        narrow_glow = multi_blur(edges, round(3 * self.blur_factor))
+        wide_glow = multi_blur(edges, round(8 * self.blur_factor))
+
+        glow_map = self.strength * (edges * 60.0 + narrow_glow * 120.0 + wide_glow * 170.0)
+
+        res = image.astype(np.float32)
         
-        h, w = gray.shape
-        grad_x = np.zeros_like(gray, dtype=float)
-        grad_y = np.zeros_like(gray, dtype=float)
-        
-        padded = np.pad(gray, 1, mode='edge')
-        
-        for y in range(1, h + 1):
-            for x in range(1, w + 1):
-                neighborhood = padded[y-1:y+2, x-1:x+2]
-                grad_x[y-1, x-1] = np.sum(neighborhood * sobel_x)
-                grad_y[y-1, x-1] = np.sum(neighborhood * sobel_y)
-                
-        edge = np.sqrt(grad_x**2 + grad_y**2)
-        edge = np.clip((edge / edge.max()) * 255 if edge.max() > 0 else 0, 0, 255)
-        
-        neon = np.zeros((h, w, 3), dtype=np.uint8)
-        neon[:, :, 0] = np.clip(edge * 1.0, 0, 255).astype(np.uint8) # Blue
-        neon[:, :, 1] = np.clip(edge * 0.8, 0, 255).astype(np.uint8) # Green
-        neon[:, :, 2] = np.clip(edge * 0.1, 0, 255).astype(np.uint8) # Red
-        return neon
+        res[:, :, 0] += glow_map
+        res[:, :, 1] += glow_map
+
+        return np.clip(res, 0, 255).astype(np.uint8)
+
+
+
