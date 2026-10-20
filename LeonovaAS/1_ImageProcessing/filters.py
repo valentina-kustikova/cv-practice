@@ -40,13 +40,41 @@ class Grayscale(ImageFilter):
         0, 255).astype(np.uint8)
 
 class Antique(ImageFilter):
-    """Фильтр антиквариат (сепия) добавить виньетку"""
+    """Фильтр антиквариат (сепия)"""
+    def __init__(self, vignette=0.6, vignette_scale=0.9, feather=0.3):
+        if not 0 <= vignette <= 1:
+            raise ValueError("vignette must be in [0, 1]")
+        if not 0 < vignette_scale <= 2:
+            raise ValueError("vignette_scale must be in (0, 2]")
+        if feather <= 0:
+            raise ValueError("Negative feather")
+        self.vignette = vignette
+        self.vignette_scale = vignette_scale
+        self.feather = feather
+    
     def apply_filter(self, image):
-        result = Grayscale().apply_filter(image) 
-        B = result * 0.43
-        G = result * 0.74
-        R = result * 1.07
-        result = np.stack([B, G, R], axis=-1)
+        sepia = Grayscale().apply_filter(image) 
+        B = sepia * 0.43
+        G = sepia * 0.74
+        R = sepia * 1.07
+        sepia = np.stack([B, G, R], axis=-1)
+        
+        H, W = image.shape[:2]
+        
+        cx, cy = W / 2, H / 2
+        a = W / 2 * self.vignette_scale
+        b = H / 2 * self.vignette_scale
+
+        dx = (np.arange(W) - cx)[None, :] / a
+        dy = (np.arange(H) - cy)[:, None] / b
+        d = np.sqrt(dx**2 + dy**2)
+
+        t = np.clip((1 + self.feather - d) / (2 * self.feather), 0, 1)
+        mask = t * t * (3 - 2 * t)
+
+        mask_3ch = mask[..., None]
+        result = sepia * (1 - self.vignette + self.vignette * mask_3ch)
+
         return np.clip(result, 0, 255).astype(np.uint8)
     
 class Fade(ImageFilter):
@@ -100,7 +128,7 @@ class Matte(ImageFilter):
         return result
 
 class Age(ImageFilter):
-    """Эффект состаривания картинки затемнить царапины"""
+    """Эффект состаривания картинки"""
     def __init__(self, sigma = 10.0, seed = None):
         if sigma < 0:
             raise ValueError("Negative sigma value")
@@ -131,9 +159,9 @@ class Age(ImageFilter):
             angle = rng.uniform(0, 2 * np.pi)
             
             if rng.random() < 0.7:
-                intensity = float(rng.uniform(30, 80)) #светлая
+                intensity = float(rng.uniform(10, 20)) #светлая
             else:
-                intensity = float(rng.uniform(-80, -30)) #тёмная
+                intensity = float(rng.uniform(-25, -10)) #тёмная
 
             x1 = int(x0 + length * np.cos(angle))
             y1 = int(y0 + length * np.sin(angle))
@@ -158,6 +186,34 @@ class Neon(ImageFilter):
             self.color = np.array((17,255,0), dtype=np.float32)
         self.intensity = intensity
         
+    @staticmethod
+    def _gaussian_kernel(k, sigma):
+        """Гауссово ядро размера"""
+        r = k // 2
+        x = np.arange(-r, r + 1, dtype=np.float32)
+        kernel = np.exp(-(x ** 2) / (2.0 * sigma ** 2))
+        kernel /= kernel.sum()
+        return kernel
+
+    @classmethod
+    def _gaussian_blur(cls, arr, k, sigma):
+        """Гауссово размытие"""
+        kernel = cls._gaussian_kernel(k, sigma)
+        r = k // 2
+        H, W = arr.shape
+
+        padded_h = np.pad(arr, ((0, 0), (r, r)), mode='edge')
+        tmp = np.zeros_like(arr, dtype=np.float32)
+        for i in range(k):
+            tmp += padded_h[:, i:i + W] * kernel[i]
+
+        padded_v = np.pad(tmp, ((r, r), (0, 0)), mode='edge')
+        result = np.zeros_like(arr, dtype=np.float32)
+        for i in range(k):
+            result += padded_v[i:i + H, :] * kernel[i]
+
+        return result
+        
     def apply_filter(self, image):
         gray = (Grayscale().apply_filter(image)).astype(np.float32)
         
@@ -166,21 +222,25 @@ class Neon(ImageFilter):
         Gx[:, 1:-1] = gray[:, 2:] - gray[:, :-2]
         Gy[1:-1, :] = gray[2:, :] - gray[:-2, :]
 
-        G = np.sqrt(Gx**2 + Gy**2)
-        
+        G = np.sqrt(Gx ** 2 + Gy ** 2)
+
         if G.max() > 0:
             G = G / G.max()
-        G = G ** 0.7
-        
-        padded = np.pad(G, 1, mode='edge')
-        glow = (
-            padded[:-2, :-2] + padded[:-2, 1:-1] + padded[:-2, 2:] +
-            padded[1:-1, :-2] + padded[1:-1, 1:-1] + padded[1:-1, 2:] +
-            padded[2:, :-2] + padded[2:, 1:-1] + padded[2:, 2:]
-        ) / 9.0
-        
-        neon = (G[..., None] + glow[..., None] * 0.5) * self.color * self.intensity
-        
-        result = image.astype(np.float32) * 0.2 + neon
+        G = G ** 0.9
+
+        glow_narrow = self._gaussian_blur(G, k=5,  sigma=2.5)
+        glow_medium = self._gaussian_blur(G, k=15, sigma=4.0)
+        glow_wide   = self._gaussian_blur(G, k=41, sigma=11.0)
+
+        WHITE = np.array((255, 255, 255), dtype=np.float32)
+
+        core   = G[..., None] * WHITE * 1.2
+        narrow = glow_narrow[..., None] * self.color * 0.8
+        medium = glow_medium[..., None] * self.color * 0.4
+        wide   = glow_wide[..., None] * self.color * 0.35
+
+        neon = core + narrow + medium + wide
+
+        result = image.astype(np.float32) + neon * self.intensity
 
         return np.clip(result, 0, 255).astype(np.uint8)                
