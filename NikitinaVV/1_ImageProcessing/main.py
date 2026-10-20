@@ -22,15 +22,19 @@ def cli_argument_parser():
     params.add_argument('--width', type=int, help='resize: новая ширина')
     params.add_argument('--height', type=int, help='resize: новая высота')
     params.add_argument('--scale', type=float, help='resize: коэффициент масштабирования')
+    params.add_argument('--vignette', type=float, default=0.6, help='antique: затемнение углов от 0 до 1')
     params.add_argument('--strength', type=float, default=0.5, help='fade: сила эффекта от 0 до 1')
-    params.add_argument('--grain', type=float, default=12, help='film: сила зерна')
-    params.add_argument('--radius', type=float, default=0.7, help='matte: радиус овала')
+    params.add_argument('--grain', type=float, default=8, help='film: сила зерна')
+    params.add_argument('--radius', type=float, default=0.7, help='matte: радиус овала, больше 0 и меньше 1')
     params.add_argument('--softness', type=float, default=0.3, help='matte: ширина перехода к белому')
-    params.add_argument('--noise', type=float, default=20, help='old: сила шума')
-    params.add_argument('--scratches', type=int, default=30, help='old: количество царапин')
-    params.add_argument('--threshold', type=float, default=0.2, help='neon: порог контуров от 0 до 1')
+    params.add_argument('--noise', type=float, default=7, help='old: сила зерна')
+    params.add_argument('--dust', type=int, default=900, help='old: количество пылинок')
+    params.add_argument('--hairs', type=int, default=8, help='old: количество ворсинок')
+    params.add_argument('--threshold', type=float, default=0.25, help='neon: порог контуров, больше 0 и меньше 1')
     params.add_argument('--color', type=int, nargs=3, default=[255, 0, 255], metavar=('R', 'G', 'B'),
                         help='neon: цвет свечения')
+    params.add_argument('--glow', type=float, default=1.0, help='neon: сила ореола вокруг контуров')
+    params.add_argument('--background', type=float, default=0.15, help='neon: яркость фона от 0 до 1')
     params.add_argument('--seed', type=int, help='film, old: зерно генератора случайных чисел')
     return parser.parse_args() 
 
@@ -45,6 +49,9 @@ def read_image(path):
 
 
 def save_image(path, image):
+    folder = os.path.dirname(path)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
     ok, buffer = cv2.imencode(os.path.splitext(path)[1], image)
     if not ok:
         raise ValueError(f'Не удалось сохранить изображение: {path}')
