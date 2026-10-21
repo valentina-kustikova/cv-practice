@@ -225,37 +225,19 @@ $$t = \mathrm{clip}\!\left(\frac{d - 1 + \text{softness}}{\text{softness}}\right
 python main.py -i images/cat.png -f matte -p size=0.9 -p color=0
 ```
 
-### 7. Состаренная фотография — `oldphoto`
-
-| Параметр | По умолчанию | Описание |
-|---|---|---|
-| `noise` | `0.4` | сила зерна |
-| `scratches` | `20` | количество царапин |
-| `spots` | `15` | количество пятен |
-| `creases` | `1` | количество заломов |
-| `vignette` | `0.6` | затемнение краёв |
-| `seed` | случайно | зерно генератора для повторяемого результата |
-
-1. **Мягкость, сепия, выцветание:** размытие с $\sigma = \max(W, H)/1000$,
-   фильтр `antique`, затем $I = 25 + 0.8\,I$.
-2. **Виньетка:** $I \leftarrow I\,(1 - 0.6\,v\,r^2)$, где
-   $r^2 = \left(\frac{x - W/2}{W/2}\right)^2 + \left(\frac{y - H/2}{H/2}\right)^2$.
-3. **Зерно:** $I \leftarrow I + n,\ n \sim \mathcal N(0, \sigma^2),\ \sigma = 45\cdot\text{noise}$.
-4. **Заломы.** Прямая через случайную точку $p_0$ под углом $\theta$,
-   $n = (\cos\theta, \sin\theta)$, $w = \min(W, H)/350$, $t$ — координата вдоль прямой:
-   $$d = (p - p_0)\cdot n + w\sin\frac{t}{60w},$$
-   $$I \leftarrow I\,\big(1 - 0.3\,e^{-((d - 2.5w)/1.5w)^2}\big), \qquad
-   I \leftarrow I + (235 - I)\cdot 0.55\,e^{-(d/w)^2} + \mathcal N(0, 22^2)\,e^{-(d/4w)^2}.$$
-   Считается только в полосе $|d| < 10w$.
-5. **Царапины** — вертикальные линии со случайным блужданием
-   $x_{k+1} = x_k + \varepsilon$, $\varepsilon \in \{-1, 0, 1\}$ с вероятностями
-   $0.2, 0.6, 0.2$: $I \leftarrow (1 - a)\,I + a\cdot\text{tone}$, $a \sim U(0.3, 0.7)$,
-   tone = 235 (80 %) или 30.
-6. **Пятна** — круги с мягким краем $\alpha = \mathrm{clip}(1.5 - \rho/r)\cdot a$,
-   $a \sim U(0.3, 0.6)$, $\rho$ — расстояние до центра. 70 % светлые, 30 % — мелкие
-   тёмные точки ($r \le 1.2$ px).
-7. **Потёртый край:** где расстояние до края $\frac{\min(x, y, W - x, H - y)}{\min(W, H)} < 0.02 + 0.01u$,
-   $u \sim U(0, 1)$, изображение плавно заменяется цветом бумаги.
+### 7. oldphoto — состаренное фото
+Параметры: `noise=0.4`, `scratches=20`, `spots=15`, `creases=1`,
+`vignette=0.6` ($v$), `seed` (чтобы результат повторялся).
+ 
+1. Размытие, сепия и выцветание: $I = 25 + 0.8\,I_{sepia}$.
+2. Виньетка: $I \leftarrow I\,(1 - 0.6\,v\,r^2)$, $r$ — расстояние до центра (1 у края).
+3. Зерно: $I \leftarrow I + \mathcal N(0,\ (45\cdot\text{noise})^2)$.
+4. Заломы: для прямой с нормалью $n$ расстояние $d = (p - p_0)\cdot n$;
+   светлая полоса $(235 - I)\cdot 0.55\,e^{-(d/w)^2}$ и тень рядом.
+5. Царапины: вертикальные линии со случайным сдвигом $x_{k+1} = x_k + \varepsilon$,
+   $\varepsilon \in \{-1, 0, 1\}$.
+6. Пятна: круги с мягким краем $\alpha = \mathrm{clip}(1.5 - \rho/r)$.
+7. Потёртый край: пиксели у границы кадра заменяются цветом бумаги.
 
 ```bash
 python main.py -i images/cat.png -f oldphoto -p seed=7
@@ -264,45 +246,21 @@ python main.py -i images/cat.png -f oldphoto -p noise=0.7 -p scratches=50 -p cre
 
 ### 8. Неоновый эффект — `neon`
 
-| Параметр | По умолчанию | Описание |
-|---|---|---|
-| `color` | `rainbow` | `rainbow`, `source`, `cyan`, `pink`, `green`, `yellow` |
-| `threshold` | `0.12` | порог контуров, $[0, 1)$ |
-| `glow` | `1.2` | яркость свечения |
-| `background` | `0.15` | доля яркости исходного фона |
-
-1. Яркость $Y$ слегка размывается ($\sigma = 1$) для подавления шума.
-2. Градиент оператором Собеля:
-   $$K_x = \begin{pmatrix}-1&0&1\\-2&0&2\\-1&0&1\end{pmatrix},\quad K_y = K_x^T,\qquad
-   |G| = \sqrt{G_x^2 + G_y^2},\quad \theta = \operatorname{atan2}(G_y, G_x).$$
-   Свёртка записана сдвигами массива: $G_x$ — взвешенная сумма правых соседей
-   минус сумма левых.
-3. Нормировка по 99-му перцентилю и мягкий порог:
-   $E = \mathrm{clip}\big((|G|_{norm} - t)/(1 - t)\big)$.
-4. Цвет линий $T$:
-   - `rainbow` — цвет зависит от направления контура:
-     $T = 127.5\,\big(1 + \cos(\theta + \tfrac{2\pi}{3}),\ 1 + \cos(\theta - \tfrac{2\pi}{3}),\ 1 + \cos\theta\big)$ для B, G, R;
-   - `source` — исходный цвет с растянутой насыщенностью
-     $T = 255\cdot\frac{C - \min(R,G,B)}{\max(R,G,B) - \min(R,G,B)}$;
-   - именованный цвет — константа.
-5. Свечение: $L = T\cdot E$,
-   $N = L + \text{glow}\cdot\big(0.9\,\mathrm{blur}_2(L) + 0.7\,\mathrm{blur}_6(L) + 0.5\,\mathrm{blur}_{14}(L)\big)$,
-   результат $I' = \mathrm{screen}(\text{background}\cdot I,\ N)$.
+Параметры: `color=rainbow` (`source`, `cyan`, `pink`, `green`, `yellow`),
+`threshold=0.12` ($t$), `glow=1.2`, `background=0.15`.
+ 
+Контуры — градиент яркости оператором Собеля:
+ 
+$$K_x = \begin{pmatrix}-1&0&1\\-2&0&2\\-1&0&1\end{pmatrix},\ K_y = K_x^T, \qquad
+|G| = \sqrt{G_x^2 + G_y^2}, \qquad E = \mathrm{clip}\Big(\frac{|G| - t}{1 - t}\Big).$$
+ 
+Цвет линий $T$: в режиме `rainbow` зависит от направления контура
+$\theta = \mathrm{atan2}(G_y, G_x)$, в `source` — исходный цвет пикселя.
+Свечение — сумма размытых копий линий:
+$N = L + \text{glow}\cdot(0.9\,\mathrm{blur}_2 + 0.7\,\mathrm{blur}_6 + 0.5\,\mathrm{blur}_{14})(L)$,
+$L = T\cdot E$. Итог: $I' = \text{background}\cdot I \oplus N$.
 
 ```bash
 python main.py -i images/cat.png -f neon
 python main.py -i images/aloe.jpg -f neon -p color=cyan -p glow=1.5
 ```
-
----
-
-## Проверка
-
-Собственные реализации сравнивались с функциями OpenCV (только в тестах):
-
-| Реализация | Эталон | Максимальное расхождение |
-|---|---|---|
-| `resize` | `cv2.resize(..., INTER_LINEAR)` | 1 уровень яркости |
-| `grayscale` | `cv2.cvtColor(..., COLOR_BGR2GRAY)` | 1 уровень яркости |
-| `blur` | три прохода `cv2.blur` | 0.02 |
-| Собель в `neon` | `cv2.Sobel` | $10^{-4}$ |
