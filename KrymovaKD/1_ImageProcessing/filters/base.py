@@ -10,7 +10,7 @@ class ImageFilter(ABC):
         """Применяет фильтр к изображению."""
         pass
 
-    @staticmethod
+    @staticmethod #метод можно вызвать через класс, не создавая заранее его объект
     def get_filter(name):
         """Возвращает объект фильтра по его имени."""
         from .geometry import Resize

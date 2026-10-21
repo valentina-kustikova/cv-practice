@@ -5,7 +5,7 @@ from .base import ImageFilter
 
 
 class Matte(ImageFilter):
-    """Создаёт белую мягкую овальную рамку по краям."""
+    """Создаёт белую мягкую овальную рамку по краям"""
 
     def apply(self, image, radius=0.58, strength=1.0, softness=2.2, **kwargs):
         if not 0 < radius < 1:
@@ -232,7 +232,7 @@ class Noise(ImageFilter):
 
 
 def box_blur(image):
-    """Размывает изображение усреднением соседних пикселей 3x3."""
+    """Размывает изображение усреднением соседних пикселей 3x3"""
 
     if image.ndim not in (2, 3):
         raise ValueError("Ожидается двумерное или цветное изображение")
@@ -260,7 +260,7 @@ def box_blur(image):
 
 
 class Neon(ImageFilter):
-    """Создаёт неоновое свечение на основных контурах изображения."""
+    """Создаёт неоновое свечение на основных контурах изображения"""
 
     def apply(self, image, strength=2.0, blur=1.3, **kwargs):
         if strength < 0:

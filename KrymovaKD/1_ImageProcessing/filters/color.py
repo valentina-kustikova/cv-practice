@@ -4,7 +4,7 @@ from .base import ImageFilter
 
 
 class Grayscale(ImageFilter):
-    """Преобразует изображение в оттенки серого."""
+    """Преобразует изображение в оттенки серого"""
 
     def apply(self, image, **kwargs):
         blue = image[:, :, 0].astype(np.float32)
@@ -17,7 +17,7 @@ class Grayscale(ImageFilter):
 
 
 class Antique(ImageFilter):
-    """Придаёт изображению тёплый оттенок сепии."""
+    """Придаёт изображению тёплый оттенок сепии"""
 
     def apply(self, image, **kwargs):
         blue = image[:, :, 0].astype(np.float32)
@@ -34,7 +34,7 @@ class Antique(ImageFilter):
 
 
 class FadeColor(ImageFilter):
-    """Имитирует выцветание изображения заданным цветом."""
+    """Имитирует выцветание изображения заданным цветом"""
 
     def apply(self, image, alpha=0.35, color=(235, 215, 175), **kwargs):
         if not 0 <= alpha <= 1:
