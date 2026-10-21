@@ -71,7 +71,7 @@ class ImageFilter(ABC):
             raise ValueError("Параметр strength должен быть в диапазоне от 0 до 1.")
         return strength
 
-
+"""_Resize_"""
 class Resize(ImageFilter):
     """Изменение размера изображения без вызова cv2.resize()."""
 
@@ -135,7 +135,7 @@ class RGB2GrayScale(ImageFilter):
     def apply_filter(self, image: ImageArray) -> ImageArray:
         return _gray_bgr(image)
 
-
+"""_Antique_"""
 class Antique(ImageFilter):
     """Сепия с мягким затемнением краёв — стилизация под старую фотографию."""
 
@@ -167,7 +167,7 @@ class Antique(ImageFilter):
         result = src * (1.0 - self.strength) + sepia * self.strength
         return _to_uint8(result)
 
-
+"""_Fade_"""
 class FadeColor(ImageFilter):
     """Выцветание: ослабление контраста, поднятие теней и уменьшение насыщенности."""
 
@@ -184,7 +184,7 @@ class FadeColor(ImageFilter):
         result = src * (1.0 - self.strength) + faded * self.strength
         return _to_uint8(result)
 
-
+"""_Film_"""
 class InfraredFilm(ImageFilter):
     """Стилизация под инфракрасную плёнку с псевдоцветным преобразованием каналов."""
 
@@ -209,7 +209,7 @@ class InfraredFilm(ImageFilter):
         result = src * (1.0 - self.strength) + pseudo_infrared * self.strength
         return _to_uint8(result)
 
-
+"""_Matte_"""
 class Matte(ImageFilter):
     """Белая овальная маска с плавным переходом к краям изображения."""
 
@@ -237,7 +237,7 @@ class Matte(ImageFilter):
         result = src * (1.0 - alpha) + 255.0 * alpha
         return _to_uint8(result)
 
-
+"""_Scratch_"""
 class ScratchesAndNoise(ImageFilter):
     """Добавляет зернистость и случайные светлые/тёмные царапины."""
 
@@ -291,7 +291,7 @@ class ScratchesAndNoise(ImageFilter):
 
         return result
 
-
+"""_Neon_"""
 class Neon(ImageFilter):
     """Неоновый эффект: градиенты Собеля, затемнение фона и цветное свечение контуров."""
 
