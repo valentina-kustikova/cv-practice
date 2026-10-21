@@ -204,36 +204,170 @@ class Neon(ImageFilter):
         self.neon_gain = neon_gain
         self.neon_brightness = neon_brightness
 
-    def apply_filter(self, image, neon_gain=None, neon_brightness=None):
-        neon_gain = self.neon_gain if neon_gain is None else neon_gain
-        neon_brightness = (
-            self.neon_brightness
-            if neon_brightness is None
-            else neon_brightness
-        )
-        if neon_gain <= 0:
-            raise ValueError("neon_gain must be positive")
-        if not 0 <= neon_brightness <= 1:
-            raise ValueError("neon_brightness must be between 0 and 1")
+#     def apply_filter(self, image, neon_gain=None, neon_brightness=None):
+#         neon_gain = self.neon_gain if neon_gain is None else neon_gain
+#         neon_brightness = (
+#             self.neon_brightness
+#             if neon_brightness is None
+#             else neon_brightness
+#         )
+#         if neon_gain <= 0:
+#             raise ValueError("neon_gain must be positive")
+#         if not 0 <= neon_brightness <= 1:
+#             raise ValueError("neon_brightness must be between 0 and 1")
 
-        gray = RGB2GrayScale().apply_filter(image).astype(np.float32)
-        horizontal_gradient = np.zeros_like(gray)
-        vertical_gradient = np.zeros_like(gray)
-        horizontal_gradient[:, :-1] = gray[:, 1:] - gray[:, :-1]
-        vertical_gradient[:-1, :] = gray[1:, :] - gray[:-1, :]
+#         gray = RGB2GrayScale().apply_filter(image).astype(np.float32)
+#         horizontal_gradient = np.zeros_like(gray)
+#         vertical_gradient = np.zeros_like(gray)
+#         horizontal_gradient[:, :-1] = gray[:, 1:] - gray[:, :-1]
+#         vertical_gradient[:-1, :] = gray[1:, :] - gray[:-1, :]
 
-        magnitude = np.sqrt(
-            horizontal_gradient**2 + vertical_gradient**2
-        )
-        magnitude = np.clip(magnitude * neon_gain, 0, 255)
-        magnitude = cv2.dilate(
-            magnitude, np.ones((5, 5), dtype=np.uint8)
-        )
-        result = image.astype(np.float32) * neon_brightness
-        result[:, :, 0] += magnitude
-        result[:, :, 2] += magnitude
-        return clip_image(result)
+#         magnitude = np.sqrt(
+#             horizontal_gradient**2 + vertical_gradient**2
+#         )
+#         magnitude = np.clip(magnitude * neon_gain, 0, 255)
+#         magnitude = cv2.dilate(
+#             magnitude, np.ones((5, 5), dtype=np.uint8)
+#         )
+#         result = image.astype(np.float32) * neon_brightness
+#         result[:, :, 0] += magnitude
+#         result[:, :, 2] += magnitude
+#         return clip_image(result)
 
+    # @staticmethod
+    # def _blur(image: np.ndarray, iterations: int) -> np.ndarray:
+    #     result = image.astype(np.float32)
+
+    #     for _ in range(iterations):
+    #         p = np.pad(result, 1, mode="edge")
+    #         result = (
+    #             p[:-2, :-2] + p[:-2, 1:-1] + p[:-2, 2:] +
+    #             p[1:-1, :-2] + p[1:-1, 1:-1] + p[1:-1, 2:] +
+    #             p[2:, :-2] + p[2:, 1:-1] + p[2:, 2:]
+    #         ) / 9.0
+
+    #     return result
+
+    # def apply_filter(self, img: Image) -> Image:
+    #     if self.neon_gain < 0:
+    #         raise ValueError("neon-strength должен быть >= 0")
+
+    #     if self.neon_brightness < 0:
+    #         raise ValueError("neon-blur должен быть >= 0")
+
+    #     gray = RGB2GrayScale().apply_filter(img).astype(
+    #         np.float32
+    #     )
+
+    #     gx = np.zeros_like(gray)
+    #     gy = np.zeros_like(gray)
+
+    #     gx[:, :-1] = gray[:, 1:] - gray[:, :-1]
+    #     gy[:-1, :] = gray[1:, :] - gray[:-1, :]
+
+    #     magnitude = np.sqrt(gx ** 2 + gy ** 2)
+    #     edges = np.clip(magnitude / 255.0, 0.0, 1.0)
+
+    #     soft_iterations = max(0, round(4 * self.neon_brightness))
+    #     wide_iterations = max(0, round(10 * self.neon_brightness))
+
+    #     soft_glow = self._blur(edges, soft_iterations)
+    #     wide_glow = self._blur(edges, wide_iterations)
+
+    #     glow = self.neon_gain * (
+    #         edges * 70.0
+    #         + soft_glow * 130.0
+    #         + wide_glow * 180.0
+    #     )
+
+    #     result = img.astype(np.float32).copy()
+
+    #     result[:, :, 0] = result[:, :, 0] * 0.8 + glow
+    #     result[:, :, 2] = result[:, :, 2] * 0.8 + glow
+
+    #     return np.clip(result, 0, 255).astype(np.uint8)
+
+    # def apply_filter(self, img, **kwargs):
+    #     gain = kwargs.get("neon_gain", 5.0)
+    #     if gain <= 0:
+    #         raise ValueError("neon_gain must be positive")
+
+    #     gray = RGB2GrayScale().apply_filter(img).astype(np.float32)
+
+    #     gx = np.zeros_like(gray)
+    #     gy = np.zeros_like(gray)
+
+    #     gx[:, :-1] = gray[:, 1:] - gray[:, :-1]
+    #     gy[:-1, :] = gray[1:, :] - gray[:-1, :]
+
+    #     magnitude = np.sqrt(gx**2 + gy**2)
+    #     magnitude = np.clip(magnitude * gain, 0, 255).astype(np.uint8)
+
+    #     #res = np.zeros_like(img)
+    #     res = img.astype(np.float32)
+    #     res[:, :, 0] += magnitude
+    #     res[:, :, 1] += magnitude
+    #     return np.clip(res, 0, 255).astype(np.uint8)
+
+    
+class Neon(ImageFilter):
+    def __init__(self, neon_gain=40, neon_brightness=0.8, color=(255, 10, 149), neon_brightness_width=10):
+        self.neon_gain = neon_gain
+        self.neon_brightness = neon_brightness
+        self.color = color
+        self.neon_brightness_width = neon_brightness_width
+
+    @staticmethod
+    def _dilate(mask):
+        out = mask.copy()
+        out[1:, :] = np.maximum(out[1:, :], mask[:-1, :])
+        out[:-1, :] = np.maximum(out[:-1, :], mask[1:, :])
+        out[:, 1:] = np.maximum(out[:, 1:], mask[:, :-1])
+        out[:, :-1] = np.maximum(out[:, :-1], mask[:, 1:])
+        return out
+
+    def _neon_brightness_by_dilation(self, mask, sigma):
+        neon_brightness = mask * 0.4
+        current = mask
+        radius = max(1, int(sigma * 3))
+        for r in range(1, radius + 1):
+            current = self._dilate(current)
+            weight = np.exp(-(r * r) / (2 * sigma * sigma)) * 0.4
+            neon_brightness = np.maximum(neon_brightness, current * weight)
+        return neon_brightness
+
+    def apply_filter(self, image):
+        img = image.astype(np.float32)
+        b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
+
+        
+        gray = RGB2GrayScale().apply_filter(img).astype(np.float32)
+
+
+        gx = np.zeros_like(gray)
+        gy = np.zeros_like(gray)
+        gx[:, 1:-1] = gray[:, 2:] - gray[:, :-2]
+        gy[1:-1, :] = gray[2:, :] - gray[:-2, :]
+        mag = np.sqrt(gx * gx + gy * gy)
+        mask = (mag > self.neon_gain).astype(np.float32)
+        sigma = max(1.0, float(self.neon_brightness_width))
+        neon_brightness_mask = self._neon_brightness_by_dilation(mask, sigma)
+
+        cb, cg, cr = self.color
+        base = img * 0.85
+
+        edges = np.zeros_like(img)
+        edges[:, :, 0] = mask * cb
+        edges[:, :, 1] = mask * cg
+        edges[:, :, 2] = mask * cr
+
+        neon_brightness_layer = np.zeros_like(img)
+        neon_brightness_layer[:, :, 0] = neon_brightness_mask * cb
+        neon_brightness_layer[:, :, 1] = neon_brightness_mask * cg
+        neon_brightness_layer[:, :, 2] = neon_brightness_mask * cr
+
+        out = base + edges + neon_brightness_layer * self.neon_brightness
+        return np.clip(out, 0, 255).astype(np.uint8)
 
 FILTERS = {
     "resize": Resize().apply_filter,
