@@ -18,11 +18,15 @@ def cli_argument_parser():
     parser.add_argument('--contrast', type=float, default=0.5,
                             help='Contrast amount for fade')
     parser.add_argument('--alpha', type=float, default=0.3,
-                            help='Alpha amount for matte and fade')
+                            help='Alpha amount for fade')
     parser.add_argument('--grain', type=float, default=0.05,
                                 help='Grain amount for film')
     parser.add_argument('--threshold', type=float, default=40,
                                     help='Threshold amount for neon')
     parser.add_argument('--glow_ksize', type=int, default=7,
                                     help='ksize amount for neon')
+    parser.add_argument('--radius', type=float, default=0.4,
+                                        help='radius amount for matte')
+    parser.add_argument('--softness', type=float, default=0.9,
+                                            help='softness amount for matte')
     return parser.parse_args()

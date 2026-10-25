@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 from abc import ABC
 from numpy.lib.stride_tricks import sliding_window_view
 
@@ -31,6 +32,7 @@ class ImageFilter(ABC):
     def apply_filter(self, image):
         pass
 
+
 class ResizeFilter(ImageFilter, filter_name='resize'):
     def __init__(self):
         self.width = self._cli_args.width
@@ -50,7 +52,6 @@ class ResizeFilter(ImageFilter, filter_name='resize'):
 
 
 class GrayscaleFilter(ImageFilter, filter_name='grayscale'):
-
     def apply_filter(self, image):
         b, g, r = image[:, :, 0], image[:, :, 1], image[:, :, 2]
         gray = 0.114 * b + 0.587 * g + 0.299 * r
@@ -119,21 +120,29 @@ class FilmFilter(ImageFilter, filter_name='film'):
 
 class MatteFilter(ImageFilter, filter_name='matte'):
     def __init__(self):
-        self.alpha = self._cli_args.alpha
+        self.radius = self._cli_args.radius
+        self.softness = self._cli_args.softness
 
     def apply_filter(self, image):
-        h, w = image.shape[:2]
+        img = image.astype(np.float32) / 255.0
+        h, w = img.shape[:2]
+
         y, x = np.ogrid[:h, :w]
-        center_y, center_x = h / 2, w / 2
+        cy, cx = h / 2, w / 2
+        dist = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
 
-        a = w * self.alpha
-        b = h * self.alpha
+        norm = min(h, w) / 2
+        d = dist / norm
 
-        mask = ((x - center_x) ** 2 / a ** 2 + (y - center_y) ** 2 / b ** 2) <= 1
+        t = np.clip((d - self.radius) / self.softness, 0, 1)
+        t = t * t * (3 - 2 * t)
+        t = t[:, :, np.newaxis]
 
-        result = image.copy()
-        result[~mask] = [255, 255, 255] 
-        return result
+        img = img * (1 - t) + t * 1.0
+
+        noise = np.random.normal(0, 0.02, img.shape)
+        img = np.clip(img + noise, 0, 1)
+        return (img * 255).astype(np.uint8)
 
 
 class ScratchesFilter(ImageFilter, filter_name='scratches'):
@@ -142,7 +151,8 @@ class ScratchesFilter(ImageFilter, filter_name='scratches'):
         self.noise_amount = self._cli_args.noise_amount
 
     def apply_filter(self, image):
-        img = image.copy()
+        old_im = AntiqueFilter().apply_filter(image)        
+        img = old_im.copy()
         h, w = img.shape[:2]
 
         for _ in range(self.num_scratches):
@@ -166,10 +176,10 @@ class NeonFilter(ImageFilter, filter_name='neon'):
 
     @staticmethod
     def convolve2d(img, kernel):
-                kh, kw = kernel.shape
-                padded = np.pad(img, ((kh//2, kh//2), (kw//2, kw//2)), mode='edge')
-                windows = sliding_window_view(padded, (kh, kw))
-                return np.sum(windows * kernel, axis=(-1, -2))
+        kh, kw = kernel.shape
+        padded = np.pad(img, ((kh//2, kh//2), (kw//2, kw//2)), mode='edge')
+        windows = sliding_window_view(padded, (kh, kw))
+        return np.sum(windows * kernel, axis=(-1, -2))
 
     @staticmethod
     def blur_channel(ch, kernel_1d, k):
@@ -186,16 +196,14 @@ class NeonFilter(ImageFilter, filter_name='neon'):
 
     def apply_filter(self, image):
         gray = GrayscaleFilter().apply_filter(image)
-    
         gray_f = gray.astype(np.float32)
 
         Kx = np.array([[-1, 0, 1],
-                       [-2, 0, 2],
-                       [-1, 0, 1]], dtype=np.float32)
+                    [-2, 0, 2],
+                    [-1, 0, 1]], dtype=np.float32)
         Ky = np.array([[-1, -2, -1],
-                       [ 0,  0,  0],
-                       [ 1,  2,  1]], dtype=np.float32)
-
+                    [ 0,  0,  0],
+                    [ 1,  2,  1]], dtype=np.float32)
 
         gx = self.convolve2d(gray_f, Kx)
         gy = self.convolve2d(gray_f, Ky)
@@ -203,14 +211,11 @@ class NeonFilter(ImageFilter, filter_name='neon'):
         magnitude = np.sqrt(gx * gx + gy * gy)
         if magnitude.max() > 0:
             magnitude = magnitude / magnitude.max() * 255.0
-        magnitude = magnitude.astype(np.uint8)
 
-        edges = (magnitude > self.threshold).astype(np.uint8) * 255
+        edges = (magnitude > self.threshold).astype(np.float32)
 
-        neon = np.zeros_like(image)
-        if neon.ndim == 2:
-            neon = np.stack([neon] * 3, axis=-1)
-        neon[edges > 0] = (255, 255, 0)
+        neon_color = np.array([255.0, 255.0, 0.0], dtype=np.float32)
+        edge_layer = edges[..., None] * neon_color
 
         k = self.glow_ksize
         sigma = k / 6.0
@@ -218,11 +223,10 @@ class NeonFilter(ImageFilter, filter_name='neon'):
         kernel_1d = np.exp(-x**2 / (2 * sigma**2))
         kernel_1d /= kernel_1d.sum()
 
-
-        glow = np.zeros_like(neon, dtype=np.float32)
+        glow = np.zeros_like(edge_layer, dtype=np.float32)
         for c in range(3):
-            glow[:, :, c] = self.blur_channel(neon[:, :, c].astype(np.float32), kernel_1d, k)
+            glow[:, :, c] = self.blur_channel(edge_layer[:, :, c], kernel_1d, k)
 
-        result = neon.astype(np.float32) + glow * 0.7
+        result = image.astype(np.float32) + edge_layer * 0.5 + glow * 0.9
         result = np.clip(result, 0, 255).astype(np.uint8)
         return result
