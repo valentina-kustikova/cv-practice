@@ -63,14 +63,32 @@ class Grayscale(ImageFilter):
 
 
 class Antique(ImageFilter):
+    def __init__(self, vignette_strength: float = 0.5):
+        self.vignette_strength = max(0.0, min(1.0, float(vignette_strength)))
+
     def apply_filter(self, image: np.ndarray) -> np.ndarray:
         gray = Grayscale().apply_filter(image).astype(np.float32)
         sepia = np.zeros((gray.shape[0], gray.shape[1], 3), dtype=np.uint8)
-        # R = 1.07 * Y, G = 0.74 * Y, B = 0.43 * Y
-        sepia[:, :, 0] = np.clip(gray * 0.43, 0, 255)  
-        sepia[:, :, 1] = np.clip(gray * 0.74, 0, 255)   
-        sepia[:, :, 2] = np.clip(gray * 1.07, 0, 255)  
-        
+
+        sepia[:, :, 0] = np.clip(gray * 0.43, 0, 255)   # B
+        sepia[:, :, 1] = np.clip(gray * 0.74, 0, 255)   # G
+        sepia[:, :, 2] = np.clip(gray * 1.07, 0, 255)   # R
+
+        if self.vignette_strength > 0:
+            h, w = sepia.shape[:2]
+            cy, cx = h / 2.0, w / 2.0
+            rx, ry = cx, cy
+
+            y_idx, x_idx = np.ogrid[:h, :w]
+            d = np.sqrt(((x_idx - cx) / rx) ** 2 + ((y_idx - cy) / ry) ** 2)
+
+            mask = np.clip((d - 0.4) / 0.6, 0.0, 1.0)
+            mask = (mask ** 1.5) * self.vignette_strength
+            mask = mask[..., np.newaxis]
+
+            sepia = sepia.astype(np.float32) * (1.0 - mask)
+            sepia = np.clip(sepia, 0, 255).astype(np.uint8)
+
         return sepia
 
 class FadeColor(ImageFilter):
@@ -138,38 +156,47 @@ class AgedPhoto(ImageFilter):
             res[:, x_line] = res[:, x_line] * 0.85 + 255 * 0.15
 
         return np.clip(res, 0, 255).astype(np.uint8)
-
+        
 class Neon(ImageFilter):
-    def __init__(self, gain: float = 2.5, threshold: float = 0.05, glow: bool = True):
-        self.gain = float(gain)
+    def __init__(self, threshold: float = 0.04, glow: float = 1.0,
+                 dim: float = 0.55, color: tuple = (255, 255, 50),
+                 glow_width: float = 4.0):
         self.threshold = max(0.0, min(1.0, float(threshold)))
-        self.glow = glow
+        self.glow = float(glow)
+        self.dim = max(0.1, min(1.0, float(dim)))
+        self.color = tuple(color)
+        self.glow_width = max(1.0, float(glow_width))
 
     def _sobel(self, gray: np.ndarray) -> np.ndarray:
-        padded = np.pad(gray, 1, mode='edge')
-        gx = (-1 * padded[:-2, :-2] + 1 * padded[:-2, 2:] +
-              -2 * padded[1:-1, :-2] + 2 * padded[1:-1, 2:] +
-              -1 * padded[2:, :-2] + 1 * padded[2:, 2:])
-        gy = (-1 * padded[:-2, :-2] - 2 * padded[:-2, 1:-1] - 1 * padded[:-2, 2:] +
-               1 * padded[2:, :-2] + 2 * padded[2:, 1:-1] + 1 * padded[2:, 2:])
+        p = np.pad(gray, 1, mode='edge')
+        gx = (-1 * p[:-2, :-2] + 1 * p[:-2, 2:] +
+              -2 * p[1:-1, :-2] + 2 * p[1:-1, 2:] +
+              -1 * p[2:, :-2] + 1 * p[2:, 2:])
+        gy = (-1 * p[:-2, :-2] - 2 * p[:-2, 1:-1] - 1 * p[:-2, 2:] +
+               1 * p[2:, :-2] + 2 * p[2:, 1:-1] + 1 * p[2:, 2:])
         return np.sqrt(gx**2 + gy**2)
 
-    def _dilate(self, mask: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def _dilate(mask: np.ndarray) -> np.ndarray:
         p = np.pad(mask, 1, mode='constant', constant_values=0)
-        result = np.zeros_like(mask)
-        for i in range(3):
-            for j in range(3):
-                result = np.maximum(result, p[i:i+mask.shape[0], j:j+mask.shape[1]])
-        return result
+        h, w = mask.shape
+        out = np.zeros_like(mask)
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                if dy == 0 and dx == 0:
+                    continue
+                out = np.maximum(out, p[1+dy:1+dy+h, 1+dx:1+dx+w])
+        return out
 
-    def _blur(self, mask: np.ndarray, radius: int = 5) -> np.ndarray:
-        result = mask.copy()
-        for _ in range(radius):
-            p = np.pad(result, 1, mode='edge')
-            result = (p[:-2, 1:-1] + p[2:, 1:-1] +
-                      p[1:-1, :-2] + p[1:-1, 2:] +
-                      p[1:-1, 1:-1] * 4) / 8.0
-        return result
+    def _glow_by_dilation(self, mask: np.ndarray, sigma: float) -> np.ndarray:
+        glow = mask * 0.5
+        current = mask
+        radius = max(1, int(sigma * 1.5))
+        for r in range(1, radius + 1):
+            current = self._dilate(current)
+            weight = np.exp(-(r * r) / (2 * (sigma / 2) ** 2)) * 0.9
+            glow = np.maximum(glow, current * weight)
+        return glow
 
     def apply_filter(self, image: np.ndarray) -> np.ndarray:
         gray = Grayscale().apply_filter(image).astype(np.float32)
@@ -179,24 +206,27 @@ class Neon(ImageFilter):
         if max_val > 0:
             edges = edges / max_val
 
-        edges = np.where(edges > self.threshold, edges, 0.0)
-        thick = self._dilate(edges)
-        thick = np.clip(thick * self.gain, 0.0, 1.0)
-        if self.glow:
-            aura = self._blur(edges, radius=6) * 0.8
-            mask = np.clip(thick + aura, 0.0, 1.0)
-        else:
-            mask = thick
-        neon_color = np.array([255, 255, 50], dtype=np.float32)
-
-        alpha = mask[..., np.newaxis]
+        mask = (edges > self.threshold).astype(np.float32)
+        glow_mask = self._glow_by_dilation(mask, self.glow_width)
 
         if len(image.shape) == 2:
             base = np.stack((image,) * 3, axis=-1).astype(np.float32)
         else:
             base = image[:, :, :3].astype(np.float32)
+        base = base * self.dim
 
-        result = base * (1.0 - alpha) + neon_color * alpha
+        cb, cg, cr = self.color
+        edges_layer = np.zeros_like(base)
+        edges_layer[:, :, 0] = mask * cb
+        edges_layer[:, :, 1] = mask * cg
+        edges_layer[:, :, 2] = mask * cr
+
+        glow_layer = np.zeros_like(base)
+        glow_layer[:, :, 0] = glow_mask * cb
+        glow_layer[:, :, 1] = glow_mask * cg
+        glow_layer[:, :, 2] = glow_mask * cr
+
+        result = base + edges_layer + glow_layer * self.glow
         result = np.clip(result, 0, 255).astype(np.uint8)
 
         if len(image.shape) == 3 and image.shape[2] == 4:
