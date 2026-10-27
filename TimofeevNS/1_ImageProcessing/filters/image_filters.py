@@ -8,7 +8,9 @@
 """
 
 import random
-from typing import List, Tuple, Set, Dict, Any
+import math
+from collections import deque
+from typing import List, Tuple, Set, Dict, Any, Optional
 
 import numpy as np
 
@@ -16,11 +18,10 @@ Point = Tuple[int, int]
 
 
 # ============================================================
-# Базовые матричные операции (реализованы вручную)
+# Базовые матричные операции
 # ============================================================
 
 def _to_grayscale(image: np.ndarray) -> np.ndarray:
-    """BGR -> gray: 0.114*B + 0.587*G + 0.299*R."""
     b = image[..., 0].astype(np.float32)
     g = image[..., 1].astype(np.float32)
     r = image[..., 2].astype(np.float32)
@@ -28,7 +29,6 @@ def _to_grayscale(image: np.ndarray) -> np.ndarray:
 
 
 def _convolve2d(gray: np.ndarray, kernel: np.ndarray) -> np.ndarray:
-    """2D свёртка произвольным ядром (edge-padding)."""
     kh, kw = kernel.shape
     ph, pw = kh // 2, kw // 2
     padded = np.pad(gray, ((ph, ph), (pw, pw)), mode='edge')
@@ -41,7 +41,6 @@ def _convolve2d(gray: np.ndarray, kernel: np.ndarray) -> np.ndarray:
 
 
 def _dilate(mask: np.ndarray, thickness: int) -> np.ndarray:
-    """Утолщение маски. thickness — желаемый размер ядра (нечётное)."""
     if thickness <= 1:
         return mask.copy()
     r = (thickness - 1) // 2
@@ -62,7 +61,6 @@ def _gaussian_kernel_1d(sigma: float) -> np.ndarray:
 
 
 def _gaussian_blur(gray: np.ndarray, sigma: float) -> np.ndarray:
-    """Разделимое гауссово размытие (строки, потом столбцы)."""
     k = _gaussian_kernel_1d(sigma)
     r = len(k) // 2
     h, w = gray.shape
@@ -80,18 +78,15 @@ def _gaussian_blur(gray: np.ndarray, sigma: float) -> np.ndarray:
 
 
 def _ellipse_mask(h: int, w: int) -> np.ndarray:
-    """Бинарная маска эллипса: центр — центр изображения,
-    полуоси = w/2 и h/2."""
-    cy, cx = (h - 1) / 2.0, (w - 1) / 2.0 # зачем?
+    cy, cx = (h - 1) / 2.0, (w - 1) / 2.0
     a, b = w / 2.0, h / 2.0
     ys = np.arange(h, dtype=np.float32)[:, None]
     xs = np.arange(w, dtype=np.float32)[None, :]
-    inside = ((xs - cx) / a) ** 2 + ((ys - cy) / b) ** 2 <= 1.0 # зачем?
+    inside = ((xs - cx) / a) ** 2 + ((ys - cy) / b) ** 2 <= 1.0
     return inside.astype(np.uint8) * 255
 
 
 def _bresenham_line(p1: Point, p2: Point) -> List[Point]:
-    """Целочисленный отрезок между p1 и p2 (алгоритм Брезенхэма)."""
     y1, x1 = int(p1[0]), int(p1[1])
     y2, x2 = int(p2[0]), int(p2[1])
     pts: List[Point] = []
@@ -115,7 +110,6 @@ def _bresenham_line(p1: Point, p2: Point) -> List[Point]:
 
 
 def _stamp_square(mask: np.ndarray, cy: int, cx: int, thickness: int) -> None:
-    """Штамп квадрата thickness x thickness в точке (cy, cx)."""
     h, w = mask.shape
     r = (thickness - 1) // 2
     y0, y1_ = max(0, cy - r), min(h, cy + r + 1)
@@ -125,7 +119,7 @@ def _stamp_square(mask: np.ndarray, cy: int, cx: int, thickness: int) -> None:
 
 
 # ============================================================
-# 5. Генератор рандомных точек
+# 5. Генератор случайных точек
 # ============================================================
 
 def generate_random_points(image_shape: Tuple[int, ...], count: int) -> List[Point]:
@@ -135,7 +129,7 @@ def generate_random_points(image_shape: Tuple[int, ...], count: int) -> List[Poi
 
 
 # ============================================================
-# 1. Белый шум
+# 1-3. Шумы
 # ============================================================
 
 def add_white_noise(image: np.ndarray, count: int) -> np.ndarray:
@@ -145,20 +139,12 @@ def add_white_noise(image: np.ndarray, count: int) -> np.ndarray:
     return result
 
 
-# ============================================================
-# 2. Чёрный шум
-# ============================================================
-
 def add_black_noise(image: np.ndarray, count: int) -> np.ndarray:
     result = image.copy()
     for (y, x) in generate_random_points(result.shape, count):
         result[y, x] = (0, 0, 0)
     return result
 
-
-# ============================================================
-# 3. Соль и перец
-# ============================================================
 
 def add_salt_pepper_noise(image: np.ndarray, count: int) -> np.ndarray:
     salt_count = count // 2
@@ -169,7 +155,7 @@ def add_salt_pepper_noise(image: np.ndarray, count: int) -> np.ndarray:
 
 
 # ============================================================
-# Понижение интенсивности в точке
+# 4. Понижение интенсивности
 # ============================================================
 
 def reduce_intensity_at_point(image: np.ndarray, point: Point,
@@ -178,16 +164,12 @@ def reduce_intensity_at_point(image: np.ndarray, point: Point,
     y, x = point
     result[y, x] = np.clip(result[y, x].astype(np.float32) * factor, 0, 255)\
         .astype(np.uint8)
-    return result # удалить
+    return result
 
-
-# ============================================================
-# 4. Понижение интенсивности
-# ============================================================
 
 def reduce_intensity(image: np.ndarray,
-                               points: Set[Point],
-                               factor: float = 0.5) -> np.ndarray:
+                     points: Set[Point],
+                     factor: float = 0.5) -> np.ndarray:
     result = image.copy()
     for point in points:
         y, x = point
@@ -205,7 +187,7 @@ def apply_ellipse_mask(image: np.ndarray,
     h, w = image.shape[:2]
     mask = _ellipse_mask(h, w)
     result = image.copy()
-    result[mask == 0] = color #
+    result[mask == 0] = color
     return result
 
 
@@ -213,28 +195,11 @@ def apply_ellipse_mask(image: np.ndarray,
 # 7. Разрастание региона
 # ============================================================
 
-from collections import deque
-
-
 def grow_region(image: np.ndarray,
                 center: Point,
                 depth: int,
                 tolerance: int = 0,
                 connectivity: int = 8) -> Set[Point]:
-    """
-    Разрастание региона от точки `center` на `depth` порядков соседства.
-
-    depth=0 -> только центр
-    depth=1 -> центр + его соседи
-    depth=2 -> плюс соседи соседей
-    ...
-
-    В регион попадают только пиксели того же цвета, что и центральный
-    (с допуском `tolerance` по каждому каналу).
-    `connectivity` = 4 или 8 — сколько соседей рассматривать.
-
-    Возвращает множество точек (y, x).
-    """
     h, w = image.shape[:2]
     cy, cx = center
 
@@ -258,7 +223,6 @@ def grow_region(image: np.ndarray,
     visited: Set[Point] = {(cy, cx)}
     frontier: deque = deque([(cy, cx)])
 
-    # depth + 1, потому что depth=0 — это сам центр (нулевой порядок)
     for _ in range(depth + 1):
         if not frontier:
             break
@@ -280,15 +244,7 @@ def grow_region(image: np.ndarray,
     return region
 
 
-
-# ============================================================
-# Функция возврата множества всех точек изображения
-# ============================================================
-
-
-
 def all_points(image: np.ndarray) -> Set[Point]:
-    """Возвращает множество всех точек (y, x) изображения."""
     h, w = image.shape[:2]
     return {(y, x) for y in range(h) for x in range(w)}
 
@@ -335,10 +291,6 @@ FILM_DEFECT_TABLE: Dict[str, Dict[str, Any]] = {
 }
 
 
-# ============================================================
-# 8. Применение дефекта плёнки
-# ============================================================
-
 def apply_film_defect(image: np.ndarray, film_type: str,
                       region: Set[Point]) -> np.ndarray:
     if film_type not in FILM_DEFECT_TABLE:
@@ -354,7 +306,7 @@ def apply_film_defect(image: np.ndarray, film_type: str,
 
 
 # ============================================================
-# 10. Засеривание ("выцветание")
+# 10. Засеривание
 # ============================================================
 
 def desaturate_region(image: np.ndarray, region: Set[Point],
@@ -369,22 +321,23 @@ def desaturate_region(image: np.ndarray, region: Set[Point],
 
 
 # ============================================================
-# Генератор (царапин)
+# 11-12. Царапины
 # ============================================================
 
-import math
-
-
 def _fill_rhombus(mask: np.ndarray,
-                  p1: Point,
-                  p2: Point,
+                  p1: Point, p2: Point,
                   half_diag_fraction: float = 0.02) -> None:
     """
-    Заливает в `mask` (uint8, значения 0/255) ромб с диагоналями:
-      - по отрезку p1–p2 (его длина L),
-      - по перпендикуляру через середину, полудлина = half_diag_fraction * L.
+    Заполняет в mask ромб с вершинами p1, p3, p2, p4.
 
-    p1, p2 — координаты (y, x). Если p1 == p2, ставится одна точка.
+    - p1, p2 — концы отрезка (главная диагональ).
+    - p3, p4 — на смещении от середины:
+          x_offset = ±L * half_diag_fraction * sin(angle)
+          y_offset = ±L * half_diag_fraction * cos(angle)
+      где sin(angle) = dy/L, cos(angle) = dx/L, L — длина отрезка.
+
+    Заливаются точки из bbox{p1,p2,p3,p4}, лежащие внутри фигуры,
+    ограниченной прямыми p1-p3, p3-p2, p2-p4, p4-p1.
     """
     h, w = mask.shape[:2]
     y1, x1 = int(p1[0]), int(p1[1])
@@ -395,71 +348,128 @@ def _fill_rhombus(mask: np.ndarray,
     length = math.hypot(dy, dx)
 
     if length == 0:
-        # Вырожденный отрезок — одна точка
         if 0 <= y1 < h and 0 <= x1 < w:
             mask[y1, x1] = 255
         return
 
-    # Ортонормированный базис: e_d — вдоль отрезка, e_p — перпендикуляр
-    uy, ux = dy / length, dx / length     # e_d
-    py, px = -ux, uy                       # e_p = поворот e_d на 90°
+    # sin/cos угла, под которым лежит отрезок (от оси x)
+    sin_a = dy / length
+    cos_a = dx / length
 
-    half = length / 2.0                    # полудиагональ вдоль отрезка
-    perp_half = half_diag_fraction * length  # полудиагональ по перпендикуляру
+    # Середина отрезка
+    my = (y1 + y2) / 2.0
+    mx = (x1 + x2) / 2.0
 
-    # Центр ромба — середина отрезка
-    my, mx = (y1 + y2) / 2.0, (x1 + x2) / 2.0
+    # Смещение для p3, p4
+    offset = length * half_diag_fraction
+    x_off = offset * sin_a
+    y_off = offset * cos_a
 
-    # Границы bounding box (проекции половин диагоналей на оси y и x)
-    ext_y = abs(uy) * half + abs(py) * perp_half
-    ext_x = abs(ux) * half + abs(px) * perp_half
+    # p3, p4 в координатах (y, x)
+    py3 = my + y_off
+    px3 = mx + x_off
+    py4 = my - y_off
+    px4 = mx - x_off
 
-    y_min = max(0, int(math.floor(my - ext_y)) - 1)
-    y_max = min(h - 1, int(math.ceil(my + ext_y)) + 1)
-    x_min = max(0, int(math.floor(mx - ext_x)) - 1)
-    x_max = min(w - 1, int(math.ceil(mx + ext_x)) + 1)
+    # Вырожденный случай: все 4 точки оказались на одной прямой.
+    # Такое бывает, например, для строго диагональных отрезков (dy == ±dx).
+    # В этом случае формула даёт не ромб, а отрезок — заливаем его.
+    cross_3 = (y2 - y1) * (px3 - x1) - (x2 - x1) * (py3 - y1)
+    cross_4 = (y2 - y1) * (px4 - x1) - (x2 - x1) * (py4 - y1)
+    if abs(cross_3) < 1e-6 and abs(cross_4) < 1e-6:
+        steps = max(abs(dy), abs(dx), 1)
+        for i in range(steps + 1):
+            t = i / steps
+            yy = int(round(y1 + t * dy))
+            xx = int(round(x1 + t * dx))
+            if 0 <= yy < h and 0 <= xx < w:
+                mask[yy, xx] = 255
+        return
 
-    # Точка внутри ромба <=> сумма нормированных проекций <= 1
+    # Bbox, содержащий все 4 вершины
+    ys_all = (y1, y2, py3, py4)
+    xs_all = (x1, x2, px3, px4)
+    y_min = max(0, int(math.floor(min(ys_all))) - 1)
+    y_max = min(h - 1, int(math.ceil(max(ys_all))) + 1)
+    x_min = max(0, int(math.floor(min(xs_all))) - 1)
+    x_max = min(w - 1, int(math.ceil(max(xs_all))) + 1)
+
+    # Центр ромба = середина p1-p2 = середина p3-p4
+    cy, cx = my, mx
+
+    # Знаки cross-произведений центра относительно каждой из 4 сторон
+    # задают «внутреннюю» сторону.
+    ref_1 = (px3 - x1) * (cy - y1) - (py3 - y1) * (cx - x1)
+    ref_2 = (x2 - px3) * (cy - py3) - (y2 - py3) * (cx - px3)
+    ref_3 = (px4 - x2) * (cy - y2) - (py4 - y2) * (cx - x2)
+    ref_4 = (x1 - px4) * (cy - py4) - (y1 - py4) * (cx - px4)
+
     for y in range(y_min, y_max + 1):
-        vy = y - my
         for x in range(x_min, x_max + 1):
-            vx = x - mx
-            proj_d = vy * uy + vx * ux      # проекция на длинную диагональ
-            proj_p = vy * py + vx * px      # проекция на короткую диагональ
-            if abs(proj_d) / half + abs(proj_p) / perp_half <= 1.0:
+            s1 = (px3 - x1) * (y - y1) - (py3 - y1) * (x - x1)
+            s2 = (x2 - px3) * (y - py3) - (y2 - py3) * (x - px3)
+            s3 = (px4 - x2) * (y - y2) - (py4 - y2) * (x - x2)
+            s4 = (x1 - px4) * (y - py4) - (y1 - py4) * (x - px4)
+            if (s1 * ref_1 >= 0 and s2 * ref_2 >= 0
+                    and s3 * ref_3 >= 0 and s4 * ref_4 >= 0):
                 mask[y, x] = 255
-
-
-
-# ============================================================
-# 11. Генератор рандомных отрезков (царапин) + растеризация
-# ============================================================
 
 
 def generate_scratches(image_shape: Tuple[int, ...],
                        scratch_coefficient: float,
                        max_segments: int = 30,
-                       max_thickness: int = 3
+                       max_thickness: int = 3,
+                       max_length: float = -1
                        ) -> List[Tuple[Point, Point, int]]:
+    """
+    Генерирует n = max_segments * scratch_coefficient царапин.
+
+    Если задан max_length (в пикселях):
+      генерируются случайные кандидаты, из них отбираются только те,
+      чья длина не превышает max_length; процесс повторяется, пока не
+      наберётся n подходящих царапин (или пока не будет исчерпан лимит
+      попыток — тогда возвращается меньше n).
+
+    max_length=None или <= 0 — без ограничения (прежнее поведение).
+    """
     h, w = image_shape[:2]
     n = max(1, int(max_segments * scratch_coefficient))
+
+    # Без ограничения длины — генерируем n штук сразу
+    if max_length <= 0:
+        max_length = max_segments + 5
+
     scratches: List[Tuple[Point, Point, int]] = []
-    for _ in range(n):
-        p1 = (random.randint(0, h - 1), random.randint(0, w - 1))
-        p2 = (random.randint(0, h - 1), random.randint(0, w - 1))
-        thickness = random.randint(1, max_thickness)
-        scratches.append((p1, p2, thickness))
+    attempts = 0
+    max_attempts = n * 100  # страховка от бесконечного цикла
+
+    while len(scratches) < n and attempts < max_attempts:
+        # Батч кандидатов размером «сколько ещё не хватает»
+        remaining = n - len(scratches)
+        batch: List[Tuple[Point, Point, int]] = []
+
+        for _ in range(remaining):
+            if attempts >= max_attempts:
+                break
+            p1 = (random.randint(0, h - 1), random.randint(0, w - 1))
+            p2 = (random.randint(0, h - 1), random.randint(0, w - 1))
+            attempts += 1
+
+            length = p2[0] - p1[0] + p2[1] - p1[1] # манхэттен
+            if length <= max_length:
+                thickness = random.randint(1, max_thickness)
+                batch.append((p1, p2, thickness))
+
+        # Отбираем из батча столько, сколько ещё нужно
+        need = n - len(scratches)
+        scratches.extend(batch[:need])
+
     return scratches
 
 
 def scratches_to_mask(image_shape: Tuple[int, ...],
                       scratches: List[Tuple[Point, Point, int]],
                       half_diag_fraction: float = 0.02) -> np.ndarray:
-    """
-    Растеризует царапины как ромбовидные углубления.
-    Третий элемент в каждой записи (толщина) сохраняется для совместимости,
-    но больше не используется — форма определяется только отрезком.
-    """
     h, w = image_shape[:2]
     mask = np.zeros((h, w), dtype=np.uint8)
     for entry in scratches:
@@ -468,18 +478,15 @@ def scratches_to_mask(image_shape: Tuple[int, ...],
     return mask
 
 
-# ============================================================
-# 12. Царапание
-# ============================================================
-
 def apply_scratches(image: np.ndarray,
                     scratch_coefficient: float,
                     scratch_color: Tuple[int, int, int] = (255, 255, 255),
-                    intensity: float = 0.8,
-                    max_segments: int = 10,
+                    intensity: float = 0.5,
+                    max_segments: int = 20,
                     max_thickness: int = 3,
                     half_diag_fraction: float = 0.02) -> np.ndarray:
-    scratches = generate_scratches(image.shape, scratch_coefficient, max_segments, max_thickness)
+    scratches = generate_scratches(image.shape, scratch_coefficient,
+                                   max_segments, max_thickness)
     mask = scratches_to_mask(image.shape, scratches, half_diag_fraction)
     mask_bool = mask > 0
 
@@ -493,7 +500,7 @@ def apply_scratches(image: np.ndarray,
 
 
 # ============================================================
-# 13. Выделение краёв (Sobel + гистерезис)
+# 13. Края (Sobel + гистерезис)
 # ============================================================
 
 _SOBEL_X = np.array([[-1, 0, 1],
@@ -554,28 +561,22 @@ def neonify(image: np.ndarray,
     result[edges > 0] = glow_color
     return result
 
-# ============================================================
-# 15. по Отцу
-# ============================================================
 
+# ============================================================
+# 15. Оцу
+# ============================================================
 
 def otsu_threshold(gray: np.ndarray) -> int:
-    """
-    Вычисляет порог бинаризации методом Оцу для grayscale-изображения (H, W).
-    Возвращает целое число 0..255.
-    """
-    hist = np.bincount(gray.ravel().astype(np.uint8), minlength=256) \
+    hist = np.bincount(gray.ravel().astype(np.uint8), minlength=256)\
              .astype(np.float64)
     total = hist.sum()
     if total == 0:
         return 0
 
-    # Накопленные суммы для быстрого вычисления mu0, mu1
     levels = np.arange(256, dtype=np.float64)
-    cum_count = np.cumsum(hist)              # omega0 * total
-    cum_sum = np.cumsum(hist * levels)       # sum of i*hist[i] up to t
+    cum_count = np.cumsum(hist)
+    cum_sum = np.cumsum(hist * levels)
 
-    # Защита от деления на 0: где cum_count == 0 или == total, дисперсия = 0
     w0 = cum_count / total
     w1 = 1.0 - w0
 
@@ -592,30 +593,411 @@ def otsu_threshold(gray: np.ndarray) -> int:
 
 
 def otsu_binarize(image: np.ndarray, invert: bool = False) -> np.ndarray:
-    """
-    Бинаризует изображение методом Оцу.
-
-    Параметры
-    ---------
-    image : np.ndarray
-        BGR-изображение (H, W, 3) или grayscale (H, W).
-    invert : bool
-        Если True, инвертирует результат (фон — белый, объект — чёрный).
-
-    Возвращает
-    ----------
-    np.ndarray
-        Бинарное изображение (H, W), значения 0 или 255, dtype=uint8.
-    """
     if image.ndim == 3:
         gray = _to_grayscale(image).astype(np.uint8)
     else:
         gray = image.astype(np.uint8)
 
     t = otsu_threshold(gray)
-    # Пиксели строго выше порога — 255, иначе 0
     binary = np.where(gray > t, 255, 0).astype(np.uint8)
 
     if invert:
         binary = 255 - binary
     return binary
+
+
+# ============================================================
+# 16-17. edxdy — регионы между вложенными эллипсами
+# ============================================================
+
+def _ellipse_boundary(cx: float, cy: float,
+                      a: float, b: float,
+                      W: int, H: int) -> Set[Point]:
+    if a <= 0 or b <= 0:
+        return set()
+
+    perimeter = math.pi * (
+        3 * (a + b) - math.sqrt(max(0.0, (3 * a + b) * (a + 3 * b)))
+    )
+    n_samples = max(8, int(perimeter * 4))
+
+    pts: Set[Point] = set()
+    for k in range(n_samples):
+        theta = 2.0 * math.pi * k / n_samples
+        x = int(round(cx + a * math.cos(theta)))
+        y = int(round(cy + b * math.sin(theta)))
+        if 0 <= y < H and 0 <= x < W:
+            pts.add((y, x))
+    return pts
+
+
+def edxdy(image: np.ndarray,
+          center: Point,
+          h_semi: float, v_semi: float,
+          dx: float, dy: float,
+          max_rings: int = 500) -> List[Set[Point]]:
+    H, W = image.shape[:2]
+    cy, cx = center
+
+    if dx <= 0 or dy <= 0:
+        raise ValueError('dx and dy must be positive')
+    if h_semi <= 0 or v_semi <= 0:
+        raise ValueError('semi-axes must be positive')
+
+    ellipses: List[Tuple[float, float]] = []
+    i = 0
+    while i < max_rings:
+        a = h_semi + i * dx
+        b = v_semi + i * dy
+        ellipses.append((a, b))
+
+        max_h = max(abs(cx - 0.0), abs(cx - (W - 1)))
+        max_v = max(abs(cy - 0.0), abs(cy - (H - 1)))
+        if (max_h / a) ** 2 + (max_v / b) ** 2 <= 1.0:
+            break
+        i += 1
+
+    N = len(ellipses)
+    if N == 0:
+        return []
+
+    ys = np.arange(H, dtype=np.float32)[:, None]
+    xs = np.arange(W, dtype=np.float32)[None, :]
+
+    result: List[Set[Point]] = []
+    prev_inside = None
+
+    for i, (a, b) in enumerate(ellipses):
+        e = ((xs - cx) / a) ** 2 + ((ys - cy) / b) ** 2
+        cur_inside = e <= 1.0
+
+        if i == 0:
+            region_mask = cur_inside
+        else:
+            region_mask = cur_inside & ~prev_inside
+
+        ys_r, xs_r = np.where(region_mask)
+        result.append(set(zip(ys_r.tolist(), xs_r.tolist())))
+        prev_inside = cur_inside
+
+    return result
+
+
+def edxdy_masks(image: np.ndarray,
+                center: Point,
+                h_semi: float, v_semi: float,
+                dx: float, dy: float,
+                max_rings: int = 500) -> List[np.ndarray]:
+    H, W = image.shape[:2]
+    cy, cx = center
+
+    if dx <= 0 or dy <= 0:
+        raise ValueError('dx and dy must be positive')
+    if h_semi <= 0 or v_semi <= 0:
+        raise ValueError('semi-axes must be positive')
+
+    ellipses: List[Tuple[float, float]] = []
+    i = 0
+    while i < max_rings:
+        a = h_semi + i * dx
+        b = v_semi + i * dy
+        ellipses.append((a, b))
+        max_h = max(abs(cx - 0.0), abs(cx - (W - 1)))
+        max_v = max(abs(cy - 0.0), abs(cy - (H - 1)))
+        if (max_h / a) ** 2 + (max_v / b) ** 2 <= 1.0:
+            break
+        i += 1
+
+    N = len(ellipses)
+    if N == 0:
+        return []
+
+    ys = np.arange(H, dtype=np.float32)[:, None]
+    xs = np.arange(W, dtype=np.float32)[None, :]
+
+    result: List[np.ndarray] = []
+    prev_inside = None
+
+    for i, (a, b) in enumerate(ellipses):
+        e = ((xs - cx) / a) ** 2 + ((ys - cy) / b) ** 2
+        cur_inside = e <= 1.0
+
+        if i == 0:
+            result.append(cur_inside.copy())
+        else:
+            result.append(cur_inside & ~prev_inside)
+
+        prev_inside = cur_inside
+
+    return result
+
+
+# ============================================================
+# 18-20. Виньетки
+# ============================================================
+
+def _apply_vignette_rings_sets(image: np.ndarray,
+                               rings: List[Set[Point]],
+                               brighten: bool,
+                               strength: float) -> np.ndarray:
+    N = len(rings)
+    if N <= 1:
+        return image.copy()
+
+    result = image.astype(np.float32)
+    for i, ring in enumerate(rings):
+        amount = (i / (N - 1)) * strength
+        amount = min(max(amount, 0.0), 1.0)
+        for (y, x) in ring:
+            px = result[y, x]
+            if brighten:
+                result[y, x] = px + (255.0 - px) * amount
+            else:
+                result[y, x] = px * (1.0 - amount)
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+
+def _apply_vignette_rings_masks(image: np.ndarray,
+                                masks: List[np.ndarray],
+                                brighten: bool,
+                                strength: float) -> np.ndarray:
+    N = len(masks)
+    if N <= 1:
+        return image.copy()
+
+    result = image.astype(np.float32)
+    for i, mask in enumerate(masks):
+        amount = (i / (N - 1)) * strength
+        amount = min(max(amount, 0.0), 1.0)
+        if not mask.any():
+            continue
+        px = result[mask]
+        if brighten:
+            result[mask] = px + (255.0 - px) * amount
+        else:
+            result[mask] = px * (1.0 - amount)
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+
+def _apply_vignette_random_sets(image: np.ndarray,
+                                rings: List[Set[Point]],
+                                brighten: bool,
+                                interval_len: float,
+                                strength: float) -> np.ndarray:
+    N = len(rings)
+    if N <= 1:
+        return image.copy()
+
+    L = float(interval_len)
+    if not 0.0 < L <= 1.0:
+        raise ValueError('interval_len must be in (0, 1]')
+
+    result = image.astype(np.float32)
+    for i, ring in enumerate(rings):
+        t = i / (N - 1)
+        lo = t * (1.0 - L)
+        hi = lo + L
+        for (y, x) in ring:
+            r = random.uniform(lo, hi) * strength
+            r = min(max(r, 0.0), 1.0)
+            px = result[y, x]
+            if brighten:
+                result[y, x] = px + (255.0 - px) * r
+            else:
+                result[y, x] = px * (1.0 - r)
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+
+def _apply_vignette_random_masks(image: np.ndarray,
+                                 masks: List[np.ndarray],
+                                 brighten: bool,
+                                 interval_len: float,
+                                 strength: float) -> np.ndarray:
+    N = len(masks)
+    if N <= 1:
+        return image.copy()
+
+    L = float(interval_len)
+    if not 0.0 < L <= 1.0:
+        raise ValueError('interval_len must be in (0, 1]')
+
+    result = image.astype(np.float32)
+    for i, mask in enumerate(masks):
+        if not mask.any():
+            continue
+        t = i / (N - 1)
+        lo = t * (1.0 - L)
+        hi = lo + L
+
+        n = int(mask.sum())
+        r = np.random.uniform(lo, hi, size=n) * strength
+        r = np.clip(r, 0.0, 1.0)
+
+        px = result[mask]
+        if brighten:
+            result[mask] = px + (255.0 - px) * r[:, None]
+        else:
+            result[mask] = px * (1.0 - r[:, None])
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+
+# Публичные виньетки — с центром, работают поверх edxdy
+
+def vignette_rings(image: np.ndarray,
+                   center: Point,
+                   h_semi: float, v_semi: float,
+                   dx: float, dy: float,
+                   brighten: bool,
+                   strength: float = 1.0) -> np.ndarray:
+    rings = edxdy(image, center, h_semi, v_semi, dx, dy)
+    return _apply_vignette_rings_sets(image, rings, brighten, strength)
+
+
+def vignette_rings_masks(image: np.ndarray,
+                         center: Point,
+                         h_semi: float, v_semi: float,
+                         dx: float, dy: float,
+                         brighten: bool,
+                         strength: float = 1.0) -> np.ndarray:
+    masks = edxdy_masks(image, center, h_semi, v_semi, dx, dy)
+    return _apply_vignette_rings_masks(image, masks, brighten, strength)
+
+
+def vignette_random_rings(image: np.ndarray,
+                          center: Point,
+                          h_semi: float, v_semi: float,
+                          dx: float, dy: float,
+                          brighten: bool,
+                          interval_len: float = 0.2,
+                          strength: float = 1.0) -> np.ndarray:
+    rings = edxdy(image, center, h_semi, v_semi, dx, dy)
+    return _apply_vignette_random_sets(image, rings, brighten,
+                                       interval_len, strength)
+
+
+def vignette_random_rings_masks(image: np.ndarray,
+                                center: Point,
+                                h_semi: float, v_semi: float,
+                                dx: float, dy: float,
+                                brighten: bool,
+                                interval_len: float = 0.2,
+                                strength: float = 1.0) -> np.ndarray:
+    masks = edxdy_masks(image, center, h_semi, v_semi, dx, dy)
+    return _apply_vignette_random_masks(image, masks, brighten,
+                                        interval_len, strength)
+
+
+def vignette_smooth(image: np.ndarray,
+                    h_semi: float, v_semi: float,
+                    brighten: bool,
+                    strength: float = 1.0) -> np.ndarray:
+    H, W = image.shape[:2]
+    cy, cx = (H - 1) / 2.0, (W - 1) / 2.0
+
+    ys, xs = np.mgrid[0:H, 0:W].astype(np.float32)
+    u = (xs - cx) / h_semi
+    v = (ys - cy) / v_semi
+    r = np.sqrt(u * u + v * v)
+
+    r_max = float(r.max())
+    if r_max <= 1.0:
+        return image.copy()
+
+    amount = np.clip((r - 1.0) / (r_max - 1.0), 0.0, 1.0) * strength
+    amount = np.minimum(amount, 1.0)[..., None]
+
+    result = image.astype(np.float32)
+    if brighten:
+        result = result + (255.0 - result) * amount
+    else:
+        result = result * (1.0 - amount)
+
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+
+# ============================================================
+# 21. Сепия
+# ============================================================
+
+_SEPIA_MATRIX = np.array([
+    [0.393, 0.769, 0.189],
+    [0.349, 0.686, 0.168],
+    [0.272, 0.534, 0.131],
+], dtype=np.float32)
+
+
+def apply_sepia(image: np.ndarray,
+                strength: float = 1.0) -> np.ndarray:
+    r = image[..., 2].astype(np.float32)
+    g = image[..., 1].astype(np.float32)
+    b = image[..., 0].astype(np.float32)
+
+    new_r = _SEPIA_MATRIX[0, 0] * r + _SEPIA_MATRIX[0, 1] * g + _SEPIA_MATRIX[0, 2] * b
+    new_g = _SEPIA_MATRIX[1, 0] * r + _SEPIA_MATRIX[1, 1] * g + _SEPIA_MATRIX[1, 2] * b
+    new_b = _SEPIA_MATRIX[2, 0] * r + _SEPIA_MATRIX[2, 1] * g + _SEPIA_MATRIX[2, 2] * b
+
+    sepia = np.stack([new_b, new_g, new_r], axis=-1)
+    sepia = np.clip(sepia, 0, 255)
+
+    if strength >= 1.0:
+        return sepia.astype(np.uint8)
+    if strength <= 0.0:
+        return image.copy()
+
+    blended = image.astype(np.float32) * (1.0 - strength) + sepia * strength
+    return np.clip(blended, 0, 255).astype(np.uint8)
+
+
+# ============================================================
+# 22. Состаривание фото: сепия -> царапины -> vignette_random_rings
+# ============================================================
+
+def apply_aging(image: np.ndarray,
+                center: Point,
+                sepia_strength: float = 1.0,
+                scratch_coefficient: float = 0.8,
+                scratch_color: Tuple[int, int, int] = (255, 255, 255),
+                scratch_intensity: float = 0.6,
+                max_segments: int = 10,
+                max_thickness: int = 3,
+                half_diag_fraction: float = 0.02,
+                vignette_h_semi: Optional[float] = None,
+                vignette_v_semi: Optional[float] = None,
+                vignette_dx: float = 10.0,
+                vignette_dy: float = 10.0,
+                vignette_brighten: bool = False,
+                vignette_interval_len: float = 0.2,
+                vignette_strength: float = 1.0) -> np.ndarray:
+    """
+    Состаривание фото: последовательно применяет
+        1) сепию,
+        2) царапины,
+        3) виньетку со случайными коэффициентами в кольцах.
+
+    center — явный центр для виньетки.
+    Если полуоси виньетки не заданы, берутся w/4 и h/4.
+    """
+    H, W = image.shape[:2]
+    if vignette_h_semi is None:
+        vignette_h_semi = W / 4.0
+    if vignette_v_semi is None:
+        vignette_v_semi = H / 4.0
+
+    result = apply_sepia(image, strength=sepia_strength)
+    result = apply_scratches(result,
+                             scratch_coefficient=scratch_coefficient,
+                             scratch_color=scratch_color,
+                             intensity=scratch_intensity,
+                             max_segments=max_segments,
+                             max_thickness=max_thickness,
+                             half_diag_fraction=half_diag_fraction)
+    result = vignette_random_rings(result,
+                                   center=center,
+                                   h_semi=vignette_h_semi,
+                                   v_semi=vignette_v_semi,
+                                   dx=vignette_dx,
+                                   dy=vignette_dy,
+                                   brighten=vignette_brighten,
+                                   interval_len=vignette_interval_len,
+                                   strength=vignette_strength)
+    return result
