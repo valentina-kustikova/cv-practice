@@ -44,7 +44,6 @@
 
 #### Шаг 1. Python и системные зависимости
 
-```bash
 sudo apt update
 sudo apt install python3 python3-pip python3-venv git libgl1 libglib2.0-0
 
@@ -53,14 +52,12 @@ sudo apt install python3 python3-pip python3-venv git libgl1 libglib2.0-0
     libgl1 и libglib2.0-0 — обязательны для opencv-python, иначе import cv2 падает с libGL.so.1: cannot open shared object file
 
 Шаг 2. Клонирование
-bash
 
 git clone <URL_репозитория>
 cd <папка_репозитория>
 
 Если репозиторий приватный и вы работаете через SSH — настройте ключи заранее. Для HTTPS git попросит логин/токен.
 Шаг 3. Виртуальное окружение
-bash
 
 python3 -m venv venv
 source venv/bin/activate
@@ -69,7 +66,6 @@ source venv/bin/activate
 
 При следующем открытии терминала активацию нужно повторить. Деактивация — deactivate.
 Шаг 4. Зависимости
-bash
 
 pip install --upgrade pip
 pip install numpy opencv-python
@@ -78,7 +74,6 @@ macOS
 Шаг 1. Python и git
 
 На macOS обычно уже есть python3, но не всегда актуальной версии. Рекомендуется поставить через Homebrew:
-bash
 
 # Если Homebrew нет:
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -88,20 +83,17 @@ brew install python git
 
 Проверка: python3 --version (должен быть 3.9+).
 Шаг 2. Клонирование
-bash
 
 git clone <URL_репозитория>
 cd <папка_репозитория>
 
 Шаг 3. Виртуальное окружение
-bash
 
 python3 -m venv venv
 source venv/bin/activate
 
 Синтаксис активации совпадает с Linux. На Apple Silicon (M1/M2/M3) специальных действий не нужно — numpy и opencv-python имеют готовые wheels под arm64.
 Шаг 4. Зависимости
-bash
 
 pip install --upgrade pip
 pip install numpy opencv-python
@@ -116,7 +108,6 @@ Windows
 git — с https://git-scm.com/download/win.
 
 Проверка:
-powershell
 
 python --version
 git --version
@@ -125,25 +116,19 @@ git --version
 Шаг 2. Клонирование
 
 В PowerShell или CMD:
-powershell
 
 git clone <URL_репозитория>
 cd <папка_репозитория>
 
 Шаг 3. Виртуальное окружение
-powershell
 
 python -m venv venv
 
 Активация зависит от терминала:
 
-PowerShell:
-powershell
-
 .\venv\Scripts\Activate.ps1
 
 Если PowerShell блокирует запуск скриптов с ошибкой running scripts is disabled, разрешите локальные скрипты (один раз):
-powershell
 
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 
@@ -153,13 +138,11 @@ cmd
 venv\Scripts\activate.bat
 
 Git Bash / MSYS2:
-bash
 
 source venv/Scripts/activate
 
 После активации приглашение станет вида (venv) C:\...>. Деактивация — deactivate.
 Шаг 4. Зависимости
-powershell
 
 pip install --upgrade pip
 pip install numpy opencv-python
@@ -167,7 +150,6 @@ pip install numpy opencv-python
 Проверка установки
 
 Из активированного venv:
-bash
 
 python -c "import cv2, numpy; print('OpenCV', cv2.__version__); print('NumPy', numpy.__version__)"
 
@@ -176,14 +158,12 @@ python -c "import cv2, numpy; print('OpenCV', cv2.__version__); print('NumPy', n
 
 Скрипт применяет один или несколько фильтров к изображению и сохраняет результаты в отдельные файлы с именами <имя_входа>_<имя_фильтра>.png.
 Базовый запуск
-bash
 
 python image_filters_project/run-filters.py <путь к фото>
 
 Без флага -f применяются все зарегистрированные фильтры (~22 штуки). Результаты сохраняются в ./output/.
 
 Только отдельные фильтры:
-bash
 
 python image_filters_project/run-filters.py <путь к фото> -f sepia -f aging
 
@@ -267,7 +247,6 @@ input (позиционный)	путь	—	Входное изображени�
     neon — неоновый эффект (края + свечение)
 
 Примеры
-bash
 
 # Все фильтры с дефолтными параметрами
 python image_filters_project/run-filters.py <путь к фото>
@@ -289,7 +268,6 @@ python image_filters_project/run-filters.py <путь к фото> -f edges -o <
 
 Пакетная обработка (все изображения из папки)
 Linux / macOS
-bash
 
 mkdir -p /путь/к/output
 
@@ -312,7 +290,6 @@ f - это переменная для имени файла
 echo ">>> $f" - >>> + что сейчас обрабатываем
 
 Windows PowerShell
-powershell
 
 New-Item -ItemType Directory -Force -Path output | Out-Null
 
@@ -336,7 +313,6 @@ image_filters_project/
 python: command not found (Linux / macOS) — используйте python3. На macOS python — это старый Python 2.7, он не подойдёт.
 
 ModuleNotFoundError: No module named 'cv2' — либо venv не активирован, либо pip install шёл в другой интерпретатор. Проверьте:
-bash
 
 which python         # Linux / macOS
 where python         # Windows
@@ -344,12 +320,10 @@ where python         # Windows
 Путь должен быть внутри venv/. Если нет — deactivate, потом снова source venv/bin/activate (или .\venv\Scripts\Activate.ps1 на Windows), и повторите pip install.
 
 ImportError: libGL.so.1: cannot open shared object file (Linux) — не установлен libgl1:
-bash
 
 sudo apt install libgl1 libglib2.0-0
 
 PowerShell не запускает Activate.ps1 — ошибка running scripts is disabled. Разрешите один раз:
-powershell
 
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 
