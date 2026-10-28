@@ -1,4 +1,5 @@
 import numpy as np
+from PIL import Image
 
 def to_uint8(img):
     return np.clip(img, 0, 255).astype(np.uint8)
@@ -46,10 +47,10 @@ class ImageFilter:
             )
         if name == 'neon':
             return Neon(params.get('sob_threshold', 50))
-        if name == 'scratches':
-            return ScratchesNoise(params.get('noise_sigma', 15),
-                                  params.get('num_scratches', 7),
-                                  params.get('seed'))
+        if name == 'scratches_texture':
+            return ScratchesTexture(params.get('noise_sigma', 15),
+                                    params.get('texture_alpha', 0.65),
+                                    params.get('seed'))
         raise ValueError('Неизвестный фильтр: ' + name)
 
     def apply_filter(self, img):
@@ -87,6 +88,14 @@ class Antique(ImageFilter):
                            [0.349, 0.686, 0.168],
                            [0.272, 0.534, 0.131]], dtype=np.float32)
         result = img.astype(np.float32) @ matrix.T
+        h, w = img.shape[:2]
+        cx, cy = (w - 1) / 2, (h - 1) / 2
+        x = (np.arange(w, dtype=np.float32) - cx) / max(cx, 0.5)
+        y = (np.arange(h, dtype=np.float32) - cy) / max(cy, 0.5)
+        distance_squared = (y[:, None] ** 2 + x[None, :] ** 2) / 2
+        vignette_strength = 0.75
+        vignette = 1 - vignette_strength * distance_squared
+        result *= vignette[..., None]
         return to_uint8(result)
 
 
@@ -120,9 +129,9 @@ class Film(ImageFilter):
             raise ValueError('Для плёнки нужно RGB-изображение')
         source = img.astype(np.float32)
         aerochrome_matrix = np.array([
-            [ 0.0,  2.2, -1.0 ], 
-            [ 1.0,  0.0,  0.0 ], 
-            [ 0.0, -1.0,  2.0 ]   
+            [ -0.5,  4.5, -2.3 ], 
+            [ 1.0,  -2.0,  2.0 ], 
+            [ 0.0, -0.6,  1.6 ]   
         ])
         result = np.dot(source, aerochrome_matrix.T)
         
@@ -158,66 +167,41 @@ class Matte(ImageFilter):
         result = weight * img.astype(np.float32) + (1 - weight) * 255
         return to_uint8(result)
 
-class ScratchesNoise(ImageFilter):
-    def __init__(self, noise_sigma=15, num_scratches=7, seed=None):
-        if not isinstance(noise_sigma, (int, float, np.integer, np.floating)) or \
-                not np.isfinite(noise_sigma) or noise_sigma < 0:
+class ScratchesTexture(ImageFilter):
+    def __init__(self, noise_sigma=15, texture_alpha=0.65, seed=None):
+        if not np.isfinite(noise_sigma) or noise_sigma < 0:
             raise ValueError('noise_sigma должен быть конечным числом не меньше нуля')
-        if not isinstance(num_scratches, (int, np.integer)) or num_scratches < 0:
-            raise ValueError('num_scratches должен быть целым числом не меньше нуля')
+        if not 0 <= texture_alpha <= 1:
+            raise ValueError('texture_alpha должен быть от 0 до 1')
         self.noise_sigma = noise_sigma
-        self.num_scratches = num_scratches
+        self.texture_alpha = texture_alpha
         self.seed = seed
 
     def apply_filter(self, img):
-        rng = np.random.default_rng(self.seed)
-
+        if img.ndim != 3 or img.shape[2] != 3:
+            raise ValueError('Для состаривания нужно RGB-изображение')
         h, w = img.shape[:2]
-        result = img.astype(np.float32)
 
-        noise = rng.normal(0, self.noise_sigma, (h, w, 1))
-        result += noise
+        matrix = np.array([[0.393, 0.769, 0.189],
+                           [0.349, 0.686, 0.168],
+                           [0.272, 0.534, 0.131]], dtype=np.float32)
+        result = np.clip(img.astype(np.float32) @ matrix.T, 0, 255)
 
-        for _ in range(self.num_scratches):
-            x0 = rng.integers(0, w)
-            y0 = rng.integers(0, h)
+        rng = np.random.default_rng(self.seed)
+        result = np.clip(result + rng.normal(0, self.noise_sigma, (h, w, 1)), 0, 255)
 
-            length = rng.integers(max(1, h // 12), max(2, h // 2 + 1))
+        with Image.open('images/tekstyra_small.jpg') as source:
+            texture = np.array(source)
 
-            x1 = np.clip(x0 + rng.integers(-4, 5), 0, w - 1)
-            y1 = min(y0 + length, h - 1)
+        texture = Resize(h, w).apply_filter(texture)
+        if texture.ndim == 3 and texture.shape[2] == 4:
+            texture = (texture[..., :3].astype(np.float32) * (texture[..., 3:4] / 255))
+        texture = get_gray(texture)
+        mask = texture[..., None] / 255
 
-            if y1 <= y0:
-                continue
+        screen = 255 - (255 - result) * (1 - mask)
+        return to_uint8((1 - self.texture_alpha) * result + self.texture_alpha * screen)
 
-            t = np.linspace(0, 1, y1 - y0 + 1)
-
-            x = np.rint(x0 + t * (x1 - x0)).astype(int)
-            y = np.rint(y0 + t * (y1 - y0)).astype(int)
-
-            thickness = rng.integers(1, 3)
-            color = 240 if rng.random() < 0.7 else 20
-            alpha = rng.uniform(0.45, 0.85)
-
-            for offset in range(thickness):
-                xx = np.clip(x + offset, 0, w - 1)
-
-                result[y, xx] = (
-                    (1 - alpha) * result[y, xx] + alpha * color
-                )
-
-        dust_count = int(h * w * 0.0003)
-
-        ys = rng.integers(0, h, size=dust_count)
-        xs = rng.integers(0, w, size=dust_count)
-
-        dust_color = rng.choice([30, 225], size=dust_count)
-
-        result[ys, xs] = (
-            0.3 * result[ys, xs] + 0.7 * dust_color[:, None]
-        )
-
-        return to_uint8(result)
 
 class Neon(ImageFilter):
     def __init__(self, sob_threshold=50):
@@ -237,5 +221,10 @@ class Neon(ImageFilter):
         edges = (magnitude > self.sob_threshold).astype(np.float32)
         glow = convolve(edges, np.ones((5, 5), dtype=np.float32) / 25)
         strength = np.clip(edges + 2 * glow, 0, 1)
+        halo = strength.copy()
+        kernel = np.ones((7, 7), dtype=np.float32) / 49
+        for _ in range(45):
+            halo = convolve(halo, kernel)
+        strength = np.maximum(strength, 1.2 * halo)
         color = np.array([0, 255, 255], dtype=np.float32)
         return to_uint8(strength[:, :, None] * color)

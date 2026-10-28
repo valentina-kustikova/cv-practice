@@ -13,7 +13,7 @@ def cli_argument_parser():
     parser.add_argument('output', help='путь для результата')
     parser.add_argument('--filter', required=True,
                         choices=['resize', 'gray', 'antique', 'fade', 'film',
-                                 'matte', 'scratches', 'neon'])
+                                 'matte', 'scratches_texture', 'neon'])
     parser.add_argument('--new-h', type=int)
     parser.add_argument('--new-w', type=int)
     parser.add_argument('--alpha', type=float, default=0.5)
@@ -21,7 +21,8 @@ def cli_argument_parser():
                         metavar=('R', 'G', 'B'), default=(200, 200, 200))
     parser.add_argument('--grain-sigma', type=float, default=10)
     parser.add_argument('--noise-sigma', type=float, default=15)
-    parser.add_argument('--num-scratches', type=int, default=7)
+    parser.add_argument('--texture-alpha', type=float, default=0.65,
+                        help='сила текстуры от 0 до 1 (по умолчанию 0.65)')
     parser.add_argument('--sob-threshold', type=float, default=50)
     parser.add_argument('--seed', type=int)
     parser.add_argument('--radius', type=float, default=1.25)
