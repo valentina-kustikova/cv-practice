@@ -194,8 +194,7 @@ class ScratchesTexture(ImageFilter):
             texture = np.array(source)
 
         texture = Resize(h, w).apply_filter(texture)
-        if texture.ndim == 3 and texture.shape[2] == 4:
-            texture = (texture[..., :3].astype(np.float32) * (texture[..., 3:4] / 255))
+
         texture = get_gray(texture)
         mask = texture[..., None] / 255
 
@@ -211,6 +210,7 @@ class Neon(ImageFilter):
 
     def apply_filter(self, img):
         gray = get_gray(img)
+        base = img.astype(np.float32)
         kernel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]],
                             dtype=np.float32)
         kernel_y = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]],
@@ -227,4 +227,7 @@ class Neon(ImageFilter):
             halo = convolve(halo, kernel)
         strength = np.maximum(strength, 1.2 * halo)
         color = np.array([0, 255, 255], dtype=np.float32)
-        return to_uint8(strength[:, :, None] * color)
+        neon = strength[:, :, None] * color
+        neon_aplha = 0.5
+        result = base + neon_aplha * neon
+        return to_uint8(result)

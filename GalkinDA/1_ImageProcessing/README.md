@@ -250,8 +250,14 @@ result = strength * [0, 255, 255]
 halo = strength
 halo = convolve(halo, ones(7, 7) / 49)  # повторяется 45 раз
 strength = maximum(strength, 1.2 * halo)
-result = strength * [0, 255, 255]
+neon = strength * [0, 255, 255]
 ```
 
 `maximum` выбирает большее значение для каждого пикселя.
 Результат — голубые контуры с мягким широким свечением на чёрном фоне.
+
+В итоге применяем `neon` к исходному изображению с `neon_alpha = 0.5`
+```
+neon_aplha = 0.5
+result = base + neon_aplha * neon
+```
