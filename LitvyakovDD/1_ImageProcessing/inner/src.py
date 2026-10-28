@@ -350,6 +350,8 @@ class Neon(ImageFilter):
         gy[1:-1, :] = gray[2:, :] - gray[:-2, :]
         mag = np.sqrt(gx * gx + gy * gy)
         mask = (mag > self.neon_gain).astype(np.float32)
+        for time in range(1,2):
+            mask = self._dilate(mask)
         sigma = max(1.0, float(self.neon_brightness_width))
         neon_brightness_mask = self._neon_brightness_by_dilation(mask, sigma)
 
