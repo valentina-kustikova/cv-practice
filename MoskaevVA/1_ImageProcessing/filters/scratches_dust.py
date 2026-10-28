@@ -52,27 +52,27 @@ class Scratches(ImageFilter):
         
         tex = _load_texture("scratches.png", (h, w))
         if tex is not None:
-            print(">>> УСПЕХ: Текстура scratches.png загружена!") # <-- Добавь это
+            print(">>> УСПЕХ: Текстура scratches.png загружена!") 
             a = self.texture_strength
             out *= (1.0 - a) + a * tex[..., None]
         else:
-            print(">>> ОШИБКА: Файл scratches.png НЕ НАЙДЕН!") # <-- Добавь это
+            print(">>> ОШИБКА: Файл scratches.png НЕ НАЙДЕН!") 
 
         dust_tex = _load_texture("dust.png", (h, w))
         if dust_tex is not None:
-            print(">>> УСПЕХ: Текстура dust.png загружена!") # <-- Добавь это
+            print(">>> УСПЕХ: Текстура dust.png загружена!") 
             a = self.texture_strength * 0.5
             out = out + (1.0 - out / 255.0) * dust_tex[..., None] * a * 255.0
         else:
-            print(">>> ОШИБКА: Файл dust.png НЕ НАЙДЕН!") # <-- Добавь это
+            print(">>> ОШИБКА: Файл dust.png НЕ НАЙДЕН!") 
 
         grain_tex = _load_texture("grain.png", (h, w))
         if grain_tex is not None:
-            print(">>> УСПЕХ: Текстура grain.png загружена!") # <-- Добавь это
+            print(">>> УСПЕХ: Текстура grain.png загружена!") 
             a = self.texture_strength * 0.3
             out += (grain_tex[..., None] - 0.5) * a * 40.0
         else:
-            print(">>> ОШИБКА: Файл grain.png НЕ НАЙДЕН!") # <-- Добавь это
+            print(">>> ОШИБКА: Файл grain.png НЕ НАЙДЕН!")
 
         return out
 
@@ -111,6 +111,16 @@ class Scratches(ImageFilter):
         h, w = image.shape[:2]
         out = image.astype(np.float32)
 
+        img = image.astype(np.float32)
+        
+        sepia = np.array([
+            [0.393, 0.769, 0.189],
+            [0.349, 0.686, 0.168],
+            [0.272, 0.534, 0.131],
+        ], dtype=np.float32)
+        out = img.reshape(-1, 3) @ sepia.T
+        out = out.reshape(img.shape)
+
         # 1) зерно
         if self.noise_sigma > 0:
             out += rng.normal(0, self.noise_sigma, out.shape).astype(np.float32)
@@ -118,20 +128,20 @@ class Scratches(ImageFilter):
         # 2) готовые текстуры (если есть)
         out = self._apply_textures(out)
 
-        # 3) мягкая пыль — пятна, а не бинарные точки
-        if self.dust > 0:
-            n_spots = int(self.dust * h * w * 0.02)
-            for _ in range(n_spots):
-                cy = int(rng.integers(0, h))
-                cx = int(rng.integers(0, w))
-                r = int(rng.integers(1, 3))
-                bright = rng.random() < 0.5
-                val = (float(rng.uniform(200, 245)) if bright
-                       else float(rng.uniform(10, 50)))
-                y0, y1 = max(0, cy - r), min(h, cy + r + 1)
-                x0, x1 = max(0, cx - r), min(w, cx + r + 1)
-                patch = out[y0:y1, x0:x1]
-                out[y0:y1, x0:x1] = patch * 0.6 + val * 0.4
+        # # 3) мягкая пыль — пятна, а не бинарные точки
+        # if self.dust > 0:
+        #     n_spots = int(self.dust * h * w * 0.02)
+        #     for _ in range(n_spots):
+        #         cy = int(rng.integers(0, h))
+        #         cx = int(rng.integers(0, w))
+        #         r = int(rng.integers(1, 3))
+        #         bright = rng.random() < 0.5
+        #         val = (float(rng.uniform(200, 245)) if bright
+        #                else float(rng.uniform(10, 50)))
+        #         y0, y1 = max(0, cy - r), min(h, cy + r + 1)
+        #         x0, x1 = max(0, cx - r), min(w, cx + r + 1)
+        #         patch = out[y0:y1, x0:x1]
+        #         out[y0:y1, x0:x1] = patch * 0.6 + val * 0.4
 
         # 4) хаотичные тонкие царапины
         for _ in range(self.n_scratches):

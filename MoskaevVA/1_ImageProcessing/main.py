@@ -39,10 +39,7 @@ def cli_argument_parser() -> argparse.Namespace:
     p.add_argument("--grain", type=float, default=0.25)
 
     # film — непроявленная плёнка
-    p.add_argument("--mix", type=float, default=0.6)
-    p.add_argument("--veil", type=float, default=0.25)
-    p.add_argument("--tint", choices=["cyan", "magenta", "sepia"],
-                   default="cyan")
+    p.add_argument("--noise", type=float, default=8.0)
 
     # matte
     p.add_argument("--softness", type=float, default=0.15)
@@ -81,10 +78,8 @@ def build_filter(name: str, a: argparse.Namespace) -> ImageFilter:
         return ImageFilter.get_filter("fade", strength=a.strength,
                                       black_lift=a.black_lift)
     if name == "film":
-        return ImageFilter.get_filter("film", mix=a.mix,
-                                      grain=a.grain, seed=a.seed,
-                                      veil=a.veil, lift=a.black_lift,
-                                      tint=a.tint)
+        return ImageFilter.get_filter("film", strength=a.strength,
+                                      noise=a.noise)
     if name == "matte":
         return ImageFilter.get_filter("matte", softness=a.softness,
                                       scale=a.scale,

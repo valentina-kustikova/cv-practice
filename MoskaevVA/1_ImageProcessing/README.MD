@@ -42,7 +42,7 @@
 | grayscale | —                                                                         | оттенки серого (BT.601)               |
 | antique   | --strength, --grain, --seed                                               | сепия + виньетка + зерно              |
 | fade      | --strength, --black-lift                                                  | выцветание, сжатие диапазона          |
-| film      | --mix, --grain, --seed, --veil, --black-lift, --tint                      | ИК-монохром + вуаль + зерно           |
+| film | --strength, --noise | перестановка каналов + тонирование + шум |
 | matte     | --softness, --scale, --mask-width, --mask-height, --center-x, --center-y  | белая овальная рамка (smoothstep)     |
 | scratches | --n-scratches, --noise-sigma, --seed, --dust, --vertical-bias,            | текстуры + царапины + пыль            |
 |           | --texture-strength                                                        |                                       |
@@ -75,11 +75,11 @@
 
     # film
     python main.py -i input.png -o out/film.png -f film
-    python main.py -i input.png -o out/film_cyan.png -f film --mix 1.0 --veil 0.3 --tint cyan
-    python main.py -i input.png -o out/film_magenta.png -f film --mix 0.8 --veil 0.25 --tint magenta
-    python main.py -i input.png -o out/film_sepia.png -f film --mix 0.7 --veil 0.3 --tint sepia
-    python main.py -i input.png -o out/film_weak.png -f film --mix 0.2 --veil 0.05 --grain 0.1
-    python main.py -i input.png -o out/film_max.png -f film --mix 1.0 --veil 0.35 --black-lift 10 --grain 0.5 --tint cyan
+    python main.py -i input.png -o out/film_soft.png -f film --strength 0.2 --noise 4
+    python main.py -i input.png -o out/film_strong.png -f film --strength 0.7 --noise 15
+    python main.py -i input.png -o out/film_max.png -f film --strength 1.0 --noise 25
+    python main.py -i input.png -o out/film_clean.png -f film --strength 0.5 --noise 0
+    python main.py -i input.png -o out/film_swap.png -f film --strength 1.0 --noise 8
 
     # matte
     python main.py -i input.png -o out/matte.png -f matte
@@ -224,74 +224,25 @@ s = strength, s принадлежит [0, 1].
 Если f_max <= f_min (black_lift >= 128), изображение становится
 однородным серым уровня f_min.
 
-## 5. Film — инфракрасная плёнка + вуаль + зерно
+## 5. Film — имитация плёнки
 
-Эффект имитирует съёмку в ближнем ИК: живая зелень (хлорофилл) начинает
-отражать очень сильно и «выгорает» в белое, небо и синие объекты —
-уходят в тёмное, кадр становится почти монохромным с эмульсионным
-свечением и цветовой вуалью.
+### Перестановка каналов
 
-### ИК-монохром
+    new_r = (1 - strength) * R + strength * B
+    new_g = G * (1 - 0.15 * strength)
+    new_b = (1 - strength) * B + strength * R
 
-Изолируем зелёный вклад, подавляя красный и синий:
+strength ∈ [0, 1] управляет сдвигом: 0 — каналы не меняются,
+1 — R и B меняются местами, G приглушается на 15%.
 
-    green_mask(x, y) = clip( 2*G - 0.5*R - 0.5*B,  0,  255 )
+### Тонирование
 
-Базовая ИК-яркость (зелёный доминирует, синий уничтожается):
+    out_b = clip(out_b * 1.05, 0, 255)   # синий +5%
+    out_r = clip(out_r * 0.95, 0, 255)   # красный -5%
 
-    ir_base(x, y) = 0.8*G + 0.4*R - 0.6*B
-    ir_gray(x, y) = clip( ir_base + 1.2 * green_mask,  0,  255 )
+### Шум
 
-### S-кривая контраста
-
-Нормализуем и применяем сигмоиду:
-
-    u(x, y)     = ir_gray(x, y) / 255
-    s(u)        = 1 / (1 + exp( -10 * (u - 0.45) ))
-    ir_gray'(x, y) = s(u) * 255
-
-Света травы разгоняются до 255, тени становятся угольными.
-
-### Смешивание с обычным ЧБ
-
-    standard_gray(x, y) = 0.299*R + 0.587*G + 0.114*B
-    base_mono(x, y)     = (1 - m) * standard_gray + m * ir_gray'
-
-m = mix, m принадлежит [0, 1].
-
-    out(x, y, c) = base_mono(x, y)   для всех c
-
-### Подъём чёрного
-
-    f_min = lift
-    out_1 = f_min + out * (255 - f_min) / 255
-
-### Эмульсионное свечение (halo)
-
-Box-blur по кресту (5 точек):
-
-    blur(x, y, c) = ( up + down + left + right + center ) / 5
-
-    out_2 = 0.4 * out_1 + 0.6 * blur(out_1)
-
-Баланс смещён в сторону свечения — вокруг яркой травы появляется
-мягкий ореол, характерный для ИК-плёнки.
-
-### Цветовая вуаль
-
-    veil_color = (130, 160, 170)   # cyan
-               | (170, 140, 160)   # magenta
-               | (160, 145, 125)   # sepia
-    out_3 = (1 - v) * out_2 + v * veil_color
-
-v = veil, v принадлежит [0, 1].
-
-### Зерно
-
-    lum(x, y)  = base_mono(x, y) / 255
-    mask       = clip( 1 - 4*(lum - 0.5)^2,  0.1,  1 )
-    eta(x, y) ~ N(0, (grain * 30)^2)
-    out'(x, y, c) = out_3(x, y, c) + eta(x, y) * mask(x, y)
+    out += N(0, noise^2)
 
 ## 6. Matte — овальная маска (smoothstep)
 
@@ -348,18 +299,6 @@ Smoothstep даёт плавный переход с нулевой произв
     I_4 = I_3 + (grain_tex - 0.5) * (a * 0.3) * 40
 
 Если файла нет — слой пропускается, в лог пишется `logging.warning`.
-
-### Мягкая пыль
-
-Число пятен:
-
-    n_spots = int( dust * H * W * 0.02 )
-
-Каждое пятно — квадрат радиуса r ∈ {1, 2}:
-
-    val = uniform(200, 245)   # белое, с вероятностью 0.5
-        | uniform(10, 50)     # чёрное, иначе
-    I_5(patch) = 0.6 * I_4(patch) + 0.4 * val
 
 ### Хаотичные царапины
 
