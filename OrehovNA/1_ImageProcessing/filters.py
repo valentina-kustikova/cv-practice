@@ -81,7 +81,8 @@ class AntiqueFilter(ImageFilter):
         output_b = r * 0.272 + g * 0.534 + b * 0.131
         
         antique = np.stack([output_b, output_g, output_r], axis=-1)
-        return np.clip(antique, 0, 255).astype(np.uint8)
+        antique = np.clip(antique, 0, 255).astype(np.uint8)
+        return MatteFilter(1.2, 0.9, 0.0).apply_filter(antique)
 
 class FadeColorFilter(ImageFilter):
     def __init__(self, factor=0.4):
@@ -93,21 +94,40 @@ class FadeColorFilter(ImageFilter):
         faded = image * (1 - self.factor) + gray_3d * self.factor
         return np.clip(faded, 0, 255).astype(np.uint8)
 
+import numpy as np
+
 class FilmSimulationFilter(ImageFilter):
     def apply_filter(self, image):
-        r = image[:, :, 2].astype(float)
+        b = image[:, :, 0].astype(float)
         g = image[:, :, 1].astype(float)
+        r = image[:, :, 2].astype(float)
         
-        ir_gray = r * 0.7 + g * 0.3
+        ir_light = r * 0.3 + g * 0.7
         
-        ir_gray = (ir_gray - 128) * 1.5 + 128
-        ir_gray = np.clip(ir_gray, 0, 255).astype(np.uint8)
-        return np.stack([ir_gray, ir_gray, ir_gray], axis=-1)
+        # 3. Поднимаем контраст для эффекта «серебряного» свечения листьев
+        ir_light = (ir_light - 128) * 1.5 + 128
+        ir_light = np.clip(ir_light, 0, 255).astype(np.uint8)
+        
+        # 4. Добавляем мягкую подложку для теней (аналоговая вуаль), чтобы они не были черными
+        shadow_r = np.full_like(ir_light, 20)
+        
+        # 5. Собираем каналы в правильном BGR порядке, чтобы на выходе получить красный цвет:
+        # Чтобы картинка была красной, Синий и Зеленый каналы должны быть темными (зануляем их)
+        blue_channel = np.zeros_like(ir_light)
+        green_channel = np.zeros_like(ir_light)
+        
+        # Направляем основной ИК-сигнал строго в Красный канал
+        red_channel = np.clip(ir_light.astype(int) + shadow_r, 0, 255).astype(np.uint8)
+        
+        # Собираем финальный массив в исходном формате BGR
+        return np.stack([blue_channel, green_channel, red_channel], axis=-1)
+
 
 class MatteFilter(ImageFilter):
-    def __init__(self, matte_radius=0.7, matte_softness=0.2):
+    def __init__(self, matte_radius=0.7, matte_softness=0.2, color = 255.0):
         self.radius = float(matte_radius)
         self.softness = float(matte_softness)
+        self.color = float(color)
         if self.radius <= 0:
             raise ValueError("matte_radius must be positive")
         if self.softness < 0:
@@ -127,7 +147,7 @@ class MatteFilter(ImageFilter):
         
         weight = weight[:, :, None]
 
-        res = image.astype(np.float32) * (1 - weight) + 255.0 * weight
+        res = image.astype(np.float32) * (1 - weight) + self.color * weight
         return np.clip(res, 0, 255).astype(np.uint8)
 
 
@@ -168,40 +188,143 @@ class ScratchNoiseFilter(ImageFilter):
 
 
 class NeonFilter(ImageFilter):
-    def __init__(self, neon_strength: float = 1.5, neon_blur: float = 0.8):
+    def __init__(
+        self,
+        neon_strength: float = 1.5,
+        neon_blur: float = 0.8,
+        neon_color=(255, 0, 255),
+        tint=(120, 0, 80),
+        glow_inner: float = 0.1,        # было 0.9
+        glow_outer: float = 1.5,         # было 0.7
+        glow_inner_scale: float = 3.0,   # было 2.0 — сильнее размытие ближнего ореола
+        glow_outer_scale: float = 6.0,   # было 5.0
+    ):
         self.strength = float(neon_strength)
         self.blur_factor = float(neon_blur)
+        self.color = self._norm_color(neon_color)
+        self.tint = self._norm_color(tint)
+
+        self.glow_inner = float(glow_inner)
+        self.glow_outer = float(glow_outer)
+        self.glow_inner_scale = float(glow_inner_scale)
+        self.glow_outer_scale = float(glow_outer_scale)
+
+    @staticmethod
+    def _norm_color(c):
+        c = np.asarray(c, dtype=np.float32).reshape(3)
+        if c.max() > 1.0:
+            c = c / 255.0
+        return c
+
+    @staticmethod
+    def _gaussian_kernel(sigma):
+        sigma = max(float(sigma), 1e-6)
+        radius = max(1, int(np.ceil(3.0 * sigma)))
+        x = np.arange(-radius, radius + 1, dtype=np.float32)
+        k = np.exp(-0.5 * (x / sigma) ** 2)
+        return k / k.sum()
+
+    @staticmethod
+    def _conv_axis(img, kernel, axis):
+        n = img.shape[axis]
+        r = len(kernel) // 2
+        pad = [(0, 0)] * img.ndim
+        pad[axis] = (r, r)
+        p = np.pad(img, pad, mode="edge")
+
+        out = np.zeros_like(img, dtype=np.float32)
+        for i, w in enumerate(kernel):
+            sl = [slice(None)] * img.ndim
+            sl[axis] = slice(i, i + n)
+            out += float(w) * p[tuple(sl)]
+        return out
+
+    @classmethod
+    def _blur(cls, img, sigma):
+        if sigma <= 0:
+            return img.astype(np.float32, copy=False)
+        k = cls._gaussian_kernel(sigma)
+        out = cls._conv_axis(img, k, 0)
+        out = cls._conv_axis(out, k, 1)
+        return out
+
+    @staticmethod
+    def _sobel(gray):
+        p = np.pad(gray.astype(np.float32), 1, mode="edge")
+
+        gx = (
+            p[:-2, 2:] + 2 * p[1:-1, 2:] + p[2:, 2:]
+            - p[:-2, :-2] - 2 * p[1:-1, :-2] - p[2:, :-2]
+        )
+        gy = (
+            p[2:, :-2] + 2 * p[2:, 1:-1] + p[2:, 2:]
+            - p[:-2, :-2] - 2 * p[:-2, 1:-1] - p[:-2, 2:]
+        )
+        return gx, gy
 
     def apply_filter(self, image: np.ndarray) -> np.ndarray:
-        h, w, c = image.shape
-        gray = GrayScaleFilter().apply_filter(image)[:, :, 0].astype(np.float32)
+        if image.ndim == 2:
+            image = np.stack([image, image, image], axis=-1)
 
-        gx, gy = np.zeros_like(gray), np.zeros_like(gray)
-        gx[:, :-1] = gray[:, 1:] - gray[:, :-1]
-        gy[:-1, :] = gray[1:, :] - gray[:-1, :]
-        
-        edges = np.clip(np.sqrt(gx**2 + gy**2) / 255.0, 0.0, 1.0)
+        img = image.astype(np.float32)
+        if img.shape[2] == 4:
+            img = img[:, :, :3]
 
-        def multi_blur(img_mask, iterations):
-            res = img_mask.copy()
-            for _ in range(max(0, iterations)):
-                p = np.pad(res, 1, mode="edge")
-                res = (p[:-2, :-2] + p[:-2, 1:-1] + p[:-2, 2:] +
-                       p[1:-1, :-2] + p[1:-1, 1:-1] + p[1:-1, 2:] +
-                       p[2:, :-2] + p[2:, 1:-1] + p[2:, 2:]) / 9.0
-            return res
+        if img.max() > 1.0:
+            img /= 255.0
 
-        narrow_glow = multi_blur(edges, round(3 * self.blur_factor))
-        wide_glow = multi_blur(edges, round(8 * self.blur_factor))
+        # Яркость
+        lum = (
+            0.114 * img[:, :, 0]
+            + 0.587 * img[:, :, 1]
+            + 0.299 * img[:, :, 2]
+        )
 
-        glow_map = self.strength * (edges * 60.0 + narrow_glow * 120.0 + wide_glow * 170.0)
+        # Слегка размываем перед выделением контуров, чтобы не ловить шум
+        smooth = self._blur(lum, max(0.6, self.blur_factor))
 
-        res = image.astype(np.float32)
-        
-        res[:, :, 0] += glow_map
-        res[:, :, 1] += glow_map
+        # Контуры
+        gx, gy = self._sobel(smooth)
+        mag = np.sqrt(gx * gx + gy * gy)
 
-        return np.clip(res, 0, 255).astype(np.uint8)
+        max_v = float(mag.max())
+        if max_v > 1e-8:
+            mag /= max_v
+
+        # “Ядро” неона — тонкие контуры
+        edge = np.clip((mag - 0.03) / 0.25, 0.0, 1.0)
+        edge = edge ** 0.65
+        core = np.clip(edge * self.strength, 0.0, 1.0)
+
+        # Свечение вокруг контуров: несколько радиусов размытия
+        glow_1 = self._blur(core, max(0.8, self.blur_factor * self.glow_inner_scale))
+        glow_2 = self._blur(core, max(2.0, self.blur_factor * self.glow_outer_scale))
+        glow = np.clip((self.glow_inner * glow_1 + self.glow_outer * glow_2) * self.strength,0.0, 1.0)
+
+        # Широкая аура
+        aura = self._blur(core, max(3.0, self.blur_factor * 10.0))
+        aura = np.clip(aura * self.strength * 0.8, 0.0, 1.0)
+
+        # Затемнённая и подкрашенная база
+        tint = self.tint.reshape(1, 1, 3)
+        ambient = (0.12 + 0.35 * lum[:, :, None]) * tint
+        base = np.clip(img * 0.22 + ambient, 0.0, 1.0)
+
+        # Цветной неоновый слой
+        color = self.color.reshape(1, 1, 3)
+        neon_layer = color * (
+            core[:, :, None] * 1.8
+            + glow[:, :, None] * 1.15
+            + aura[:, :, None] * 0.75
+        )
+        neon_layer = np.clip(neon_layer, 0.0, 1.0)
+
+        # Screen-смешивание
+        out = 1.0 - (1.0 - base) * (1.0 - neon_layer)
+        out = np.clip(out * 255.0, 0.0, 255.0).astype(np.uint8)
+
+        return out
+
 
 
 
