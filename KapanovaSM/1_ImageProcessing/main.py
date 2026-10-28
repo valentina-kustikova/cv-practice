@@ -45,10 +45,10 @@ def cli_argument_parser():
                         help='Уровень шума для aged')
     parser.add_argument('--scratch_intensity', type=float, default=0.6,
                         help='Заметность текстуры в aged (0..1)')
-    parser.add_argument('--neon_strength', type=float, default=9.0,
-                        help='Усиление контура неона (>0)')
-    parser.add_argument('--neon_threshold', type=float, default=20.0,
-                        help='Порог контура неона (>=0): слабее — не рисуется')
+    parser.add_argument('--neon_strength', type=float, default=1.5,
+                        help='Яркость контура неона (>0)')
+    parser.add_argument('--neon_blur_size', type=float, default=5.0,
+                        help='Ширина свечения вокруг контура (>0)')
 
     return parser.parse_args()
 
@@ -94,7 +94,7 @@ def main():
         params['scratch_intensity'] = args.scratch_intensity
     elif args.filter == 'neon':
         params['strength'] = args.neon_strength
-        params['threshold'] = args.neon_threshold
+        params['blur_size'] = args.neon_blur_size
 
     try:
         flt = ImageFilter.get_filter(args.filter, **params)
