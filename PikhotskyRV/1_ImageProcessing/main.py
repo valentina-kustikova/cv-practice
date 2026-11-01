@@ -72,15 +72,15 @@ def save_image(filename, image):
 
 def main(argv=None):
     args = cli_argument_parser(argv)
-    parameters = vars(args).copy()
-    input_path = parameters.pop("input")
-    output_path = parameters.pop("output")
-    filter_name = parameters.pop("filter")
+    parameters = {}
+    for name, value in vars(args).items():
+        if name not in ("input", "output", "filter"):
+            parameters[name] = value
     try:
-        image = read_image(input_path)
-        image_filter = ImageFilter.get_filter(filter_name, **parameters)
+        image = read_image(args.input)
+        image_filter = ImageFilter.get_filter(args.filter, **parameters)
         result = image_filter.apply_filter(image)
-        save_image(output_path, result)
+        save_image(args.output, result)
     except (OSError, ValueError, cv2.error) as error:
         print(f"Ошибка: {error}", file=sys.stderr)
         return 1
