@@ -51,9 +51,9 @@ python main.py -i images/mountain.jpg -o results/gray.jpg -f gray
 python main.py -i images/mountain.jpg -o results/antique.jpg -f antique -p 1
 python main.py -i images/mountain.jpg -o results/fade.jpg -f fade_color -p 0.4
 python main.py -i images/mountain.jpg -o results/film.jpg -f film_effect
-python main.py -i images/mountain.jpg -o results/matte.jpg -f matte -p 0.6
+python main.py -i images/mountain.jpg -o results/matte.jpg -f matte -p 0.8 -s 0.3
 python main.py -i images/mountain.jpg -o results/old.jpg -f old_photo -p 0.7
-python main.py -i images/mountain.jpg -o results/neon.jpg -f neon -p 0.3
+python main.py -i images/mountain.jpg -o results/neon.jpg -f neon -p 1
 ```
 
 Проверка обработки ошибок:

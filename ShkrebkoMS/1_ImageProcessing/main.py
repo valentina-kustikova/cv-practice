@@ -18,6 +18,8 @@ def cli_argument_parser():
                         help="тип фильтра")
     parser.add_argument("-p", "--param", type=float, default=None,
                         help="параметр фильтра (например, коэффициент масштабирования для resize и др. фильтров)")
+    parser.add_argument("-s", "--softness", type=float, default=None,
+                        help="мягкость края маски (для matte)")
 
     return parser.parse_args()
 
@@ -41,7 +43,7 @@ def main():
         sys.exit(1)
 
     try:
-        image_filter = ImageFilter.get_filter(args.filter, args.param)
+        image_filter = ImageFilter.get_filter(args.filter, args.param, args.softness)
     except ValueError as error:
         print("Ошибка:", error)
         sys.exit(1)
