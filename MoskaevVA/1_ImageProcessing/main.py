@@ -57,11 +57,8 @@ def cli_argument_parser() -> argparse.Namespace:
     p.add_argument("--texture-strength", type=float, default=0.35)
 
     # neon
-    p.add_argument("--threshold", type=float, default=30.0)
-    p.add_argument("--glow-radius", type=int, default=2)
-    p.add_argument("--glow-strength", type=float, default=1.2)
-    p.add_argument("--halo-radius", type=int, default=6)
-    p.add_argument("--halo-strength", type=float, default=0.8)
+    p.add_argument("--neon-strength", type=float, default=1.5)
+    p.add_argument("--neon-blur", type=float, default=0.8)
 
     return p.parse_args()
 
@@ -96,11 +93,9 @@ def build_filter(name: str, a: argparse.Namespace) -> ImageFilter:
                                       vertical_bias=a.vertical_bias,
                                       texture_strength=a.texture_strength)
     if name == "neon":
-        return ImageFilter.get_filter("neon", threshold=a.threshold,
-                                      glow_radius=a.glow_radius,
-                                      glow_strength=a.glow_strength,
-                                      halo_radius=a.halo_radius,
-                                      halo_strength=a.halo_strength)
+        return ImageFilter.get_filter("neon",
+                                      neon_strength=a.neon_strength,
+                                      neon_blur=a.neon_blur)
     raise ValueError("unknown filter: " + name)
 
 

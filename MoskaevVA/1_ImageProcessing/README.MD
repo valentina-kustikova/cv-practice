@@ -102,14 +102,7 @@
     python main.py -i input.png -o out/scratches_max.png -f scratches --n-scratches 40 --noise-sigma 25 --dust 0.02 --vertical-bias 0.5 --texture-strength 0.7
 
     # neon
-    python main.py -i input.png -o out/neon.png -f neon
-    python main.py -i input.png -o out/neon_thin.png -f neon --threshold 60 --glow-radius 1 --glow-strength 1.5 --halo-radius 4 --halo-strength 0.6
-    python main.py -i input.png -o out/neon_thick.png -f neon --threshold 15 --glow-radius 3 --glow-strength 1.0 --halo-radius 8 --halo-strength 1.0
-    python main.py -i input.png -o out/neon_halo.png -f neon --threshold 25 --glow-radius 2 --glow-strength 1.2 --halo-radius 12 --halo-strength 1.5
-    python main.py -i input.png -o out/neon_nohalo.png -f neon --threshold 30 --halo-radius 0 --glow-strength 1.5
-    python main.py -i input.png -o out/neon_max.png -f neon --threshold 20 --glow-radius 3 --glow-strength 2.0 --halo-radius 10 --halo-strength 1.5
-    python main.py -i input.png -o out/neon_min.png -f neon --threshold 80 --glow-radius 1 --glow-strength 0.8 --halo-radius 3 --halo-strength 0.3
-
+    python main.py -i input.png -o out.png -f neon --neon-strength 8.5 --neon-blur 19.8
 ---
 
 # Математическое описание алгоритмов
@@ -323,62 +316,78 @@ Smoothstep даёт плавный переход с нулевой произв
 Если пиксель выходит за границы — царапина обрывается.
 Никаких ярко-белых толстых полос: цвет 190–235, alpha <= 0.30.
 
-## 8. Neon — неоновые контуры + свечение + гало
+## 8. Neon — неоновые контуры + свечение
 
-### Яркость и лапласиан
+### Яркость
 
     Y = 0.299 * R + 0.587 * G + 0.114 * B
 
-Ядро свёртки (8-связный лапласиан):
+Считается через `RGB2GrayScale` (BT.601), берётся один канал.
 
-    K = |  1   1   1 |
-        |  1  -8   1 |
-        |  1   1   1 |
+### Границы — разности соседних пикселей
 
-    L(x, y) = сумма по dx,dy из {-1, 0, 1} от K(dy, dx) * Y(x + dx, y + dy)
+Вместо свёртки с ядром — простые односторонние разности:
 
-Границы обрабатываются через np.pad(gray, 1, mode="edge").
+    gx(x, y) = Y(x+1, y) - Y(x, y)
+    gy(x, y) = Y(x, y+1) - Y(x, y)
 
-### Маска контура
+    |∇Y| = sqrt(gx^2 + gy^2)
 
-    edge_mask(x, y) = clip( (|L(x, y)| - T) * 3,  0,  255 ) / 255
+    edges(x, y) = clip( |∇Y| / 255,  0,  1 )
 
-T = threshold — порог отсечения слабых контуров.
-edge_mask принадлежит [0, 1].
+`edges` принадлежит [0, 1]. Последняя строка/столбец остаются нулевыми
+(разность не определена) — это не влияет на визуальный результат.
 
-Цвет неона нормируется:
+### Два слоя свечения
 
-    c = color / 255
+Размытие — усреднение 3×3, повторяемое `iterations` раз:
 
-### Слои неонового света
+    blur(I, n):
+        for _ in range(n):
+            I = (сумма 9 соседей с паддингом edge) / 9
+        return I
 
-**1) Жёсткое ядро контура:**
+Ширина ореола задаётся `neon_blur` (b ≥ 0):
 
-    neon_edge(x, y) = edge_mask(x, y) * c
+    soft_iterations = max(0, round(4 * b))
+    wide_iterations = max(0, round(10 * b))
 
-**2) Внутреннее мягкое свечение** — скользящее среднее через cumsum:
+    soft(x, y) = blur(edges, soft_iterations)
+    wide(x, y) = blur(edges, wide_iterations)
 
-    box_blur(img, r):
-        padded_x = pad(img, ((0,0), (r,r)), mode='edge')
-        cum_x    = cumsum(padded_x, axis=1)
-        blur_x   = (cum_x[:, 2r:] - cum_x[:, :-2r]) / (2r)
-        padded_y = pad(blur_x, ((r,r), (0,0)), mode='edge')
-        cum_y    = cumsum(padded_y, axis=0)
-        blur_y   = (cum_y[2r:, :] - cum_y[:-2r, :]) / (2r)
-        return blur_y
+При b = 0 оба слоя вырождаются в `edges` (без размытия).
 
-    inner(x, y) = box_blur( edge_mask,  glow_radius * 2 )
-    neon_inner(x, y) = inner(x, y) * c * glow_strength
+### Свечение
 
-**3) Внешнее гало** — широкое размытие маски контура:
+`s = neon_strength` (s ≥ 0) — общая яркость:
 
-    r_wide = halo_radius * 4
-    wide(x, y) = box_blur( edge_mask,  r_wide )
-    halo_mask(x, y) = clip( wide(x, y) - inner(x, y) * 0.2,  0,  1 )
-    neon_halo(x, y) = halo_mask(x, y) * c * halo_strength
+    glow(x, y) = s * ( edges(x, y) * 70
+                     + soft(x, y)   * 130
+                     + wide(x, y)   * 180 )
 
-Вычитание `inner * 0.2` аккуратно вырезает центр — остаётся мягкое
-внешнее облако вокруг контура.
+Три слагаемых: жёсткое ядро контура (70), внутреннее мягкое свечение (130),
+широкое гало (180).
+
+### Наложение
+
+Свечение аддитивно добавляется в **красный и синий** каналы (RGB):
+
+    R'(x, y) = clip( R(x, y) + glow(x, y),  0,  255 )
+    G'(x, y) = G(x, y)
+    B'(x, y) = clip( B(x, y) + glow(x, y),  0,  255 )
+
+R + B даёт фиолетово-розовый неон; зелёный не трогается, чтобы контуры
+не уходили в белый. Фон не притемняется — эффект накладывается
+поверх оригинала.
+
+### Параметры
+
+| Параметр | Смысл | Диапазон | По умолчанию |
+|----------|-------|----------|--------------|
+| `--neon-strength` | яркость свечения | ≥ 0 | 1.5 |
+| `--neon-blur` | ширина ореола (множитель числа итераций размытия) | ≥ 0 | 0.8 |
+
+Отрицательные значения вызывают `ValueError` в `__init__`.
 
 ### Блендинг Screen
 
