@@ -1,4 +1,4 @@
-"""Извлечение локальных признаков: классические дескрипторы (OpenCV) и CNN (PyTorch)."""
+"""Извлечение локальных признаков: классические дескрипторы (OpenCV) и нейросети (PyTorch)."""
 
 import logging
 from abc import ABC, abstractmethod
@@ -19,7 +19,6 @@ class FeatureExtractor(ABC):
     """
 
     name = None
-    default_pca_dim = None  # рекомендуемая размерность PCA перед K-средних (None – без PCA)
     _registry = {}
 
     def __init_subclass__(cls, **kwargs):
@@ -29,7 +28,7 @@ class FeatureExtractor(ABC):
 
     @classmethod
     def create(cls, name, **params):
-        """Фабричный метод: создает экстрактор по его имени (sift, orb, resnet50, ...)."""
+        """Фабричный метод: создает экстрактор по его имени (sift, orb, dinov2, ...)."""
         if name not in cls._registry:
             raise ValueError(f"Неизвестный метод '{name}'. Доступны: {cls.available()}")
         return cls._registry[name](**params)
@@ -61,9 +60,8 @@ class FeatureExtractor(ABC):
 class ClassicalExtractor(FeatureExtractor):
     """Базовый класс классических детекторов/дескрипторов OpenCV.
 
-    Изображения Intel Image Classification имеют размер 150x150, на них детекторы
-    находят мало точек, поэтому изображение предварительно увеличивается до
-    ``image_size`` по большей стороне и переводится в оттенки серого.
+    Изображение масштабируется до ``image_size`` по большей стороне
+    и переводится в оттенки серого.
     """
 
     def __init__(self, image_size=300, nfeatures=1000):
@@ -89,7 +87,7 @@ class ClassicalExtractor(FeatureExtractor):
 
         # Координаты ключевых точек возвращаем в масштабе исходного изображения
         scale = max(h, w) / max(resized.shape[:2])
-        keypoints = [cv2.KeyPoint(kp.pt[0] * scale, kp.pt[1] * scale, kp.size * scale, kp.angle)
+        keypoints = [cv2.KeyPoint(kp.pt[0] * scale, kp.pt[1] * scale, kp.size * scale, kp.angle, kp.response, kp.octave, kp.class_id)
                      for kp in keypoints]
         return keypoints, self._postprocess(descriptors)
 
@@ -104,7 +102,7 @@ class SiftExtractor(ClassicalExtractor):
 
     name = "sift"
 
-    def __init__(self, image_size=300, nfeatures=1000, root_sift=True):
+    def __init__(self, image_size=640, nfeatures=1000, root_sift=True):
         super().__init__(image_size=image_size, nfeatures=nfeatures)
         self._params["root_sift"] = root_sift
         self.root_sift = root_sift
@@ -157,7 +155,7 @@ class CnnExtractorBase(FeatureExtractor):
     Выход слоя размера C x H x W рассматривается как H*W локальных дескрипторов
     размерности C: каждый описывает свою область изображения (рецептивное поле).
 
-    Предобработка (совпадает с обучением моделей на ImageNet):
+    Предобработка со статистикой нормализации ImageNet:
       1. resize до input_size x input_size (cv2.resize, бикубическая интерполяция);
       2. cv2.dnn.blobFromImage: BGR -> RGB, деление на 255, HWC -> NCHW;
       3. нормализация по каналам: (x - mean) / std со статистикой ImageNet.
@@ -168,7 +166,6 @@ class CnnExtractorBase(FeatureExtractor):
     STD = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(1, 3, 1, 1)
 
     default_layer = None
-    default_pca_dim = 128
 
     def __init__(self, layer=None, input_size=320, device="auto", l2_normalize=True):
         from torchvision.models.feature_extraction import create_feature_extractor
@@ -241,19 +238,45 @@ class CnnExtractorBase(FeatureExtractor):
         return self._descriptor_size
 
 
-class ResNet50Extractor(CnnExtractorBase):
-    """ResNet-50 (He et al., 2016), веса IMAGENET1K_V2.
+class DinoV2Extractor(FeatureExtractor):
+    """Замороженная DINOv2 ViT-S/14: 384-мерные признаки патчей для BoW."""
 
-    Слой по умолчанию – layer4 (2048 каналов, шаг 32): при input_size=320 дает
-    карту 10x10, то есть 100 дескрипторов на изображение.
-    """
+    name = "dinov2"
 
-    name = "resnet50"
-    default_layer = "layer4"
+    def __init__(self, input_size=322, device="auto", l2_normalize=True):
+        import torch
 
-    def _build_model(self):
-        from torchvision.models import resnet50, ResNet50_Weights
-        return resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+        if input_size <= 0 or input_size % 14:
+            raise ValueError("DINOv2: --input-size должен быть положительным и кратным 14 (например, 322)")
+        self.input_size = input_size
+        self.l2_normalize = l2_normalize
+        self.device = CnnExtractorBase._resolve_device(device)
+        self._params = dict(input_size=input_size, device=device, l2_normalize=l2_normalize)
+        self.model = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14",
+                                    pretrained=True, trust_repo=True).eval().to(self.device)
+        self.model.requires_grad_(False)
+
+    @property
+    def descriptor_size(self):
+        return 384
+
+    def detect_and_compute(self, image):
+        import torch
+
+        resized = cv2.resize(image, (self.input_size, self.input_size), interpolation=cv2.INTER_CUBIC)
+        blob = cv2.dnn.blobFromImage(resized, scalefactor=1.0 / 255, swapRB=True, crop=False)
+        blob = (blob - CnnExtractorBase.MEAN) / CnnExtractorBase.STD
+        with torch.inference_mode():
+            features = self.model.forward_features(torch.from_numpy(blob).to(self.device))
+            descriptors = features["x_norm_patchtokens"][0].cpu().numpy().astype(np.float32)
+        if self.l2_normalize:
+            descriptors /= np.linalg.norm(descriptors, axis=1, keepdims=True) + 1e-7
+        grid = self.input_size // 14
+        h, w = image.shape[:2]
+        cell_w, cell_h = w / grid, h / grid
+        keypoints = [cv2.KeyPoint((j + 0.5) * cell_w, (i + 0.5) * cell_h, min(cell_w, cell_h))
+                     for i in range(grid) for j in range(grid)]
+        return keypoints, descriptors
 
 
 class EfficientNetB0Extractor(CnnExtractorBase):

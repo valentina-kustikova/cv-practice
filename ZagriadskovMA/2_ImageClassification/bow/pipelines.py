@@ -7,7 +7,8 @@ import time
 from pathlib import Path
 
 import numpy as np
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
 
 from .bow import BagOfWords
 from .data import DATA_LOADERS
@@ -32,11 +33,13 @@ def _extract_all(extractor, paths, callback):
 
 def _compute_histograms(model, paths):
     histograms = np.zeros((len(paths), model.vocab_size), dtype=np.float32)
-
-    def store(i, descriptors):
+    start = time.time()
+    for i, path in enumerate(paths):
+        image = read_image(path)
+        _, descriptors = model.extractor.detect_and_compute(image)
         histograms[i] = model.compute_histogram(descriptors)
-
-    _extract_all(model.extractor, paths, store)
+        if (i + 1) % LOG_EVERY == 0 or i + 1 == len(paths):
+            logger.info("  обработано %d/%d изображений (%.1f c)", i + 1, len(paths), time.time() - start)
     return histograms
 
 
@@ -48,16 +51,33 @@ def run_train(args):
     labels = np.array([label for _, label in samples])
 
     extractor = FeatureExtractor.create(args.extractor, **_extractor_params(args))
-    pca_dim = args.pca_dim if args.pca_dim is not None else extractor.default_pca_dim
     model = BagOfWords(extractor, vocab_size=args.vocab_size, classifier=args.classifier,
-                       pca_dim=pca_dim or None, max_descriptors=args.max_descriptors,
-                       tfidf=args.tfidf, random_state=args.seed)
+                       max_descriptors=args.max_descriptors,
+                       random_state=args.seed)
 
     # 1. Словарь строится по случайной подвыборке изображений, чтобы не хранить
     #    в памяти дескрипторы всего набора данных
+    if not paths or min(args.vocab_images, args.max_descriptors, args.vocab_size) <= 0:
+        raise ValueError("Нужны изображения и положительные параметры словаря")
     rng = np.random.default_rng(args.seed)
-    n_vocab = min(args.vocab_images, len(paths))
-    vocab_idx = rng.choice(len(paths), n_vocab, replace=False)
+    fit_idx = np.arange(len(paths))
+    val_idx = None
+    if args.classifier == "svm" and not args.no_tune_svm:
+        try:
+            fit_idx, val_idx = train_test_split(fit_idx, test_size=0.2,
+                                                stratify=labels, random_state=args.seed)
+        except ValueError as exc:
+            raise ValueError("Недостаточно данных для валидации; используйте --no-tune-svm") from exc
+    # Равномерный обход классов гарантирует присутствие редких классов.
+    queues = [list(rng.permutation(fit_idx[labels[fit_idx] == label])) for label in np.unique(labels)]
+    vocab_idx = []
+    n_vocab = min(args.vocab_images, len(fit_idx))
+    if n_vocab < len(queues):
+        raise ValueError("--vocab-images должен быть не меньше числа классов")
+    while len(vocab_idx) < n_vocab:
+        for queue in queues:
+            if queue and len(vocab_idx) < n_vocab:
+                vocab_idx.append(queue.pop())
     per_image = max(1, args.max_descriptors // n_vocab)
     sampled = []
 
@@ -77,7 +97,7 @@ def run_train(args):
 
     # 3. Классификатор
     logger.info("Шаг 3/3: обучение классификатора")
-    histograms = model.fit_classifier(histograms, labels, loader.class_names)
+    histograms = model.fit_classifier(histograms, labels, loader.class_names, fit_idx, val_idx)
     train_acc = accuracy_score(labels, model.predict_histograms(histograms))
     logger.info("Точность на обучающей выборке: %.4f", train_acc)
 
@@ -114,8 +134,6 @@ def run_test(args):
     print(f"\nAccuracy: {accuracy:.4f}\n")
     print(classification_report(labels, predictions, labels=range(len(model.class_names)),
                                 target_names=model.class_names, digits=4, zero_division=0))
-    print("Матрица ошибок (строки – истинный класс, столбцы – предсказанный):")
-    print(confusion_matrix(labels, predictions, labels=range(len(model.class_names))))
 
     if args.output:
         Path(args.output).parent.mkdir(parents=True, exist_ok=True)

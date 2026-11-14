@@ -93,6 +93,34 @@ class IntelImageDataLoader(DataLoader):
                 yield path, name
 
 
+class NnsuDataLoader(IntelImageDataLoader):
+    """Подготовленный набор: root/{trainval,test}/<класс>/**/*.jpg.
+
+    Источники ExtDataset и NNSUDataset объединяются download_dataset.py.
+    Разделение trainval/test сохраняется: train использует trainval.
+    """
+
+    SPLIT_DIRS = {"train": "trainval", "test": "test"}
+
+    SOURCES = {"ext", "nnsu", "extdataset", "nnsudataset"}
+
+    def __init__(self, root, limit_per_class=None):
+        super().__init__(root, limit_per_class)
+        self._class_names = [n for n in self._class_names if n.lower() not in self.SOURCES]
+        if not self._class_names:
+            raise ValueError("Сначала запустите download_dataset.py")
+
+    def _load_split(self, split):
+        directory = self._split_dir(split)
+        unknown = {p.name for p in directory.iterdir() if p.is_dir() and p.name.lower() not in self.SOURCES} - set(self.class_names)
+        if unknown:
+            raise ValueError(f"Неизвестные классы в {split}: {sorted(unknown)}")
+        for name in self.class_names:
+            for path in sorted((directory / name).rglob("*")):
+                if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS:
+                    yield path, name
+
+
 class CsvDataLoader(DataLoader):
     """Набор данных с разметкой в CSV-файлах root/train.csv и root/test.csv.
 
@@ -118,5 +146,6 @@ class CsvDataLoader(DataLoader):
 
 DATA_LOADERS = {
     "intel": IntelImageDataLoader,
+    "nnsu": NnsuDataLoader,
     "csv": CsvDataLoader,
 }

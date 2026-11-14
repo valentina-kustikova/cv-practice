@@ -1,20 +1,7 @@
-"""Скачивание и распаковка набора данных Intel Image Classification в каталог dataset/.
-
-Запуск:
-    python download_dataset.py                       # скачать и распаковать в dataset/
-    python download_dataset.py --archive archive.zip # распаковать уже скачанный архив
-    python download_dataset.py --force               # перезаписать существующий dataset/
-
-Набор данных публичный, обычно скачивается без авторизации. Если Kaggle ответит 401/403,
-используются учетные данные Kaggle API: переменные окружения KAGGLE_USERNAME и KAGGLE_KEY
-или файл ~/.kaggle/kaggle.json (создается на kaggle.com: Settings -> API -> Create New Token).
-"""
+"""Скачивание и подготовка датасета достопримечательностей ННГУ."""
 
 import argparse
-import base64
-import json
 import logging
-import os
 import shutil
 import sys
 import time
@@ -23,61 +10,33 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-DATASET_URL = "https://www.kaggle.com/api/v1/datasets/download/puneet6060/intel-image-classification"
-EXPECTED_DIRS = ("seg_train/seg_train", "seg_test/seg_test", "seg_pred/seg_pred")
+DATASET_URL = "https://cloud.unn.ru/s/MPfwfnbB6HaSXLC/download"
+EXPECTED_DIRS = ("trainval", "test")
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
+SOURCES = {"extdataset", "nnsudataset", "ext", "nnsu"}
 CHUNK_SIZE = 1 << 20
 
 logger = logging.getLogger("download_dataset")
 
 
 def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description="Скачивание набора данных Intel Image Classification")
+    parser = argparse.ArgumentParser(description="Скачивание набора данных достопримечательностей")
     parser.add_argument("--url", default=DATASET_URL, help="адрес архива")
     parser.add_argument("--output", default="dataset", help="каталог для распаковки (dataset)")
     parser.add_argument("--archive", default=None,
                         help="путь к уже скачанному архиву; если файла нет, архив скачивается в этот путь")
     parser.add_argument("--keep-archive", action="store_true", help="не удалять архив после распаковки")
-    parser.add_argument("--force", action="store_true", help="перезаписать существующий каталог с данными")
+    parser.add_argument("--force", action="store_true", help="повторно распаковать архив и обновить объединённые файлы")
     return parser.parse_args(argv)
 
 
-def kaggle_credentials():
-    """Возвращает (username, key) из окружения или ~/.kaggle/kaggle.json, иначе None."""
-    username, key = os.environ.get("KAGGLE_USERNAME"), os.environ.get("KAGGLE_KEY")
-    if username and key:
-        return username, key
-    config = Path(os.environ.get("KAGGLE_CONFIG_DIR", Path.home() / ".kaggle")) / "kaggle.json"
-    if config.is_file():
-        data = json.loads(config.read_text(encoding="utf-8"))
-        return data["username"], data["key"]
-    return None
-
-
-def open_url(url, credentials=None):
-    request = urllib.request.Request(url, headers={"User-Agent": "bow-lab-downloader/1.0"})
-    if credentials:
-        token = base64.b64encode(f"{credentials[0]}:{credentials[1]}".encode()).decode()
-        # Заголовок не передается при перенаправлении на хранилище Google Cloud,
-        # у которого своя подпись в адресе
-        request.add_unredirected_header("Authorization", f"Basic {token}")
-    return urllib.request.urlopen(request, timeout=60)
-
-
 def download(url, destination):
-    """Скачивает файл по адресу url в destination с отображением прогресса."""
-    try:
-        response = open_url(url)
-    except urllib.error.HTTPError as e:
-        if e.code not in (401, 403):
-            raise
-        credentials = kaggle_credentials()
-        if credentials is None:
-            raise RuntimeError(
-                f"Kaggle вернул {e.code}. Задайте KAGGLE_USERNAME и KAGGLE_KEY или положите "
-                "kaggle.json в ~/.kaggle (kaggle.com: Settings -> API -> Create New Token)") from e
-        logger.info("Повторный запрос с учетными данными Kaggle API (%s)", credentials[0])
-        response = open_url(url, credentials)
-
+    """Скачивает архив; неполный файл сохраняется с расширением .part."""
+    url = url.rstrip(".").rstrip("/")
+    if "cloud.unn.ru/s/" in url and not url.endswith("/download"):
+        url += "/download"
+    request = urllib.request.Request(url, headers={"User-Agent": "bow-lab-downloader/1.0"})
+    response = urllib.request.urlopen(request, timeout=60)
     total = int(response.headers.get("Content-Length", 0))
     destination.parent.mkdir(parents=True, exist_ok=True)
     partial = destination.with_suffix(destination.suffix + ".part")
@@ -117,15 +76,48 @@ def extract(archive, output):
     print()
 
 
+def source_roots(output):
+    """Находит исходную структуру, в том числе внутри обёртки Dataset/."""
+    return sorted({p.parent for p in output.rglob("*")
+                   if p.is_dir() and p.name.lower() in SOURCES
+                   and p.parent.name in EXPECTED_DIRS}) if output.exists() else []
+
+
+def normalize(output, force=False):
+    """Объединяет источники по классам; исходные файлы сохраняются."""
+    for split_dir in source_roots(output):
+        for source in sorted(split_dir.iterdir()):
+            if not source.is_dir() or source.name.lower() not in SOURCES:
+                continue
+            for class_dir in sorted(source.iterdir()):
+                if not class_dir.is_dir():
+                    continue
+                for path in sorted(class_dir.rglob("*")):
+                    if not path.is_file() or path.suffix.lower() not in IMAGE_EXTENSIONS:
+                        continue
+                    relative = path.relative_to(class_dir)
+                    target = output / split_dir.name / class_dir.name / source.name / relative
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    if force or not target.exists():
+                        # Жёсткая ссылка экономит место; копирование для других файловых систем.
+                        if target.exists():
+                            target.unlink()
+                        try:
+                            target.hardlink_to(path)
+                        except OSError:
+                            shutil.copy2(path, target)
+
+
 def verify(output):
-    """Проверяет структуру каталога и выводит число изображений в каждой выборке."""
-    for rel in EXPECTED_DIRS:
-        directory = output / rel
-        if not directory.is_dir():
-            raise RuntimeError(f"После распаковки не найден каталог {directory}")
-        count = sum(1 for p in directory.rglob("*.jpg"))
-        classes = sorted(p.name for p in directory.iterdir() if p.is_dir())
-        logger.info("  %-20s %6d изображений%s", rel, count, f", классы: {', '.join(classes)}" if classes else "")
+    for split in EXPECTED_DIRS:
+        directory = output / split
+        classes = [p for p in directory.iterdir()
+                   if p.is_dir() and p.name.lower() not in SOURCES] if directory.is_dir() else []
+        count = sum(1 for c in classes for p in c.rglob("*")
+                    if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
+        if not count:
+            raise RuntimeError(f"Не найдены изображения классов в {directory}")
+        logger.info("%s: %d изображений, %d классов", split, count, len(classes))
 
 
 def main(argv=None):
@@ -134,27 +126,30 @@ def main(argv=None):
                         handlers=[logging.StreamHandler(sys.stdout)])
     output = Path(args.output)
     try:
-        if output.exists() and any(output.iterdir()):
-            if not args.force:
-                logger.info("Каталог %s уже существует и не пуст. Для перезаписи используйте --force", output)
+        downloaded = False
+        archive = Path(args.archive) if args.archive else None
+        if not args.force and source_roots(output):
+            normalize(output)
+            verify(output)
+            return 0
+        if not args.force and archive is None:
+            try:
                 verify(output)
                 return 0
-            logger.info("Удаление существующего каталога %s", output)
-            shutil.rmtree(output)
-
-        archive = Path(args.archive) if args.archive else output.parent / "intel-image-classification.zip"
-        downloaded = False
-        if archive.is_file():
-            logger.info("Используется существующий архив %s", archive)
-        else:
+            except RuntimeError:
+                pass
+        if archive is None:
+            candidates = sorted(output.glob("*.zip")) if output.exists() else []
+            candidates += [output.parent / "Dataset.zip"]
+            archive = next((p for p in candidates if p.is_file()), output.parent / "Dataset.zip")
+        if not archive.is_file():
             download(args.url, archive)
             downloaded = True
-
         extract(archive, output)
+        normalize(output, force=args.force)
         verify(output)
         if downloaded and not args.keep_archive:
             archive.unlink()
-            logger.info("Архив удален (используйте --keep-archive, чтобы сохранить)")
         logger.info("Готово: данные в %s", output.resolve())
     except (urllib.error.URLError, zipfile.BadZipFile, RuntimeError, OSError) as e:
         logger.error("%s", e)

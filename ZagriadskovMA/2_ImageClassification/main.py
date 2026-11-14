@@ -24,7 +24,7 @@ def parse_args(argv=None):
 
     data = argparse.ArgumentParser(add_help=False)
     data.add_argument("--data-root", required=True, help="корневой каталог набора данных")
-    data.add_argument("--dataset", default="intel", choices=sorted(DATA_LOADERS), help="формат набора данных")
+    data.add_argument("--dataset", default="nnsu", choices=sorted(DATA_LOADERS), help="формат набора данных")
     data.add_argument("--limit-per-class", type=int, default=None,
                       help="ограничить число изображений на класс (для отладки)")
 
@@ -37,20 +37,18 @@ def parse_args(argv=None):
     train.add_argument("--model", required=True, help="путь для сохранения модели (.joblib)")
     train.add_argument("--vocab-size", type=int, default=200, help="число визуальных слов K")
     train.add_argument("--classifier", default="svm", choices=sorted(CLASSIFIERS))
-    train.add_argument("--vocab-images", type=int, default=2000,
+    train.add_argument("--vocab-images", type=int, default=500,
                        help="число изображений, по дескрипторам которых строится словарь")
-    train.add_argument("--max-descriptors", type=int, default=200_000,
+    train.add_argument("--max-descriptors", type=int, default=30_000,
                        help="максимум дескрипторов для K-средних")
-    train.add_argument("--pca-dim", type=int, default=None,
-                       help="PCA перед K-средних (0 – отключить; по умолчанию 128 для CNN, нет для классических)")
-    train.add_argument("--tfidf", action="store_true", help="взвешивать слова по TF-IDF")
+    train.add_argument("--no-tune-svm", action="store_true", help="отключить подбор SVM по 20%% trainval")
     train.add_argument("--seed", type=int, default=42)
     # Параметры классических экстракторов
-    train.add_argument("--image-size", type=int, default=None, help="SIFT/ORB: размер большей стороны (300)")
+    train.add_argument("--image-size", type=int, default=None, help="Размер большей стороны: SIFT 640, ORB 300")
     train.add_argument("--nfeatures", type=int, default=None, help="SIFT/ORB: максимум ключевых точек (1000)")
     # Параметры нейросетевых экстракторов
-    train.add_argument("--layer", default=None, help="CNN: слой для извлечения признаков (layer4, features.8, ...)")
-    train.add_argument("--input-size", type=int, default=None, help="CNN: размер входа сети (320)")
+    train.add_argument("--layer", default=None, help="EfficientNet: слой признаков (features.8)")
+    train.add_argument("--input-size", type=int, default=None, help="Вход сети: EfficientNet 320, DINOv2 322 (кратно 14)")
 
     test = sub.add_parser("test", parents=[data, device], help="тестирование модели")
     test.add_argument("--model", required=True)

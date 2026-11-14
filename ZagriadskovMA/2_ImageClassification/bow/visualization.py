@@ -32,9 +32,16 @@ def draw_histogram_overlay(image, histogram, label=None, keypoints=None, height_
         scale = 450 / max(canvas.shape[:2])
         canvas = cv2.resize(canvas, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
         if keypoints:
-            keypoints = [cv2.KeyPoint(kp.pt[0] * scale, kp.pt[1] * scale, kp.size * scale) for kp in keypoints]
+            keypoints = [cv2.KeyPoint(kp.pt[0] * scale, kp.pt[1] * scale, kp.size * scale, kp.angle, kp.response, kp.octave, kp.class_id) for kp in keypoints]
     if keypoints:
-        canvas = cv2.drawKeypoints(canvas, keypoints, None, color=(0, 255, 0))
+        oriented = sorted((kp for kp in keypoints if kp.angle >= 0),
+                          key=lambda kp: kp.response, reverse=True)[:30]
+        centers = [kp for kp in keypoints if kp.angle < 0]
+        if oriented:
+            canvas = cv2.drawKeypoints(canvas, oriented, None, color=(0, 255, 0),
+                                      flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        if centers:
+            canvas = cv2.drawKeypoints(canvas, centers, None, color=(0, 255, 0))
 
     h, w = canvas.shape[:2]
     panel_h = int(h * height_ratio)
