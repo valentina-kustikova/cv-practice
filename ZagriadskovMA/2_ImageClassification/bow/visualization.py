@@ -27,21 +27,20 @@ def draw_histogram_overlay(image, histogram, label=None, keypoints=None, height_
     Внизу изображения рисуется полупрозрачная панель со столбцами гистограммы,
     сверху – предсказанный класс; при наличии ключевых точек они тоже отрисовываются.
     """
+    # Рисуем в масштабе показа, иначе тонкие линии на больших фото
+    # исчезают при уменьшении matplotlib и сохранении общей фигуры.
     canvas = image.copy()
-    if max(canvas.shape[:2]) < 450:
-        scale = 450 / max(canvas.shape[:2])
-        canvas = cv2.resize(canvas, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-        if keypoints:
-            keypoints = [cv2.KeyPoint(kp.pt[0] * scale, kp.pt[1] * scale, kp.size * scale, kp.angle, kp.response, kp.octave, kp.class_id) for kp in keypoints]
+    longest = max(canvas.shape[:2])
+    scale = min(900, max(450, longest)) / longest
+    if scale != 1:
+        canvas = cv2.resize(canvas, None, fx=scale, fy=scale,
+                            interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC)
+    display_keypoints = []
     if keypoints:
-        oriented = sorted((kp for kp in keypoints if kp.angle >= 0),
-                          key=lambda kp: kp.response, reverse=True)[:30]
-        centers = [kp for kp in keypoints if kp.angle < 0]
-        if oriented:
-            canvas = cv2.drawKeypoints(canvas, oriented, None, color=(0, 255, 0),
-                                      flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        if centers:
-            canvas = cv2.drawKeypoints(canvas, centers, None, color=(0, 255, 0))
+        sx, sy = canvas.shape[1] / image.shape[1], canvas.shape[0] / image.shape[0]
+        display_keypoints = [cv2.KeyPoint(kp.pt[0] * sx, kp.pt[1] * sy,
+                                        kp.size * min(sx, sy), kp.angle,
+                                        kp.response, kp.octave, kp.class_id) for kp in keypoints]
 
     h, w = canvas.shape[:2]
     panel_h = int(h * height_ratio)
@@ -58,6 +57,28 @@ def draw_histogram_overlay(image, histogram, label=None, keypoints=None, height_
     if label is not None:
         cv2.putText(canvas, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 4, cv2.LINE_AA)
         cv2.putText(canvas, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2, cv2.LINE_AA)
+    # Поверх панели и фотографии: маркеры не затемняются гистограммой.
+    oriented = sorted((kp for kp in display_keypoints if kp.angle >= 0),
+                      key=lambda kp: kp.response, reverse=True)[:30]
+    for kp in oriented:
+        center = tuple(round(v) for v in kp.pt)
+        radius = max(1, round(kp.size / 2))
+        angle = np.deg2rad(kp.angle)
+        # Минимум длины относится только к указателю направления, не к масштабу.
+        length = max(14, radius)
+        end = (round(kp.pt[0] + length * np.cos(angle)),
+               round(kp.pt[1] + length * np.sin(angle)))
+        for color, thickness in [((0, 0, 0), 4), ((0, 255, 0), 2)]:
+            cv2.circle(canvas, center, radius, color, thickness, cv2.LINE_AA)
+            cv2.arrowedLine(canvas, center, end, color, thickness, cv2.LINE_AA,
+                            tipLength=0.3)
+        cv2.circle(canvas, center, 3, (0, 0, 0), -1, cv2.LINE_AA)
+        cv2.circle(canvas, center, 2, (0, 255, 255), -1, cv2.LINE_AA)
+    for kp in display_keypoints:
+        if kp.angle < 0:
+            center = tuple(round(v) for v in kp.pt)
+            cv2.circle(canvas, center, 3, (0, 0, 0), -1, cv2.LINE_AA)
+            cv2.circle(canvas, center, 2, (0, 255, 0), -1, cv2.LINE_AA)
     return canvas
 
 
@@ -68,7 +89,7 @@ def visualize_image_with_histogram(image, histogram, label=None, keypoints=None,
     n_descriptors – число дескрипторов изображения: столько слов распределено по столбцам гистограммы.
     """
     overlay = draw_histogram_overlay(image, histogram, label, keypoints)
-    fig, (ax_img, ax_hist) = plt.subplots(1, 2, figsize=(14, 5), gridspec_kw={"width_ratios": [1, 1.6]})
+    fig, (ax_img, ax_hist) = plt.subplots(1, 2, figsize=(14, 6), gridspec_kw={"width_ratios": [1, 1]})
     ax_img.imshow(cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB))
     ax_img.set_title(f"Предсказанный класс: {label}" if label else "Изображение")
     ax_img.axis("off")
