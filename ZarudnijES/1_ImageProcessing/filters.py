@@ -44,7 +44,7 @@ class ImageFilter:
             )
         elif filter_name == 'neon':
             return NeonFilter(
-                thickness = kwargs.get('thickness', 2),
+                thickness = kwargs.get('thickness', 4),
                 blur_size = kwargs.get('blur_size', 15)
             )
         else:
@@ -167,9 +167,10 @@ class MatteFilter(ImageFilter):
         cx, cy = w / 2, h / 2
         rx, ry = w / 2 - w * self.margin, h / 2 - h * self.margin
 
-        distance = ((X - cx) / rx) ** 2 + ((Y - cy) / ry) ** 2
+        distance = np.sqrt(((X - cx) / rx) ** 2 + ((Y - cy) / ry) ** 2)
 
-        mask = np.clip(10.5 - (10 * distance), 0, 1)
+        t = np.clip((1.15 - distance) / 0.3, 0, 1)
+        mask = t * t * (3 - 2 * t)
         mask_3ch = mask[..., None]
 
         white_bg = np.ones_like(image) * 255
@@ -238,44 +239,61 @@ class ScratchesNoiseFilter(ImageFilter):
 
 
 class NeonFilter(ImageFilter):
-    def __init__(self, thickness=2, blur_size=15):
+    def __init__(self, thickness=4, blur_size=15):
         self.thickness = thickness
         self.blur_size = blur_size
 
     def apply_filter(self, image):
         gray = GrayScale().apply_filter(image).astype(np.float64)
 
+        # 1. Находим ТОНКИЕ контуры
+        shift = max(1, 0.5 * self.thickness)
+        grad_x_thin = np.abs(np.roll(gray, -shift, axis=1) - np.roll(gray, shift, axis=1))
+        grad_y_thin = np.abs(np.roll(gray, -shift, axis=0) - np.roll(gray, shift, axis=0))
+        edges_thin = np.clip(grad_x_thin + grad_y_thin, 0, 255)
+        edges_thin = 255.0 * (edges_thin / 255.0) ** 0.5
+
+        # 2. Находим ТОЛСТЫЕ контуры
         shift = max(1, self.thickness)
-        grad_x = np.abs(np.roll(gray, -shift, axis=1) - np.roll(gray, shift, axis=1))
-        grad_y = np.abs(np.roll(gray, -shift, axis=0) - np.roll(gray, shift, axis=0))
+        grad_x_thick = np.abs(np.roll(gray, -shift, axis=1) - np.roll(gray, shift, axis=1))
+        grad_y_thick = np.abs(np.roll(gray, -shift, axis=0) - np.roll(gray, shift, axis=0))
+        edges_thick = np.clip(grad_x_thick + grad_y_thick, 0, 255)
 
-        edges = np.clip(grad_x + grad_y, 0, 255)
-
+        # Расширяем толстые контуры, чтобы сделать ореол шире
         if self.thickness > 1:
             for _ in range(self.thickness - 1):
-                edges = np.maximum(edges, np.roll(edges, 1, axis=0))
-                edges = np.maximum(edges, np.roll(edges, -1, axis=0))
-                edges = np.maximum(edges, np.roll(edges, 1, axis=1))
-                edges = np.maximum(edges, np.roll(edges, -1, axis=1))
+                edges_thick = np.maximum(edges_thick, np.roll(edges_thick, 1, axis=0))
+                edges_thick = np.maximum(edges_thick, np.roll(edges_thick, -1, axis=0))
+                edges_thick = np.maximum(edges_thick, np.roll(edges_thick, 1, axis=1))
+                edges_thick = np.maximum(edges_thick, np.roll(edges_thick, -1, axis=1))
+
+        # 3. Создаем свечение для фиолетового слоя
         if self.blur_size > 0:
-            glow = np.zeros_like(edges)
+            glow = np.zeros_like(edges_thick)
             for i in range(1, self.blur_size + 1):
-                glow += np.roll(edges, i, axis=0)
-                glow += np.roll(edges, -i, axis=0)
-                glow += np.roll(edges, i, axis=1)
-                glow += np.roll(edges, -i, axis=1)
+                glow += np.roll(edges_thick, i, axis=0)
+                glow += np.roll(edges_thick, -i, axis=0)
+                glow += np.roll(edges_thick, i, axis=1)
+                glow += np.roll(edges_thick, -i, axis=1)
             glow = glow / (4 * self.blur_size)
-        else:
-            glow = np.zeros_like(edges)
+            edges_thick = np.clip(edges_thick + glow, 0, 255)
 
-        neon_intensity = np.clip(edges + glow, 0, 255)
 
-        neon_layer = np.zeros_like(image, dtype=np.float64)
-        neon_layer[:, :, 0] = neon_intensity
-        neon_layer[:, :, 1] = neon_intensity * 0.3
-        neon_layer[:, :, 2] = neon_intensity
+        neon_purple = np.zeros_like(image, dtype=np.float64)
+
+        neon_purple[:, :, 0] = edges_thick * 1.0
+        neon_purple[:, :, 1] = edges_thick * 0.2
+        neon_purple[:, :, 2] = edges_thick * 0.7
+
+        # 5. Создаем белый слой (тонкое ядро)
+        neon_white = np.zeros_like(image, dtype=np.float64)
+        neon_white[:, :, 0] = edges_thin * 1.0
+        neon_white[:, :, 1] = edges_thin * 1.0
+        neon_white[:, :, 2] = edges_thin * 1.0
 
         dark_bg = image.astype(np.float64) * 0.4
-        result = np.maximum(dark_bg, neon_layer)
+
+        result = np.maximum(dark_bg, neon_purple)
+        result = np.maximum(result, neon_white)
 
         return to_uint8(result)

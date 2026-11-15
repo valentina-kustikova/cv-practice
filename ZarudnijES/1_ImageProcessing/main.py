@@ -30,7 +30,7 @@ def cli_argument_parser():
     parser.add_argument('--noise_level', type=int, default=20, help='Интенсивность шума')
     parser.add_argument('--scratches_count', type=int, default=15, help='Количество царапин')
 
-    parser.add_argument('--thickness', type=int, default=2, help='Толщина неоновой границы')
+    parser.add_argument('--thickness', type=int, default=4, help='Толщина неоновой границы')
     parser.add_argument('--blur_size', type=int, default=15, help='Степень блюра')
     return parser.parse_args()
 
