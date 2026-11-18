@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.conda/
+.venv/
+venv/
+models/
+outputs/
+*.joblib
+.pytest_cache/
+Dataset
