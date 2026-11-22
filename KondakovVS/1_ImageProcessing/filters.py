@@ -185,11 +185,14 @@ class Antique(ImageFilter):
                       [0.349, 0.686, 0.168],
                       [0.272, 0.534, 0.131]], dtype=np.float32)
 
-    def __init__(self, intensity=1.0, contrast=0.85):
+    def __init__(self, intensity=1.0, contrast=0.85, vignette=0.18):
         if not 0 <= intensity <= 1:
             raise ValueError("intensity должен быть в [0, 1]")
+        if not 0 <= vignette <= 1:
+            raise ValueError("vignette должен быть в [0, 1]")
         self.intensity = intensity
         self.contrast = contrast
+        self.vignette = vignette
 
     def apply_filter(self, image):
         img = to_float(ensure_bgr(image))
@@ -198,7 +201,13 @@ class Antique(ImageFilter):
         sepia = np.clip(sepia_rgb[..., ::-1], 0, 1)  
         out = (1 - self.intensity) * img + self.intensity * sepia
         out = (out - 0.5) * self.contrast + 0.5      
-        return to_uint8(out)
+        h, w = out.shape[:2]
+        y = (np.arange(h, dtype=np.float32) - (h - 1) / 2) / (h / 2)
+        x = (np.arange(w, dtype=np.float32) - (w - 1) / 2) / (w / 2)
+        distance = np.sqrt((x[None, :] ** 2 + y[:, None] ** 2) / 2)
+        t = np.clip((distance - 0.3) / 0.7, 0, 1)
+        shade = 1 - self.vignette * t * t * (3 - 2 * t)
+        return to_uint8(out * shade[..., None])
 
 
 
@@ -299,20 +308,25 @@ class OldPhoto(ImageFilter):
 
     def _scratches(self, h, w):
         mask = np.zeros((h, w), np.float32)
-        rows = np.arange(h)
         for _ in range(self.scratches):
-            x0 = self.rng.uniform(0, w)
-            slope = self.rng.normal(0, 0.05)
-            amp = self.rng.uniform(0, 3)
-            freq = self.rng.uniform(0.002, 0.02)
-            y_start = self.rng.integers(0, h // 2 + 1)
-            length = self.rng.integers(h // 4, h + 1)
-            ys = rows[y_start:min(h, y_start + length)]
-            xs = x0 + slope * ys + amp * np.sin(freq * ys)
-            strength = self.rng.uniform(0.2, 0.7)
-            for off in range(1 + (self.rng.uniform() < 0.3)):
-                xi = np.clip(np.round(xs).astype(int) + off, 0, w - 1)
-                mask[ys, xi] = np.maximum(mask[ys, xi], strength)
+            length = max(2.0, min(h, w) * self.rng.uniform(0.025, 0.075))
+            steps = max(4, int(np.ceil(length / 0.5)))
+            angles = self.rng.uniform(0, 2 * np.pi) + np.cumsum(
+                self.rng.normal(0, 0.18, steps))
+            xs = self.rng.uniform(0, w) + np.cumsum(0.5 * np.cos(angles))
+            ys = self.rng.uniform(0, h) + np.cumsum(0.5 * np.sin(angles))
+            x0, y0 = np.floor(xs).astype(int), np.floor(ys).astype(int)
+            dx, dy = xs - x0, ys - y0
+            strength = self.rng.uniform(0.2, 0.45)
+            taper = np.sin(np.linspace(0, np.pi, steps)) ** 0.5
+            for ox, oy, weight in ((0, 0, (1 - dx) * (1 - dy)),
+                                   (1, 0, dx * (1 - dy)),
+                                   (0, 1, (1 - dx) * dy),
+                                   (1, 1, dx * dy)):
+                xi, yi = x0 + ox, y0 + oy
+                valid = (xi >= 0) & (xi < w) & (yi >= 0) & (yi < h)
+                np.maximum.at(mask, (yi[valid], xi[valid]),
+                              (strength * taper * weight)[valid])
         return mask
 
     def _dust(self, h, w):
@@ -331,7 +345,8 @@ class OldPhoto(ImageFilter):
     def apply_filter(self, image):
         base = ensure_bgr(image)
         h, w = base.shape[:2]
-        out = to_float(Antique(intensity=self.sepia, contrast=0.9).apply_filter(base))
+        out = to_float(Antique(intensity=self.sepia, contrast=0.9,
+                               vignette=0).apply_filter(base))
 
         y = (np.arange(h, dtype=np.float32) - (h - 1) / 2) / (h / 2)
         x = (np.arange(w, dtype=np.float32) - (w - 1) / 2) / (w / 2)
@@ -356,34 +371,67 @@ class Neon(ImageFilter):
 
     SOBEL_X = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], np.float32)
     SOBEL_Y = SOBEL_X.T
+    HALO = ((2, 1.8), (7, 1.2), (20, 0.65))
 
-    def __init__(self, color="rainbow", threshold=0.15, glow=4.0,
-                 intensity=1.5, background=0.15):
+    def __init__(self, color="#BF00FF", threshold=0.3, glow=1.0,
+                 intensity=1.0, background=0.7):
+        if not 0 < threshold < 1:
+            raise ValueError("threshold должен быть в (0, 1)")
+        if glow < 0 or intensity < 0:
+            raise ValueError("glow и intensity должны быть >= 0")
+        if not 0 <= background <= 1:
+            raise ValueError("background должен быть в [0, 1]")
         self.color = color if color == "rainbow" else parse_color(color)
         self.threshold, self.glow = threshold, glow
         self.intensity, self.background = intensity, background
 
+    @staticmethod
+    def _thin_edges(magnitude, gx, gy):
+        h, w = magnitude.shape
+        yy, xx = np.indices((h, w), dtype=np.float32)
+        norm = np.maximum(np.sqrt(gx ** 2 + gy ** 2), 1e-8)
+        dx, dy = gx / norm, gy / norm
+
+        def sample(x, y):
+            x, y = np.clip(x, 0, w - 1), np.clip(y, 0, h - 1)
+            x0, y0 = np.floor(x).astype(int), np.floor(y).astype(int)
+            x1, y1 = np.minimum(x0 + 1, w - 1), np.minimum(y0 + 1, h - 1)
+            fx, fy = x - x0, y - y0
+            return (magnitude[y0, x0] * (1 - fx) * (1 - fy)
+                    + magnitude[y0, x1] * fx * (1 - fy)
+                    + magnitude[y1, x0] * (1 - fx) * fy
+                    + magnitude[y1, x1] * fx * fy)
+
+        forward = sample(xx + dx, yy + dy)
+        backward = sample(xx - dx, yy - dy)
+        keep = (magnitude > forward) & (magnitude >= backward)
+        return magnitude * keep
+
     def apply_filter(self, image):
         img = to_float(ensure_bgr(image))
-        gray = gaussian_blur(luminance(img), 1.0)    
+        scale = max(min(img.shape[:2]) / 1080.0, 0.35)
+        gray = gaussian_blur(luminance(img), max(1.0, 2.0 * scale))
         gx = convolve2d(gray, self.SOBEL_X)
         gy = convolve2d(gray, self.SOBEL_Y)
         mag = np.sqrt(gx ** 2 + gy ** 2)
-        mag = mag / (mag.max() + 1e-8)
-        edges = np.clip((mag - self.threshold) / (1 - self.threshold), 0, 1)
-        edges = np.sqrt(edges)                       
+        mag = mag / max(np.percentile(mag, 99), 1e-6)
+        mag = self._thin_edges(mag, gx, gy)
+        upper = min(1.5 * self.threshold, 1)
+        t = np.clip((mag - self.threshold) / (upper - self.threshold), 0, 1)
+        edges = t * t * (3 - 2 * t)
 
         if isinstance(self.color, str):            
             hue = (np.arctan2(gy, gx) + np.pi) / (2 * np.pi)
-            colored = hsv_to_bgr(hue, np.ones_like(hue), edges)
+            color = hsv_to_bgr(hue, np.ones_like(hue), np.ones_like(hue))
         else:
-            colored = edges[..., None] * self.color
+            color = self.color
 
-        glow = colored.copy()
-        for s in (self.glow / 2, self.glow, self.glow * 2):
-            glow += gaussian_blur(colored, s)
-        glow *= self.intensity / 2
-
-        out = img * self.background + glow
-        out = 1 - (1 - out).clip(0, 1) * (1 - colored)
+        halo = sum(weight * sigma * scale * gaussian_blur(edges, sigma * scale)
+                   for sigma, weight in self.HALO)
+        core = gaussian_blur(edges, max(0.4, 0.6 * scale))
+        light = (self.glow * halo[..., None] * color
+                 + 3.5 * core[..., None] * (0.85 + 0.15 * color))
+        light = 1 - np.exp(-self.intensity * light)
+        base = img * self.background
+        out = 1 - (1 - base) * (1 - light)
         return to_uint8(out)

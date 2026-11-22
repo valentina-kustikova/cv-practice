@@ -34,6 +34,7 @@ def cli_argument_parser():
     p = sub.add_parser("antique", help="фотоэффект «антиквариат» (сепия)")
     p.add_argument("--intensity", type=float, default=1.0, help="сила тонирования, [0, 1]")
     p.add_argument("--contrast", type=float, default=0.85, help="множитель контраста")
+    p.add_argument("--vignette", type=float, default=0.18, help="сила виньетки, [0, 1]")
 
     p = sub.add_parser("fade", help="выцветание цветов")
     p.add_argument("--strength", type=float, default=0.6, help="сила эффекта, [0, 1]")
@@ -59,11 +60,11 @@ def cli_argument_parser():
     p.add_argument("--seed", type=int, default=None)
 
     p = sub.add_parser("neon", help="неоновый эффект")
-    p.add_argument("--color", default="rainbow", help="'rainbow' или #RRGGBB")
-    p.add_argument("--threshold", type=float, default=0.15, help="порог контуров, [0, 1)")
-    p.add_argument("--glow", type=float, default=4.0, help="радиус свечения (sigma)")
-    p.add_argument("--intensity", type=float, default=1.5, help="яркость свечения")
-    p.add_argument("--background", type=float, default=0.15, help="яркость фона, [0, 1]")
+    p.add_argument("--color", default="#BF00FF", help="'rainbow' или #RRGGBB")
+    p.add_argument("--threshold", type=float, default=0.3, help="порог контуров, (0, 1)")
+    p.add_argument("--glow", type=float, default=1.0, help="сила цветного ореола")
+    p.add_argument("--intensity", type=float, default=1.0, help="яркость свечения")
+    p.add_argument("--background", type=float, default=0.7, help="яркость фона, [0, 1]")
 
     return parser
 
