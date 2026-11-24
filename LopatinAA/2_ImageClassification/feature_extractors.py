@@ -1,10 +1,12 @@
 
 from abc import ABC, abstractmethod
+import re
 
 import cv2
 import numpy as np
 import torch
 import torchvision
+from torchvision.models.feature_extraction import create_feature_extractor
 
 
 class FeatureExtractor(ABC):
@@ -22,20 +24,33 @@ class FeatureExtractor(ABC):
         return ["sift", "orb", "alexnet", "resnet101"]
 
     @staticmethod
-    def create(name, device="cpu"):
+    def resolve_layer(name, layer=None):
+        defaults = {"alexnet": "features.11", "resnet101": "layer3"}
+        if layer is None:
+            return defaults.get(name)
+        if name not in defaults:
+            raise ValueError("Выбор слоя доступен только для AlexNet и ResNet-101")
+        if not re.fullmatch(r"[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*", layer):
+            raise ValueError(f"Недопустимое имя слоя: {layer}")
+        return layer
+
+    @staticmethod
+    def create(name, device="cpu", layer=None):
         """
             name: sift, orb, alexnet или resnet101.
             device: cpu или cuda.
+            layer: имя слоя или узла карты признаков для CNN.
         """
         name = name.lower()
+        layer = FeatureExtractor.resolve_layer(name, layer)
         if name == "sift":
             return SiftExtractor()
         if name == "orb":
             return OrbExtractor()
         if name == "alexnet":
-            return AlexNetExtractor(device=device)
+            return AlexNetExtractor(device=device, layer=layer)
         if name == "resnet101":
-            return ResNet101Extractor(device=device)
+            return ResNet101Extractor(device=device, layer=layer)
         raise ValueError(f"Неизвестный метод извлечения признаков: {name}. "
                          f"Допустимые значения: {', '.join(FeatureExtractor.available_names())}")
 
@@ -110,14 +125,24 @@ class CnnExtractorBase(FeatureExtractor):
     IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
     IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
-    def __init__(self, device="cpu", input_size=224):
+    def __init__(self, device="cpu", input_size=224, *, layer=None):
         if device == "cuda" and not torch.cuda.is_available():
             raise RuntimeError("CUDA недоступна, используйте --device cpu")
         self.device = torch.device(device)
         self.input_size = input_size
-        self.model = self.build_model()
+        self.layer = FeatureExtractor.resolve_layer(self.name, layer)
+        backbone = self.build_model().eval()
+        self.model = create_feature_extractor(backbone, return_nodes={self.layer: "features"})
         self.model.to(self.device)
         self.model.eval()
+
+        # Проверка выхода выбранного слоя
+        with torch.inference_mode():
+            sample = torch.zeros((1, 3, input_size, input_size), device=self.device)
+            feature_map = self.model(sample)["features"]
+        if not isinstance(feature_map, torch.Tensor) or feature_map.ndim != 4:
+            raise ValueError(f"Слой {self.layer!r} должен возвращать карту N×C×H×W")
+        self.descriptor_size = feature_map.shape[1]
 
     @abstractmethod
     def build_model(self):
@@ -140,39 +165,27 @@ class CnnExtractorBase(FeatureExtractor):
         descriptors = descriptors.cpu().numpy().astype(np.float32)
 
         norms = np.linalg.norm(descriptors, axis=1, keepdims=True)
-        norms[norms == 0] = 1.0  # защита от деления на ноль для нулевых векторов
+        norms[norms == 0] = 1.0
         return descriptors / norms
 
     def detect_and_compute(self, image):
         tensor = self.preprocess(image)
         with torch.no_grad():
-            feature_map = self.model(tensor)
+            feature_map = self.model(tensor)["features"]
         return self.postprocess(feature_map)
 
 
 class AlexNetExtractor(CnnExtractorBase):
-    descriptor_size = 256
+    name = "alexnet"
 
     def build_model(self):
         weights = torchvision.models.AlexNet_Weights.IMAGENET1K_V1
-        alexnet = torchvision.models.alexnet(weights=weights)
-        # alexnet.features: [conv1, relu, pool, conv2, relu, pool,
-        #                    conv3, relu, conv4, relu, conv5, relu, pool]
-        return alexnet.features[:12]
+        return torchvision.models.alexnet(weights=weights)
 
 
 class ResNet101Extractor(CnnExtractorBase):
-    descriptor_size = 1024
+    name = "resnet101"
 
     def build_model(self):
         weights = torchvision.models.ResNet101_Weights.IMAGENET1K_V2
-        resnet = torchvision.models.resnet101(weights=weights)
-        return torch.nn.Sequential(
-            resnet.conv1,
-            resnet.bn1,
-            resnet.relu,
-            resnet.maxpool,
-            resnet.layer1,
-            resnet.layer2,
-            resnet.layer3,
-        )
+        return torchvision.models.resnet101(weights=weights)

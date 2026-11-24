@@ -11,10 +11,12 @@ RANDOM_SEED = 42
 
 class BagOfWords:
 
-    def __init__(self, extractor_name, class_names, vocab_size=300, max_descriptors=150000):
+    def __init__(self, extractor_name, class_names, vocab_size=300,
+                 max_descriptors=150000, *, layer=None):
         if vocab_size < 2:
             raise ValueError("Размер словаря должен быть не меньше 2")
         self.extractor_name = extractor_name
+        self.layer = layer
         self.class_names = list(class_names)
         self.vocab_size = vocab_size
         self.max_descriptors = max_descriptors
@@ -119,6 +121,7 @@ class BagOfWords:
         self._check_trained()
         data = {
             "extractor_name": self.extractor_name,
+            "layer": self.layer,
             "class_names": self.class_names,
             "vocab_size": self.vocab_size,
             "max_descriptors": self.max_descriptors,
@@ -138,6 +141,7 @@ class BagOfWords:
             raise ValueError("Файл модели должен содержать случайный лес")
         model = BagOfWords(
             extractor_name=data["extractor_name"],
+            layer=data.get("layer"),
             class_names=data["class_names"],
             vocab_size=data["vocab_size"],
             max_descriptors=data["max_descriptors"],

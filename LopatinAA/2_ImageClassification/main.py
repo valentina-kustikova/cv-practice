@@ -34,6 +34,8 @@ def cli_argument_parser():
     parser.add_argument("--extractor", "-e", default="sift",
                         choices=FeatureExtractor.available_names(),
                         help="Метод извлечения признаков (train)")
+    parser.add_argument("--layer",
+                        help="Узел CNN, например features.7 для AlexNet или layer2 для ResNet-101")
     parser.add_argument("--vocab-size", "-k", type=int, default=300,
                         help="Размер словаря визуальных слов (train)")
     parser.add_argument("--max-descriptors", type=int, default=150000,
@@ -44,7 +46,7 @@ def cli_argument_parser():
                         choices=list(LandmarksDataLoader.SOURCES),
                         help="Используемые части набора данных (train, test)")
     parser.add_argument("--model-path", "-p", default=None,
-                        help="Файл модели; по умолчанию models/<extractor>_rf_k<K>.pkl")
+                        help="Файл модели; по умолчанию вычисляется по экстрактору, слою и K")
     parser.add_argument("--image", "-i", default=None,
                         help="Путь к изображению (predict)")
     parser.add_argument("--output-dir", "-o", default=os.path.join(SCRIPT_DIR, "results"),
@@ -60,8 +62,17 @@ def cli_argument_parser():
     return parser.parse_args()
 
 
+def extractor_tag(name, layer):
+    """Имя экстрактора для модели и кэша с учетом нестандартного слоя."""
+    resolved = FeatureExtractor.resolve_layer(name, layer)
+    if resolved == FeatureExtractor.resolve_layer(name):
+        return name
+    return f"{name}__{resolved}"
+
+
 def default_model_path(args):
-    file_name = f"{args.extractor}_rf_k{args.vocab_size}.pkl"
+    tag = extractor_tag(args.extractor, args.layer)
+    file_name = f"{tag}_rf_k{args.vocab_size}.pkl"
     return os.path.join(SCRIPT_DIR, "models", file_name)
 
 # ---------------------------------------------------------------------------
@@ -86,13 +97,14 @@ def extract_descriptors_for_dataset(extractor, paths):
     return descriptor_list
 
 
-def load_or_extract_descriptors(args, extractor_name, split, paths, device):
+def load_or_extract_descriptors(args, extractor_name, split, paths, device, *, layer=None):
     """Кэширование дескрипторов."""
     cache_path = None
     if args.cache_dir is not None:
         os.makedirs(args.cache_dir, exist_ok=True)
         sources_tag = "_".join(sorted(args.sources))
-        cache_path = os.path.join(args.cache_dir, f"{extractor_name}_{split}_{sources_tag}.joblib")
+        tag = extractor_tag(extractor_name, layer)
+        cache_path = os.path.join(args.cache_dir, f"{tag}_{split}_{sources_tag}.joblib")
         if os.path.isfile(cache_path):
             cached = joblib.load(cache_path)
             if cached["paths"] == paths:
@@ -101,7 +113,7 @@ def load_or_extract_descriptors(args, extractor_name, split, paths, device):
             logger.warning("Кэш %s не соответствует набору изображений, пересчет", cache_path)
 
     logger.info("Создание экстрактора признаков: %s", extractor_name)
-    extractor = FeatureExtractor.create(extractor_name, device=device)
+    extractor = FeatureExtractor.create(extractor_name, device=device, layer=layer)
     descriptor_list = extract_descriptors_for_dataset(extractor, paths)
 
     if cache_path is not None:
@@ -151,11 +163,12 @@ def run_train(args):
     logger.info("Тренировочная выборка: %d изображений, %d классов",
                 len(paths), len(loader.class_names))
 
+    layer = FeatureExtractor.resolve_layer(args.extractor, args.layer)
     descriptor_list = load_or_extract_descriptors(args, args.extractor, "trainval",
-                                                  paths, args.device)
+                                                  paths, args.device, layer=layer)
 
     model = BagOfWords(args.extractor, loader.class_names, args.vocab_size,
-                       max_descriptors=args.max_descriptors)
+                       max_descriptors=args.max_descriptors, layer=layer)
 
     logger.info("Построение словаря (K-средних, K = %d)", args.vocab_size)
     start_time = time.time()
@@ -183,8 +196,11 @@ def load_trained_model(args):
         raise FileNotFoundError(f"Файл модели не найден: {model_path}. "
                                 f"Сначала обучите модель в режиме train")
     model = BagOfWords.load_model(model_path)
-    logger.info("Загружена модель %s (экстрактор %s, K = %d)",
-                model_path, model.extractor_name, model.vocab_size)
+    layer = FeatureExtractor.resolve_layer(model.extractor_name, model.layer)
+    if args.layer is not None and args.layer != layer:
+        raise ValueError(f"Слой {args.layer!r} не совпадает со слоем модели {layer!r}")
+    logger.info("Загружена модель %s (экстрактор %s, слой %s, K = %d)",
+                model_path, model.extractor_name, layer or "—", model.vocab_size)
     return model, model_path
 
 
@@ -198,7 +214,7 @@ def run_test(args):
     logger.info("Тестовая выборка: %d изображений", len(paths))
 
     descriptor_list = load_or_extract_descriptors(args, model.extractor_name, "test",
-                                                  paths, args.device)
+                                                  paths, args.device, layer=model.layer)
     histograms = model.compute_histograms(descriptor_list)
 
     scores = model.predict_scores(histograms)
@@ -233,7 +249,7 @@ def run_predict(args):
     image = read_image(args.image)
 
     model, model_path = load_trained_model(args)
-    extractor = FeatureExtractor.create(model.extractor_name, device=args.device)
+    extractor = FeatureExtractor.create(model.extractor_name, device=args.device, layer=model.layer)
     descriptors = extractor.detect_and_compute(image)
     logger.info("Найдено дескрипторов: %d", len(descriptors))
     if len(descriptors) == 0:
