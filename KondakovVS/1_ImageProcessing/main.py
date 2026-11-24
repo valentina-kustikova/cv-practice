@@ -60,7 +60,7 @@ def cli_argument_parser():
     p.add_argument("--seed", type=int, default=None)
 
     p = sub.add_parser("neon", help="неоновый эффект")
-    p.add_argument("--color", default="#BF00FF", help="'rainbow' или #RRGGBB")
+    p.add_argument("--color", default="#BF00FF", help="цвет свечения #RRGGBB")
     p.add_argument("--threshold", type=float, default=0.3, help="порог контуров, (0, 1)")
     p.add_argument("--glow", type=float, default=1.0, help="сила цветного ореола")
     p.add_argument("--intensity", type=float, default=1.0, help="яркость свечения")
