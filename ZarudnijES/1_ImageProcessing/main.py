@@ -26,6 +26,7 @@ def cli_argument_parser():
     parser.add_argument('--brightness', type=int, default=60, help='Яркость для fade')
 
     parser.add_argument('--margin', type=float, default=0.1, help='Размер рамки')
+    parser.add_argument('--blur_radius', type=float, default=0.15, help='Степень размытости рамки')
 
     parser.add_argument('--noise_level', type=int, default=20, help='Интенсивность шума')
     parser.add_argument('--scratches_count', type=int, default=15, help='Количество царапин')
@@ -63,6 +64,7 @@ def main():
             contrast = args.contrast,
             brightness = args.brightness,
             margin = args.margin,
+            blur_radius = args.blur_radius,
             noise_level = args.noise_level,
             scratches_count = args.scratches_count,
             thickness=args.thickness,
