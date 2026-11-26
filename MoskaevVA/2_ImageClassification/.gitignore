@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.joblib
+*.pkl
+logs/
+outputs/
+DATASET/
+src/__pycache__/
